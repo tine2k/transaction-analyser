@@ -1,10 +1,6 @@
-# Transaction Domain Model Specification
+# Spec Delta
 
-## Purpose
-
-Defines the core domain vocabulary of the transaction analyser: the `Transaction` aggregate, the fields it carries, how money direction is expressed, and the shape of the counterparty. This capability is the contract that any later persistence, import, or analysis work must conform to.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Transaction aggregate
 
@@ -42,49 +38,6 @@ The seven data elements of a `Transaction` are:
 - **WHEN** a transaction is observed, retrieved, or otherwise handled
 - **THEN** it is handled as a single indivisible unit whose booking date, value date, amount, purpose line, counterparty, and category are read together as one thing, and are never split apart into separate representations of the same transaction
 
-### Requirement: Dates are separate and day-precise
-
-The system SHALL hold the booking date and the value date as two distinct elements of a `Transaction`, each carrying a calendar date at day precision. The system SHALL NOT collapse the booking date and the value date into a single date, and SHALL NOT record a time of day for either.
-
-#### Scenario: Both dates are held independently
-
-- **WHEN** a transaction is described with a booking date of 2026-03-02 and a value date of 2026-03-01
-- **THEN** the transaction exposes the booking date as 2026-03-02 and the value date as 2026-03-01, and the two are reported as separate values
-
-#### Scenario: Booking date and value date may be equal
-
-- **WHEN** a transaction is described where the booking date and the value date are the same day
-- **THEN** both dates are recorded as that same day and the transaction is still well-formed
-
-#### Scenario: Dates carry no time component
-
-- **WHEN** a transaction's booking date or value date is recorded
-- **THEN** only a calendar date is held, and no time of day is available on either date
-
-### Requirement: Amount is a signed EUR value
-
-The system SHALL hold the transaction amount as a single signed decimal value denominated in EUR, and SHALL use the sign to express the direction of the money movement. A positive amount SHALL mean money came in to the account holder; a negative amount SHALL mean money went out. The system SHALL NOT require or expose a separate direction, type, or flag to state which way the money moved.
-
-#### Scenario: Incoming transaction is positive
-
-- **WHEN** a transaction is described with an amount of 250.00 EUR
-- **THEN** the transaction reads as 250.00 EUR of money coming in, with no additional direction field set
-
-#### Scenario: Outgoing transaction is negative
-
-- **WHEN** a transaction is described with an amount of -42.75 EUR
-- **THEN** the transaction reads as 42.75 EUR of money going out, with no additional direction field set
-
-#### Scenario: Direction is readable from the amount alone
-
-- **WHEN** the direction of a transaction's money movement is needed
-- **THEN** it is determined from the sign of the amount alone, and the same conclusion cannot be contradicted by any other part of the transaction
-
-#### Scenario: Amount is denominated in EUR
-
-- **WHEN** an amount is held on a transaction
-- **THEN** it is an amount in EUR, and amounts in other currencies are not representable on a transaction
-
 ### Requirement: Purpose line is free text
 
 The system SHALL hold the purpose line as free text exactly as it is given, and SHALL NOT impose a structure, vocabulary, or interpretation on it. The system SHALL NOT parse the purpose line into fields, and SHALL NOT derive any value from it other than the result of matching a category's regular expression against it. Matching a category's regular expression against the purpose line SHALL NOT alter, reformat, or replace the text, and SHALL NOT require the text to conform to any shape.
@@ -109,24 +62,7 @@ The system SHALL hold the purpose line as free text exactly as it is given, and 
 - **WHEN** a purpose line is matched by no category's regular expression
 - **THEN** the purpose line is held and reported unchanged, and the transaction remains well-formed and uncategorised
 
-### Requirement: Counterparty is name plus optional account
-
-The system SHALL hold the counterparty as a name together with an account identifier expressed as a single IBAN string, and SHALL hold that account identifier as optional rather than required. The system SHALL NOT model the counterparty as a separate aggregate or entity that transactions refer to, and SHALL NOT require a counterparty to be looked up elsewhere.
-
-#### Scenario: Counterparty with an account
-
-- **WHEN** a transaction is described with the counterparty name "ACME GmbH" and counterparty account "DE89370400440532013000"
-- **THEN** the transaction holds the name "ACME GmbH" and the single IBAN "DE89370400440532013000" as the counterparty's account
-
-#### Scenario: Counterparty name only
-
-- **WHEN** a transaction is described with the counterparty name "Cash withdrawal" and no counterparty account
-- **THEN** the transaction holds the counterparty name and reports the counterparty account as absent
-
-#### Scenario: Counterparty is held on the transaction itself
-
-- **WHEN** the counterparty of a transaction is needed
-- **THEN** it is read from that transaction directly, and reading it requires no counterparty aggregate, lookup, or registry to exist
+## ADDED Requirements
 
 ### Requirement: A category is a name and a regular expression over the purpose line
 
@@ -184,4 +120,3 @@ A transaction SHALL hold at most one category: assigning a category to a transac
 
 - **WHEN** the regular expressions of two different categories both match a single purpose line
 - **THEN** the model defines no resulting category, and no outcome is implied by the mere existence of both categories
-

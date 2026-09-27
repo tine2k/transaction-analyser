@@ -1,10 +1,6 @@
-# Transaction Postgres Schema Specification
+# Spec Delta
 
-## Purpose
-
-Defines how the `Transaction` domain model is represented in a PostgreSQL database: the table and column shape, the column types and nullability that preserve the domain's guarantees, the key strategy, and the boundary between structural constraints and deferred business validation.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: One row per transaction, held in a single table
 
@@ -38,87 +34,6 @@ The `id` column is a storage concern only; it is not a domain element, and the s
 - **WHEN** a stored transaction is read
 - **THEN** the booking date, value date, amount, purpose, counterparty name, counterparty account, and category reference are read from that one row as a single unit, and are never split across rows; the category's name and regular expression are the one value not held on the row and are obtained by following the reference to the single `categories` row it names
 
-### Requirement: Column types preserve the domain's type guarantees
-
-The system SHALL use PostgreSQL column types that cannot represent a value the domain model declares unrepresentable. The two dates SHALL use the `date` type, so that no time of day is storable. The amount SHALL use an exact decimal numeric type, so that no value is lost to binary floating-point rounding. The purpose, counterparty name, and counterparty account SHALL use a text type, so that no length limit or structure is imposed on them. The table SHALL NOT contain a currency column, and SHALL NOT contain a separate direction, type, or flag column.
-
-#### Scenario: Dates cannot hold a time of day
-
-- **WHEN** a booking date or value date is written to `transactions`
-- **THEN** the value is stored at day precision, and the schema offers no column in which a time of day could be held
-
-#### Scenario: The amount keeps its exact value
-
-- **WHEN** an amount with a fractional part, such as -42.75, is written to `amount`
-- **THEN** the stored value reads back as exactly -42.75, with no floating-point approximation
-
-#### Scenario: Free text is not length-limited or structured
-
-- **WHEN** a long or irregular purpose, counterparty name, or counterparty account is written
-- **THEN** the full text is stored as given, and the schema imposes no maximum length and no internal structure on it
-
-#### Scenario: No currency is expressible
-
-- **WHEN** a row of `transactions` is inspected
-- **THEN** the row carries no column in which a currency other than EUR could be recorded, consistent with the domain model's rule that the amount is denominated in EUR
-
-### Requirement: Required elements are rejected when absent
-
-The system SHALL reject a write that omits any of the five required elements — booking date, value date, amount, purpose, counterparty name — and SHALL accept a row with no counterparty account. The table SHALL reject a row whose amount is zero.
-
-#### Scenario: A row missing a required element is rejected
-
-- **WHEN** a write omits the value date, the amount, the purpose, or the counterparty name
-- **THEN** the database rejects the write and no row is created
-
-#### Scenario: A missing counterparty account is accepted
-
-- **WHEN** a cash withdrawal is stored with a counterparty name and no counterparty account
-- **THEN** the row is accepted and the counterparty account reads as absent rather than as an empty identifier
-
-#### Scenario: A zero amount is rejected
-
-- **WHEN** a write sets the amount to 0.00
-- **THEN** the database rejects the write, because a zero amount carries no direction and therefore cannot express the domain's signed-amount convention
-
-#### Scenario: Presence is not emptiness
-
-- **WHEN** a row is written with a purpose that is the empty string
-- **THEN** the write is accepted, since a required element means the value is present, not that it is non-empty
-
-### Requirement: Money direction is the stored sign alone
-
-The system SHALL store the amount's sign exactly as given, so that a positive amount reads as money in and a negative amount as money out. The system SHALL NOT derive, store, or allow a second column to state the direction, and SHALL NOT permit the stored sign to be contradicted by any other part of the row.
-
-#### Scenario: Incoming and outgoing amounts keep their sign
-
-- **WHEN** an amount of 250.00 EUR is stored and an amount of -42.75 EUR is stored
-- **THEN** the first row reads as money in and the second as money out, determined from the stored sign alone
-
-#### Scenario: There is no second source of direction
-
-- **WHEN** the direction of a stored transaction is needed
-- **THEN** it is read from the sign of `amount`, and the row offers no other column that could state a conflicting direction
-
-### Requirement: Every stored transaction has a stable identity
-
-The system SHALL give each row of `transactions` a surrogate identity that the database generates and maintains, and SHALL use it as the row's primary key. The system SHALL NOT require the seven domain elements to be unique, and SHALL NOT add a natural-key unique constraint over them.
-
-#### Scenario: Rows are distinguishable without a domain key
-
-- **WHEN** two transactions are stored that share the same booking date, value date, amount, purpose, and counterparty
-- **THEN** both rows are stored successfully and each is addressable by its own distinct surrogate identity
-
-#### Scenario: The identity is generated by the database
-
-- **WHEN** a row is inserted without supplying an identity
-- **THEN** the database assigns the identity, and the row's primary key cannot be left empty
-
-#### Scenario: The identity is not a domain element
-
-- **WHEN** a stored transaction is mapped back to the domain model
-- **THEN** the surrogate identity is storage metadata and does not appear as an eighth domain data element
-
 ### Requirement: The schema carries no business validation
 
 The system SHALL express only structural guarantees in the schema: column types, presence, the primary key, and referential integrity between `transactions` and `categories`. The system SHALL NOT add a constraint that validates IBAN format or checksum, SHALL NOT add a constraint relating the value date to the booking date, and SHALL NOT add a constraint on the length or content of free text. The system SHALL NOT add a constraint that a category's regular expression is well-formed, that it is non-empty, or that it is capable of matching any purpose line, and SHALL NOT add a column that orders or ranks categories. If a business rule is later decided, it SHALL arrive as its own change rather than being folded into this one.
@@ -147,6 +62,27 @@ The system SHALL express only structural guarantees in the schema: column types,
 
 - **WHEN** the schema is read in full
 - **THEN** it consists of exactly two tables, `transactions` and `categories`; `transactions` with its eight columns, its primary key, and its one foreign key to `categories`; and `categories` with its three columns and its primary key; and it contains no further table, column, constraint, trigger, function, or derived value
+
+### Requirement: Every stored transaction has a stable identity
+
+The system SHALL give each row of `transactions` a surrogate identity that the database generates and maintains, and SHALL use it as the row's primary key. The system SHALL NOT require the seven domain elements to be unique, and SHALL NOT add a natural-key unique constraint over them.
+
+#### Scenario: Rows are distinguishable without a domain key
+
+- **WHEN** two transactions are stored that share the same booking date, value date, amount, purpose, and counterparty
+- **THEN** both rows are stored successfully and each is addressable by its own distinct surrogate identity
+
+#### Scenario: The identity is generated by the database
+
+- **WHEN** a row is inserted without supplying an identity
+- **THEN** the database assigns the identity, and the row's primary key cannot be left empty
+
+#### Scenario: The identity is not a domain element
+
+- **WHEN** a stored transaction is mapped back to the domain model
+- **THEN** the surrogate identity is storage metadata and does not appear as an eighth domain data element
+
+## ADDED Requirements
 
 ### Requirement: One row per category, held in a single table
 
@@ -227,4 +163,3 @@ The system SHALL be extended additively: a new `categories` table and a new null
 
 - **WHEN** the extension is applied
 - **THEN** no existing column is renamed, retyped, or made more or less nullable, no existing row is deleted or altered, and no data is backfilled
-

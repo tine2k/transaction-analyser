@@ -1,0 +1,5 @@
+# The import source is a statement the user holds outside the repository.
+# Never commit one, wherever it is dropped.
+*.csv
+
+node_modules/

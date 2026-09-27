@@ -1,0 +1,17 @@
+{
+  "name": "transaction-analyser",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Imports transactions from a bank export CSV into the transactions table.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "import": "node tools/import-transactions.ts"
+  },
+  "dependencies": {
+    "csv-parse": "^7.0.3",
+    "pg": "^8.23.0"
+  }
+}

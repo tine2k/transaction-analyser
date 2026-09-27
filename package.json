@@ -13,13 +13,16 @@
     "dev:docker": "DATABASE_URL=postgres://analyser:analyser@localhost:5433/transaction_analyser nuxt dev --port 4000",
     "import": "node tools/import-transactions.ts",
     "postinstall": "nuxt prepare",
-    "preview": "nuxt preview"
+    "preview": "nuxt preview",
+    "test:category-match-count": "node --loader ./tests/resolve-typescript-imports.mjs --test tests/category-match-count.integration.test.ts",
+    "test:category-match-count:ui": "playwright test --config tests/playwright.config.ts"
   },
   "dependencies": {
     "csv-parse": "^7.0.3",
     "pg": "^8.23.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.3.3",
     "nuxt": "^4.5.2",
     "tailwindcss": "^4.3.3"

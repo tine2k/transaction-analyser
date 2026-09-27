@@ -23,6 +23,10 @@ const editingId = ref<string | null>(null);
 const saving = ref(false);
 const formError = ref<string | null>(null);
 const listError = ref<string | null>(null);
+const matchCount = ref<number | null>(null);
+const matchCountState = ref<'empty' | 'loading' | 'ready' | 'unavailable'>('empty');
+let previewGeneration = 0;
+let previewTimer: ReturnType<typeof setTimeout> | null = null;
 
 function messageOf(failure: unknown): string {
   const message = (failure as { data?: { message?: unknown } }).data?.message;
@@ -60,6 +64,58 @@ function removePattern(index: number): void {
 function enteredPatterns(): string[] {
   return patterns.value.filter((pattern) => pattern !== '');
 }
+
+async function loadMatchCount(generation: number, submitted: string[]): Promise<void> {
+  try {
+    const result = await $fetch<{ count: number }>('/api/categories/match-count', {
+      method: 'POST',
+      body: { patterns: submitted },
+    });
+    if (generation !== previewGeneration) {
+      return;
+    }
+    if (!Number.isSafeInteger(result.count) || result.count < 0) {
+      matchCount.value = null;
+      matchCountState.value = 'unavailable';
+      return;
+    }
+    matchCount.value = result.count;
+    matchCountState.value = 'ready';
+  } catch {
+    if (generation === previewGeneration) {
+      matchCount.value = null;
+      matchCountState.value = 'unavailable';
+    }
+  }
+}
+
+watch(patterns, (currentPatterns) => {
+  const generation = ++previewGeneration;
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer);
+    previewTimer = null;
+  }
+
+  const submitted = currentPatterns.filter((pattern) => pattern !== '');
+  matchCount.value = null;
+  if (submitted.length === 0) {
+    matchCountState.value = 'empty';
+    return;
+  }
+
+  matchCountState.value = 'loading';
+  previewTimer = setTimeout(() => {
+    previewTimer = null;
+    void loadMatchCount(generation, [...submitted]);
+  }, 250);
+}, { deep: true, flush: 'sync' });
+
+onBeforeUnmount(() => {
+  previewGeneration += 1;
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer);
+  }
+});
 
 async function submit(): Promise<void> {
   formError.value = null;
@@ -158,6 +214,21 @@ async function remove(category: Category): Promise<void> {
           Add expression
         </button>
       </fieldset>
+
+      <p class="mt-3 text-sm text-slate-600" role="status" aria-live="polite">
+        <template v-if="matchCountState === 'empty'">
+          Enter an expression to preview matching transactions.
+        </template>
+        <template v-else-if="matchCountState === 'loading'">
+          Checking matching transactions…
+        </template>
+        <template v-else-if="matchCountState === 'ready'">
+          Matches {{ matchCount }} stored transaction{{ matchCount === 1 ? '' : 's' }}.
+        </template>
+        <template v-else>
+          Match count unavailable. You can still save this category.
+        </template>
+      </p>
 
       <p v-if="formError" class="mt-3 text-sm text-red-700">{{ formError }}</p>
 

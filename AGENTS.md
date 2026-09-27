@@ -11,6 +11,12 @@
 - Keep explanations proportional to the complexity of the change.
 - Use headless Chromium for browser-based tests and verifications; do not depend on a connected desktop browser.
 
+## Database Tests
+
+- For PostgreSQL-backed tests, create a disposable PostgreSQL database in Docker and seed it only with test fixtures. Do not use the project's configured database or real transaction data.
+- Give the container a unique test-specific name, bind its port to loopback only, and use no persistent volume. Pass its connection string through `TEST_DATABASE_URL`.
+- Remove the container after the test run, including when tests fail. Keep test setup and teardown repeatable so the database can be recreated on demand.
+
 ## File Access
 
 **Never look for, search for, list, or read files outside the project directory. This is mandatory and has no exceptions you may apply on your own initiative.**

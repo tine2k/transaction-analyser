@@ -55,6 +55,18 @@ const UPDATE_CATEGORY = `
 
 const DELETE_CATEGORY = 'DELETE FROM categories WHERE id = $1';
 
+// The preview counts each transaction once, even if multiple candidate
+// expressions match its purpose. Stored categories and assignments are ignored.
+const COUNT_MATCHING_TRANSACTIONS = `
+  SELECT count(*)::text AS count
+  FROM transactions AS t
+  WHERE EXISTS (
+    SELECT 1
+    FROM unnest($1::text[]) AS candidate(pattern)
+    WHERE t.purpose ~* candidate.pattern
+  )
+`;
+
 // The global recompute. A category matches when at least one of its expressions
 // matches the purpose line, so the scalar subquery tests existence across the
 // category's expressions with `unnest`; it is null when no category matches, and
@@ -106,6 +118,19 @@ export async function listCategories(): Promise<Category[]> {
   const database = useDatabase();
   const result = await database.query(SELECT_CATEGORIES);
   return result.rows as Category[];
+}
+
+export async function countCategoryMatches(input: unknown): Promise<number> {
+  const patterns = readPatterns(input);
+  const database = useDatabase();
+  await assertPatternsCompile(database, patterns);
+
+  const result = await database.query(COUNT_MATCHING_TRANSACTIONS, [patterns]);
+  const count = Number(result.rows[0]?.count);
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error('the transaction match count is outside the supported range');
+  }
+  return count;
 }
 
 export async function createCategory(input: unknown): Promise<Category> {
@@ -199,17 +224,24 @@ function readCategoryInput(input: unknown): { name: string; patterns: string[] }
     throw new CategoryError(400, 'a category needs a name and one or more patterns');
   }
   const name = (input as { name?: unknown }).name;
-  const patterns = (input as { patterns?: unknown }).patterns;
   if (typeof name !== 'string' || name.trim() === '') {
     throw new CategoryError(400, 'a category needs a non-empty name');
   }
+  return { name, patterns: readPatterns(input) };
+}
+
+function readPatterns(input: unknown): string[] {
+  if (typeof input !== 'object' || input === null) {
+    throw new CategoryError(400, 'a category needs a name and one or more patterns');
+  }
+  const patterns = (input as { patterns?: unknown }).patterns;
   if (!Array.isArray(patterns) || patterns.length === 0) {
     throw new CategoryError(400, 'a category needs at least one pattern');
   }
   if (patterns.some((pattern) => typeof pattern !== 'string')) {
     throw new CategoryError(400, 'every pattern must be a string');
   }
-  return { name, patterns: patterns as string[] };
+  return patterns as string[];
 }
 
 function assertIdentity(id: string): void {

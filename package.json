@@ -10,6 +10,7 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
+    "dev:docker": "nuxt dev --port 4000",
     "import": "node tools/import-transactions.ts",
     "postinstall": "nuxt prepare",
     "preview": "nuxt preview"

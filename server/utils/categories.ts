@@ -1,25 +1,26 @@
 // Category management and assignment.
 //
 // Categories are listed, created, edited, and deleted here, and every change to the
-// category set re-evaluates the transactions it can affect. The matching rule is
-// the database's case-insensitive match operator `~*`, which matches a part of the
-// purpose line rather than anchoring to the whole of it; the winning category is the
-// matching one with the smallest identity. Validation compiles a candidate pattern
-// by probing the same operator, so the engine that validates is the engine that
-// evaluates.
+// category set re-evaluates the transactions it can affect. A category holds one or
+// more regular expressions, and matches a purpose line when any one of them matches;
+// the matching rule is the database's case-insensitive match operator `~*`, applied
+// to each expression and matching a part of the purpose line rather than anchoring to
+// the whole of it. The winning category is the matching one with the smallest
+// identity. Validation compiles every candidate expression by probing the same
+// operator, so the engine that validates is the engine that evaluates.
 //
 // Each mutation and the re-evaluation it triggers run inside one transaction on a
 // connection taken from the shared pool, so stored references are never observed
 // half-changed.
 //
-// See openspec/changes/add-category-management/specs/category-management-api/spec.md
-// and openspec/changes/add-category-management/specs/category-assignment/spec.md
+// See openspec/changes/allow-multiple-category-expressions/specs/category-management-api/spec.md
+// and openspec/changes/allow-multiple-category-expressions/specs/category-assignment/spec.md
 import type { Pool, PoolClient } from 'pg';
 import { useDatabase } from './db';
 
 // A category as the management surface returns it: the identity rendered as a
-// string, and the two domain elements.
-export type Category = { id: string; name: string; pattern: string };
+// string, and the two domain elements — the name and every regular expression.
+export type Category = { id: string; name: string; patterns: string[] };
 
 // A create or an edit request that the surface refused, carrying the status the
 // caller should answer with. It is thrown so a handler can map it in one place.
@@ -34,27 +35,29 @@ export class CategoryError extends Error {
 }
 
 const SELECT_CATEGORIES = `
-  SELECT id, name, pattern
+  SELECT id, name, patterns
   FROM categories
   ORDER BY id
 `;
 
 const INSERT_CATEGORY = `
-  INSERT INTO categories (name, pattern)
+  INSERT INTO categories (name, patterns)
   VALUES ($1, $2)
-  RETURNING id, name, pattern
+  RETURNING id, name, patterns
 `;
 
 const UPDATE_CATEGORY = `
   UPDATE categories
-  SET name = $2, pattern = $3
+  SET name = $2, patterns = $3
   WHERE id = $1
-  RETURNING id, name, pattern
+  RETURNING id, name, patterns
 `;
 
 const DELETE_CATEGORY = 'DELETE FROM categories WHERE id = $1';
 
-// The global recompute. The scalar subquery is null when no category matches, and
+// The global recompute. A category matches when at least one of its expressions
+// matches the purpose line, so the scalar subquery tests existence across the
+// category's expressions with `unnest`; it is null when no category matches, and
 // `ORDER BY c.id LIMIT 1` makes the smallest matching identity win. It is run after
 // a create or an edit and is idempotent.
 const RECOMPUTE_ASSIGNMENTS = `
@@ -62,7 +65,11 @@ const RECOMPUTE_ASSIGNMENTS = `
   SET category_id = (
     SELECT c.id
     FROM categories AS c
-    WHERE t.purpose ~* c.pattern
+    WHERE EXISTS (
+      SELECT 1
+      FROM unnest(c.patterns) AS expression
+      WHERE t.purpose ~* expression
+    )
     ORDER BY c.id
     LIMIT 1
   )
@@ -77,15 +84,20 @@ const REASSIGN_RETIRING_CATEGORY = `
   SET category_id = (
     SELECT c.id
     FROM categories AS c
-    WHERE c.id <> $1 AND purpose ~* c.pattern
+    WHERE c.id <> $1 AND EXISTS (
+      SELECT 1
+      FROM unnest(c.patterns) AS expression
+      WHERE purpose ~* expression
+    )
     ORDER BY c.id
     LIMIT 1
   )
   WHERE category_id = $1
 `;
 
-// Compiles a candidate pattern, and matches nothing meaningful: the empty string is
-// only there to give the operator an input. An uncompilable pattern raises 2201B.
+// Compiles a candidate expression, and matches nothing meaningful: the empty string
+// is only there to give the operator an input. An uncompilable expression raises
+// 2201B.
 const COMPILE_PATTERN = "SELECT '' ~* $1 AS ok";
 
 const IDENTITY = /^[0-9]+$/;
@@ -97,12 +109,12 @@ export async function listCategories(): Promise<Category[]> {
 }
 
 export async function createCategory(input: unknown): Promise<Category> {
-  const { name, pattern } = readCategoryInput(input);
+  const { name, patterns } = readCategoryInput(input);
   const database = useDatabase();
-  await assertPatternCompiles(database, pattern);
+  await assertPatternsCompile(database, patterns);
 
   return inTransaction(database, async (client) => {
-    const inserted = await client.query(INSERT_CATEGORY, [name, pattern]);
+    const inserted = await client.query(INSERT_CATEGORY, [name, patterns]);
     await client.query(RECOMPUTE_ASSIGNMENTS);
     return inserted.rows[0] as Category;
   });
@@ -110,12 +122,12 @@ export async function createCategory(input: unknown): Promise<Category> {
 
 export async function editCategory(id: string, input: unknown): Promise<Category> {
   assertIdentity(id);
-  const { name, pattern } = readCategoryInput(input);
+  const { name, patterns } = readCategoryInput(input);
   const database = useDatabase();
-  await assertPatternCompiles(database, pattern);
+  await assertPatternsCompile(database, patterns);
 
   return inTransaction(database, async (client) => {
-    const updated = await client.query(UPDATE_CATEGORY, [id, name, pattern]);
+    const updated = await client.query(UPDATE_CATEGORY, [id, name, patterns]);
     if (updated.rowCount === 0) {
       throw new CategoryError(404, 'no category carries that identity');
     }
@@ -182,19 +194,22 @@ async function inTransaction<T>(
   }
 }
 
-function readCategoryInput(input: unknown): { name: string; pattern: string } {
+function readCategoryInput(input: unknown): { name: string; patterns: string[] } {
   if (typeof input !== 'object' || input === null) {
-    throw new CategoryError(400, 'a category needs a name and a pattern');
+    throw new CategoryError(400, 'a category needs a name and one or more patterns');
   }
   const name = (input as { name?: unknown }).name;
-  const pattern = (input as { pattern?: unknown }).pattern;
+  const patterns = (input as { patterns?: unknown }).patterns;
   if (typeof name !== 'string' || name.trim() === '') {
     throw new CategoryError(400, 'a category needs a non-empty name');
   }
-  if (typeof pattern !== 'string') {
-    throw new CategoryError(400, 'a category needs a pattern');
+  if (!Array.isArray(patterns) || patterns.length === 0) {
+    throw new CategoryError(400, 'a category needs at least one pattern');
   }
-  return { name, pattern };
+  if (patterns.some((pattern) => typeof pattern !== 'string')) {
+    throw new CategoryError(400, 'every pattern must be a string');
+  }
+  return { name, patterns: patterns as string[] };
 }
 
 function assertIdentity(id: string): void {
@@ -203,16 +218,20 @@ function assertIdentity(id: string): void {
   }
 }
 
-async function assertPatternCompiles(database: Pool, pattern: string): Promise<void> {
-  try {
-    await database.query(COMPILE_PATTERN, [pattern]);
-  } catch (error) {
-    // 2201B is Postgres' invalid-regular-expression SQLSTATE. A different failure,
-    // such as an unreachable database, is rethrown so it is reported as one.
-    if (errorCode(error) === '2201B') {
-      throw new CategoryError(400, 'the pattern is not a usable regular expression');
+// Compiles every candidate expression, so no expression is stored that the
+// assignment cannot apply. The first uncompilable one refuses the whole request.
+async function assertPatternsCompile(database: Pool, patterns: string[]): Promise<void> {
+  for (const pattern of patterns) {
+    try {
+      await database.query(COMPILE_PATTERN, [pattern]);
+    } catch (error) {
+      // 2201B is Postgres' invalid-regular-expression SQLSTATE. A different failure,
+      // such as an unreachable database, is rethrown so it is reported as one.
+      if (errorCode(error) === '2201B') {
+        throw new CategoryError(400, 'a pattern is not a usable regular expression');
+      }
+      throw error;
     }
-    throw error;
   }
 }
 

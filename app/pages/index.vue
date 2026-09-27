@@ -26,7 +26,7 @@ type Transaction = {
 
 const { data: transactions, error, pending } = useFetch<Transaction[]>('/api/transactions');
 
-const transactionFilter = ref<'all' | 'uncategorised'>('all');
+const transactionFilter = ref<'all' | 'uncategorised'>('uncategorised');
 
 const uncategorisedTransactions = computed(() =>
   (transactions.value ?? []).filter((transaction) => transaction.category === null),

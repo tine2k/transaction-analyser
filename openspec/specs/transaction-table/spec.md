@@ -126,12 +126,17 @@ The system SHALL present a defined state when the endpoint returns no transactio
 
 ### Requirement: The table offers a read-only category-presence filter
 
-The system SHALL offer a control to select either all transactions or only transactions without a category. The all-transactions option SHALL be selected by default. Changing the selection SHALL change which returned rows are shown without changing their relative order, making another data request, or creating, altering, or deleting any stored data or category. The table SHALL NOT offer controls for searching, sorting, grouping, or paging transactions.
+The system SHALL offer a control to select either all transactions or only transactions without a category. The uncategorised-only option SHALL be selected by default when transaction data has loaded and the user has not changed the filter. Changing the selection SHALL change which returned rows are shown without changing their relative order, making another data request, or creating, altering, or deleting any stored data or category. The table SHALL NOT offer controls for searching, sorting, grouping, or paging transactions.
 
-#### Scenario: All transactions is the initial selection
+#### Scenario: Uncategorised transactions is the initial selection
 
 - **WHEN** transaction data has loaded and the user has not changed the filter
-- **THEN** the all-transactions option is selected and every returned transaction is shown
+- **THEN** the uncategorised-only option is selected and only transactions without a category are shown
+
+#### Scenario: The all-transactions filter is applied
+
+- **WHEN** the user selects the all-transactions option
+- **THEN** every returned transaction is shown
 
 #### Scenario: The uncategorised filter is applied
 

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Rules are matched in order and the last match wins, so the broad "ask"
+  // rule must stay first and the hard denies must stay last.
+  "permissions": [
+    { "action": "shell", "resource": "*", "effect": "ask" },
+
+    // Read-only git inspection
+    { "action": "shell", "resource": "git status *", "effect": "allow" },
+    { "action": "shell", "resource": "git diff *", "effect": "allow" },
+
+    // Filesystem inspection
+    { "action": "shell", "resource": "ls *", "effect": "allow" },
+    { "action": "shell", "resource": "cat *", "effect": "allow" },
+    { "action": "shell", "resource": "head *", "effect": "allow" },
+    { "action": "shell", "resource": "od *", "effect": "allow" },
+    { "action": "shell", "resource": "grep *", "effect": "allow" },
+    { "action": "shell", "resource": "cut *", "effect": "allow" },
+    { "action": "shell", "resource": "wc *", "effect": "allow" },
+    { "action": "shell", "resource": "find *", "effect": "allow" },
+
+    // Directory creation
+    { "action": "shell", "resource": "mkdir *", "effect": "allow" },
+
+    // Toolchain and environment lookup
+    { "action": "shell", "resource": "which *", "effect": "allow" },
+    { "action": "shell", "resource": "brew list *", "effect": "allow" },
+    { "action": "shell", "resource": "openspec *", "effect": "allow" },
+
+    // Output and scripting
+    { "action": "shell", "resource": "echo *", "effect": "allow" },
+    { "action": "shell", "resource": "tee *", "effect": "allow" },
+    { "action": "shell", "resource": "node *", "effect": "allow" },
+    { "action": "shell", "resource": "python3 *", "effect": "allow" },
+    { "action": "shell", "resource": "whoami *", "effect": "allow" },
+
+    // Database
+    { "action": "shell", "resource": "psql -h *", "effect": "allow" },
+    { "action": "shell", "resource": "pg_isready *", "effect": "allow" },
+
+    // Hard denies
+    { "action": "shell", "resource": "git push *", "effect": "deny" },
+    {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "deny"
+    }
+  ],
+  "experimental": {
+    "policies": [
+      {
+        "action": "permission",
+        "resource": "external_directory:*",
+        "effect": "deny"
+      }
+    ]
+  }
+}

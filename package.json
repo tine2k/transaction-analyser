@@ -8,10 +8,19 @@
     "node": ">=24"
   },
   "scripts": {
-    "import": "node tools/import-transactions.ts"
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "import": "node tools/import-transactions.ts",
+    "postinstall": "nuxt prepare",
+    "preview": "nuxt preview"
   },
   "dependencies": {
     "csv-parse": "^7.0.3",
     "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "nuxt": "^4.5.2",
+    "tailwindcss": "^4.3.3"
   }
 }

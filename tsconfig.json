@@ -1,15 +1,16 @@
 {
-  "compilerOptions": {
-    "target": "es2023",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "lib": ["es2023"],
-    "strict": true,
-    "noEmit": true,
-    "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  },
-  "include": ["tools/**/*.ts"]
+  // Nuxt generates the four configurations this file references and puts the
+  // path aliases and auto-imported types in them. Replacing this file with the
+  // references form is what lets an editor resolve them for app/ and server/.
+  //
+  // tools/import-transactions.ts is deliberately not listed: it is run directly
+  // by Node and nothing typechecks it. See design.md D2 and R1 in
+  // openspec/changes/add-nuxt-application-shell/.
+  "files": [],
+  "references": [
+    { "path": "./.nuxt/tsconfig.app.json" },
+    { "path": "./.nuxt/tsconfig.server.json" },
+    { "path": "./.nuxt/tsconfig.shared.json" },
+    { "path": "./.nuxt/tsconfig.node.json" }
+  ]
 }

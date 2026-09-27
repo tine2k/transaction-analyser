@@ -1,0 +1,4 @@
+/* The one stylesheet. Tailwind 4 has no base layer to import separately and
+   no content configuration: it scans the source tree itself. Design tokens and
+   a theme are deferred to the first change that renders real content. */
+@import 'tailwindcss';

@@ -32,9 +32,7 @@
 
     // Toolchain and environment lookup
     { "action": "shell", "resource": "which *", "effect": "allow" },
-    { "action": "shell", "resource": "npm run *", "effect": "allow" },
-    { "action": "shell", "resource": "npm view *", "effect": "allow" },
-    { "action": "shell", "resource": "npm install *", "effect": "allow" },
+    { "action": "shell", "resource": "npm *", "effect": "allow" },
     { "action": "shell", "resource": "brew list *", "effect": "allow" },
     { "action": "shell", "resource": "openspec *", "effect": "allow" },
 
@@ -54,9 +52,10 @@
     { "action": "shell", "resource": "curl *", "effect": "allow" },
 
     // Database
-    { "action": "shell", "resource": "psql -h *", "effect": "allow" },
-    { "action": "shell", "resource": "psql -lqt *", "effect": "allow" },
+    { "action": "shell", "resource": "psql *", "effect": "allow" },
     { "action": "shell", "resource": "pg_isready *", "effect": "allow" },
+    { "action": "shell", "resource": "createdb *", "effect": "allow" },
+    { "action": "shell", "resource": "dropdb *", "effect": "allow" },
 
     // Hard denies
     { "action": "shell", "resource": "git push *", "effect": "deny" },

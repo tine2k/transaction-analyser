@@ -55,9 +55,14 @@
 
     // Database
     { "action": "shell", "resource": "psql *", "effect": "allow" },
+    { "action": "shell", "resource": "postgres *", "effect": "allow" },
     { "action": "shell", "resource": "pg_isready *", "effect": "allow" },
     { "action": "shell", "resource": "createdb *", "effect": "allow" },
     { "action": "shell", "resource": "dropdb *", "effect": "allow" },
+
+    // Docker
+    { "action": "shell", "resource": "docker *", "effect": "allow" },
+    { "action": "shell", "resource": "docker-compose *", "effect": "allow" },
 
     // Hard denies
     { "action": "shell", "resource": "git push *", "effect": "deny" },

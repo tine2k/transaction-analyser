@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the server half of the application: that the browser application and its API are one server on one origin, that the API surface is a single health endpoint reaching no stored data, that the database address and its credentials come from the environment and are never disclosed, that a shared connection pool exists but is opened only when it is used, and that the existing command-line importer and the SQL migrations keep working unchanged alongside it.
+Defines the server half of the application: that the browser application and its API are one server on one origin, that the API surface is a health endpoint and one read-only transactions endpoint which is the only path that reaches stored data, that the database address and its credentials come from the environment and are never disclosed, that a shared connection pool exists but is opened only when it is used, and that the existing command-line importer and the SQL migrations keep working unchanged alongside it.
 
 ## Requirements
 
@@ -25,19 +25,24 @@ The system SHALL serve the browser application and every API endpoint from a sin
 - **WHEN** the application is built and its output is served
 - **THEN** the server answers requests at run time, and the output is not a set of files that were rendered once at build time
 
-### Requirement: The API is a single health endpoint and reaches no stored data
+### Requirement: The API is a health endpoint and a read-only transactions endpoint
 
-The system SHALL expose exactly one API endpoint: a read-only health endpoint at `/api/health`, which reports that the server is running. The system SHALL NOT expose any endpoint that reads or writes `transactions` or `categories`, and SHALL NOT expose any endpoint that accepts a request to create, alter, or delete stored data. The health endpoint SHALL report on the server alone and SHALL NOT report on the database, so that a database which is unreachable is never presented as the application being down.
+The system SHALL expose exactly two API endpoints: a read-only health endpoint at `/api/health`, which reports that the server is running, and a read-only transactions endpoint at `/api/transactions`, which returns stored transactions as defined by the `transaction-read-api` capability. The system SHALL NOT expose any further endpoint beyond these two, and SHALL NOT expose any endpoint that accepts a request to create, alter, or delete stored data. The health endpoint SHALL report on the server alone and SHALL NOT report on the database, so that a database which is unreachable is never presented as the application being down.
 
 #### Scenario: The health endpoint answers
 
 - **WHEN** a request is made for the health endpoint
 - **THEN** the server answers with a success status and a small body in a machine-readable form stating that the server is up
 
-#### Scenario: No endpoint reaches stored data
+#### Scenario: Only the named endpoints exist
 
-- **WHEN** a request is made for a path under `/api` that is not the health endpoint
+- **WHEN** a request is made for a path under `/api` other than the health endpoint and the transactions endpoint
 - **THEN** the server reports that no such resource exists, and no row is read from the database
+
+#### Scenario: The transactions endpoint reads stored data
+
+- **WHEN** a `GET` request is made for the transactions endpoint
+- **THEN** the server answers from the stored transactions as the `transaction-read-api` capability defines, and this is the only API path at which a row is read
 
 #### Scenario: No request can alter stored data
 
@@ -85,7 +90,7 @@ The system SHALL read the database address from the process environment at run t
 
 ### Requirement: One shared connection pool, opened only when it is used
 
-The system SHALL hold one shared database connection pool per server process, built from the configured address, and every consumer of the database SHALL obtain that same pool rather than opening a connection of its own. The system SHALL NOT open a connection while the server starts, while a page is rendered, or while a request is answered; a connection SHALL be established only when a statement is run through the pool. The system SHALL release the pool's connections when the server shuts down. The shell itself SHALL run no statement: the pool exists and is left unused.
+The system SHALL hold one shared database connection pool per server process, built from the configured address, and every consumer of the database SHALL obtain that same pool rather than opening a connection of its own. The system SHALL NOT open a connection while the server starts, while a page is rendered, or while a request is answered; a connection SHALL be established only when a statement is run through the pool. The system SHALL release the pool's connections when the server shuts down. The shell alone — the pages and the health endpoint — SHALL run no statement, so the pool is opened only when a statement is run through it, which only the transactions read endpoint does.
 
 #### Scenario: Starting opens no connection
 
@@ -114,8 +119,13 @@ The system SHALL hold one shared database connection pool per server process, bu
 
 #### Scenario: The shell runs no statement
 
-- **WHEN** the application runs with the shell alone
+- **WHEN** the application runs with the shell alone, without the transactions endpoint being requested
 - **THEN** no statement is sent to the database and the pool has opened no connection
+
+#### Scenario: The read endpoint is the only statement the application runs
+
+- **WHEN** the transactions endpoint is requested
+- **THEN** it runs its read through the shared pool, and no other part of the application — the pages or the health endpoint — runs a statement of its own
 
 ### Requirement: The application recognises no user and admits every requester
 

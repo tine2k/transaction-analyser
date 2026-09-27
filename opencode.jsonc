@@ -23,6 +23,7 @@
     { "action": "shell", "resource": "pgrep *", "effect": "allow" },
     { "action": "shell", "resource": "pkill *", "effect": "allow" },
     { "action": "shell", "resource": "lsof *", "effect": "allow" },
+    { "action": "shell", "resource": "xargs *", "effect": "allow" },
     { "action": "shell", "resource": "ipconfig *", "effect": "allow" },
     { "action": "shell", "resource": "sleep *", "effect": "allow" },
 
@@ -40,6 +41,8 @@
     // Output and scripting
     { "action": "shell", "resource": "echo *", "effect": "allow" },
     { "action": "shell", "resource": "printf *", "effect": "allow" },
+    { "action": "shell", "resource": "command *", "effect": "allow" },
+    { "action": "shell", "resource": "true *", "effect": "allow" },
     { "action": "shell", "resource": "test *", "effect": "allow" },
     { "action": "shell", "resource": "tee *", "effect": "allow" },
     { "action": "shell", "resource": "node *", "effect": "allow" },
@@ -47,8 +50,12 @@
     { "action": "shell", "resource": "whoami *", "effect": "allow" },
     { "action": "shell", "resource": "exit *", "effect": "allow" },
 
+    // Network
+    { "action": "shell", "resource": "curl *", "effect": "allow" },
+
     // Database
     { "action": "shell", "resource": "psql -h *", "effect": "allow" },
+    { "action": "shell", "resource": "psql -lqt *", "effect": "allow" },
     { "action": "shell", "resource": "pg_isready *", "effect": "allow" },
 
     // Hard denies

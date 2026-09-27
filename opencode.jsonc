@@ -33,6 +33,7 @@
     // Toolchain and environment lookup
     { "action": "shell", "resource": "which *", "effect": "allow" },
     { "action": "shell", "resource": "npm *", "effect": "allow" },
+    { "action": "shell", "resource": "npx playwright *", "effect": "allow" },
     { "action": "shell", "resource": "brew list *", "effect": "allow" },
     { "action": "shell", "resource": "openspec *", "effect": "allow" },
 

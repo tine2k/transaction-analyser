@@ -39,6 +39,8 @@
     // Output and scripting
     { "action": "shell", "resource": "echo *", "effect": "allow" },
     { "action": "shell", "resource": "printf *", "effect": "allow" },
+    { "action": "shell", "resource": "show *", "effect": "allow" },
+    { "action": "shell", "resource": "j *", "effect": "allow" },
     { "action": "shell", "resource": "command *", "effect": "allow" },
     { "action": "shell", "resource": "true *", "effect": "allow" },
     { "action": "shell", "resource": "test *", "effect": "allow" },

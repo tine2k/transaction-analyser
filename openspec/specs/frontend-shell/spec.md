@@ -132,17 +132,22 @@ The system SHALL present no login, no account, no sign-in control, and no user i
 
 ### Requirement: The shell performs no domain work
 
-The system SHALL NOT compute, derive, aggregate, or infer any value about a transaction or a category, and SHALL NOT evaluate any category's regular expression. The system SHALL NOT create, alter, or delete any stored data. The shell's only relationship to stored data is the single read request the transactions table makes to the read-only transactions endpoint; the shell SHALL NOT run a statement against the database, and the values it presents SHALL be exactly those the endpoint returned, unchanged. The shell SHALL NOT total, average, count, group, or otherwise derive a value from the returned transactions for display.
+The system SHALL NOT compute, derive, aggregate, or infer values about transactions or categories except for the transaction page's filter counts: the total number of transactions returned by its one read request and the number of those transactions whose category is null. The transaction page MAY use category presence to select which returned rows to display, but SHALL NOT alter the returned data or evaluate any category's regular expression. The system SHALL NOT create, alter, or delete any stored data. The shell's only relationship to stored data is the single read request the transactions table makes to the read-only transactions endpoint; the shell SHALL NOT run a statement against the database, and SHALL present the transaction values exactly as the endpoint returned them. Apart from the two filter counts and the selected view of the returned transactions, the shell SHALL NOT total, average, group, or otherwise derive a value from transaction data for display.
 
 #### Scenario: No category pattern is evaluated
 
 - **WHEN** the application runs
 - **THEN** no category's regular expression is evaluated anywhere, and no transaction is assigned a category
 
-#### Scenario: Nothing is derived from stored data
+#### Scenario: Only the filter counts are derived from transactions
 
-- **WHEN** the index route is rendered
-- **THEN** no total, count, balance, grouping, or other derived value of stored data is computed for display, and only the values the read endpoint returned are shown
+- **WHEN** the index route renders its filter options
+- **THEN** it displays the total returned transaction count and the count with a null category, but computes no other aggregate or derived transaction value
+
+#### Scenario: Filtering does not alter returned values or data
+
+- **WHEN** the user selects the uncategorised-only view
+- **THEN** the page only chooses which returned transactions to show, presents their values unchanged, and writes no data
 
 #### Scenario: The shell reads only through the read endpoint
 

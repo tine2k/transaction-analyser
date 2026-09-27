@@ -9,6 +9,7 @@
 - If an important detail is unclear, ask rather than guessing.
 - Do not invent APIs, configuration options, commands, or files.
 - Keep explanations proportional to the complexity of the change.
+- Use headless Chromium for browser-based tests and verifications; do not depend on a connected desktop browser.
 
 ## File Access
 

@@ -25,9 +25,9 @@ The system SHALL render every route inside one default layout, which supplies th
 - **WHEN** the application's layouts and routes are inspected
 - **THEN** exactly one layout is defined, it is the one every route renders in, and no route declares that it renders without it
 
-### Requirement: The only route is the index route, and it presents the transactions table
+### Requirement: The only route is the index route, and it is rendered by the browser
 
-The system SHALL provide exactly one route, the index route at `/`, which presents the transactions table defined by the `transaction-table` capability. The index route SHALL NOT show invented data presented as though it were the user's own, and SHALL NOT present a control that creates, alters, or deletes stored data. The table's rows SHALL already be present in the delivered document, so that the index route is rendered by the server rather than assembled by the browser afterwards.
+The system SHALL provide exactly one route, the index route at `/`, which presents the transactions table defined by the `transaction-table` capability. The index route SHALL NOT show invented data presented as though it were the user's own, and SHALL NOT present a control that creates, alters, or deletes stored data. The index route SHALL be rendered by the browser rather than by the server, so the document delivered first carries the application shell and the table's rows are assembled by the browser afterwards. The browser SHALL obtain the rows from the same-origin read endpoint, and the delivered document SHALL NOT be required to contain them. The server SHALL serve the application shell for any path, including a path no route matches, and SHALL NOT answer an unknown path as a missing resource; the browser SHALL render the failure page for a path its router cannot match.
 
 #### Scenario: The index route presents the table
 
@@ -42,12 +42,12 @@ The system SHALL provide exactly one route, the index route at `/`, which presen
 #### Scenario: An unknown route is the failure page
 
 - **WHEN** a path other than the index route is requested
-- **THEN** the failure page is delivered with a status saying that the route does not exist
+- **THEN** the application shell is delivered for that path, and the browser renders the failure page because its router matches no route, without the server reporting the path as missing
 
-#### Scenario: The delivered document already holds the rows
+#### Scenario: The browser assembles the rows
 
 - **WHEN** the index route is requested and the read endpoint returns transactions
-- **THEN** those rows are present in the delivered document, without the browser having to run anything to reveal them
+- **THEN** the delivered document carries the application shell rather than the rows, and those rows are assembled by the browser once it has run, so the browser has to run the application to reveal them
 
 ### Requirement: Styling arrives through one stylesheet, with no component library
 

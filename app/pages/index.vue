@@ -5,10 +5,12 @@
 // returned them: the amount as its signed decimal string, and the dates as
 // day-precise strings, so nothing is shifted or rounded on the way to the page.
 //
-// `await useFetch` runs during server rendering, so the rows are already in the
-// delivered document rather than assembled in the browser afterwards.
+// `useFetch` is not awaited: the page is rendered in the browser, so the read
+// runs on the client and the template's pending state shows while it is in
+// flight.
 //
 // See openspec/changes/add-transactions-table/specs/transaction-table/spec.md
+// and openspec/changes/disable-server-side-rendering/specs/frontend-shell/spec.md
 type Category = { id: string; name: string };
 
 type Transaction = {
@@ -22,7 +24,7 @@ type Transaction = {
   category: Category | null;
 };
 
-const { data: transactions, error, pending } = await useFetch<Transaction[]>('/api/transactions');
+const { data: transactions, error, pending } = useFetch<Transaction[]>('/api/transactions');
 </script>
 
 <template>

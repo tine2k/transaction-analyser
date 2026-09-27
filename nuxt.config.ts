@@ -1,9 +1,11 @@
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineNuxtConfig({
-  // Server-rendered, not a static export: a Nitro server answers at run time.
-  // See openspec/changes/add-nuxt-application-shell/specs/backend-shell/spec.md
-  ssr: true,
+  // Rendered in the browser, not on the server: Nuxt delivers the app shell and
+  // the client builds the page. Still not a static export — a Nitro server
+  // answers the API at run time and serves that shell.
+  // See openspec/changes/disable-server-side-rendering/specs/frontend-shell/spec.md
+  ssr: false,
 
   // Framework-maintenance pin, not a project decision.
   compatibilityDate: '2025-07-15',

@@ -24,6 +24,29 @@ describe('decimal-safe category totals', () => {
     expect(sumAbsoluteAmountStrings([])).toBe('0');
   });
 
+  it('sorts category totals numerically in descending order with name-based ties', () => {
+    const transactions: CategorySpendingTransaction[] = [
+      { bookingDate: '2026-09-01', amount: '2.000', category: { id: '1', name: 'Two' } },
+      { bookingDate: '2026-09-01', amount: '9007199254740993.02', category: { id: '2', name: 'Large lower' } },
+      { bookingDate: '2026-09-01', amount: '5.0', category: { id: '3', name: 'Zulu' } },
+      { bookingDate: '2026-09-01', amount: '9007199254740993.1', category: { id: '4', name: 'Largest' } },
+      { bookingDate: '2026-09-01', amount: '5.00', category: { id: '5', name: 'Alpha' } },
+      { bookingDate: '2026-09-01', amount: '10.00', category: { id: '6', name: 'Ten' } },
+    ];
+    const [month] = getMonthlyCategorySpendingTotals(
+      groupTransactionsByMonth(transactions, '2026-09-28'),
+    );
+
+    expect(month?.totals.map(({ name, amount }) => [name, amount])).toEqual([
+      ['Largest', '9007199254740993.1'],
+      ['Large lower', '9007199254740993.02'],
+      ['Ten', '10.00'],
+      ['Alpha', '5.00'],
+      ['Zulu', '5.0'],
+      ['Two', '2.000'],
+    ]);
+  });
+
   it('produces exact category totals and euro labels', () => {
     const transactions: CategorySpendingTransaction[] = [
       { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries' } },
@@ -35,7 +58,30 @@ describe('decimal-safe category totals', () => {
     const [total] = month?.totals ?? [];
 
     expect(total?.amount).toBe('16.50');
-    expect(formatEuroAmount(total?.amount ?? '')).toBe('€16.50');
+    expect(formatEuroAmount(total?.amount ?? '')).toBe(new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(16.5));
+  });
+
+  it('uses locale grouping and currency placement without rounding large exact amounts', () => {
+    const locale = 'de-DE';
+
+    expect(formatEuroAmount('1234567.89', locale)).toBe(new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(1234567.89));
+    expect(formatEuroAmount('9007199254740993.022', locale)).toBe('9.007.199.254.740.993,022 €');
+    expect(formatEuroAmount('-0.01', locale)).toBe(new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(-0.01));
   });
 
   it('builds positive pie values only for completed category totals', () => {

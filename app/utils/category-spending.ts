@@ -70,6 +70,15 @@ function powerOfTen(exponent: number): bigint {
   return 10n ** BigInt(exponent);
 }
 
+function compareDecimalStrings(left: string, right: string): number {
+  const leftDecimal = parseDecimal(left);
+  const rightDecimal = parseDecimal(right);
+  const commonScale = Math.max(leftDecimal.scale, rightDecimal.scale);
+  const alignedLeft = leftDecimal.coefficient * powerOfTen(commonScale - leftDecimal.scale);
+  const alignedRight = rightDecimal.coefficient * powerOfTen(commonScale - rightDecimal.scale);
+  return alignedLeft < alignedRight ? -1 : alignedLeft > alignedRight ? 1 : 0;
+}
+
 export function sumAbsoluteAmountStrings(amounts: string[]): string {
   let coefficient = 0n;
   let scale = 0;
@@ -94,11 +103,16 @@ export function sumAbsoluteAmountStrings(amounts: string[]): string {
 export function getCategorySpendingTotals(
   groups: CategoryTransactionGroup[],
 ): CategorySpendingTotal[] {
-  return groups.map((group) => ({
-    key: group.key,
-    name: group.name,
-    amount: sumAbsoluteAmountStrings(group.transactions.map(({ amount }) => amount)),
-  }));
+  return groups
+    .map((group) => ({
+      key: group.key,
+      name: group.name,
+      amount: sumAbsoluteAmountStrings(group.transactions.map(({ amount }) => amount)),
+    }))
+    .sort((left, right) =>
+      compareDecimalStrings(right.amount, left.amount)
+      || (left.name < right.name ? -1 : left.name > right.name ? 1 : 0),
+    );
 }
 
 export function getMonthlyCategorySpendingTotals(
@@ -147,8 +161,55 @@ export function createMonthlyCategoryChartData(
   }));
 }
 
-export function formatEuroAmount(amount: string): string {
-  return `€${amount}`;
+export function formatEuroAmount(amount: string, locale?: string): string {
+  const decimal = parseDecimal(amount);
+  const magnitude = decimal.coefficient < 0n ? -decimal.coefficient : decimal.coefficient;
+  const divisor = powerOfTen(decimal.scale);
+  const integer = magnitude / divisor;
+  const fraction = (magnitude % divisor).toString().padStart(decimal.scale, '0');
+  const currencyFormatter = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'EUR',
+    useGrouping: true,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  const integerFormatter = new Intl.NumberFormat(locale, {
+    useGrouping: true,
+    maximumFractionDigits: 0,
+  });
+  const digitFormatter = new Intl.NumberFormat(locale, {
+    useGrouping: false,
+    maximumFractionDigits: 0,
+  });
+  const decimalSeparator = decimal.scale > 0
+    ? new Intl.NumberFormat(locale, {
+      useGrouping: false,
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).formatToParts(1.1).find(({ type }) => type === 'decimal')?.value ?? '.'
+    : '';
+  const localizedFraction = [...fraction]
+    .map((digit) => digitFormatter.format(BigInt(digit)))
+    .join('');
+  const template = currencyFormatter.formatToParts(decimal.coefficient < 0n ? -1n : 1n);
+  const localizedInteger = integerFormatter.formatToParts(integer);
+  const result: string[] = [];
+  let insertedNumber = false;
+
+  for (const part of template) {
+    if (part.type === 'integer' && !insertedNumber) {
+      result.push(...localizedInteger.map(({ value }) => value));
+      if (decimal.scale > 0) {
+        result.push(decimalSeparator, localizedFraction);
+      }
+      insertedNumber = true;
+    } else if (part.type !== 'integer' && part.type !== 'group') {
+      result.push(part.value);
+    }
+  }
+
+  return result.join('');
 }
 
 export function getLastTwelveCalendarMonths(today: string): CalendarMonth[] {

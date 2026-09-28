@@ -1,10 +1,6 @@
-# Category Spending Chart Specification
+# Spec Delta
 
-## Purpose
-
-Defines the browser analytics page that presents a separate category spending pie chart for each of the last 12 calendar months, without changing stored data.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: The analytics route presents twelve monthly category pie charts
 

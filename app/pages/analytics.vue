@@ -51,6 +51,14 @@ function tooltipLabel(parameter: unknown): string {
   return `${item.data.name}: ${formatEuroAmount(item.data.amount)}`;
 }
 
+function sliceLabel(parameter: unknown): string {
+  const item = parameter as { data?: Partial<CategoryPieDatum> } | undefined;
+  if (item?.data?.name === undefined || item.data.amount === undefined) {
+    return '';
+  }
+  return `${item.data.name}\n${formatEuroAmount(item.data.amount)}`;
+}
+
 function chartOption(month: MonthlyCategoryChartData): EChartsOption {
   return {
     tooltip: {
@@ -61,6 +69,8 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
     series: [{
       type: 'pie',
       radius: '68%',
+      minShowLabelAngle: 0,
+      labelLayout: { hideOverlap: false },
       data: month.pieData.map((datum) => {
         const color = categoryColor(datum.key);
         return {
@@ -69,7 +79,7 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
           emphasis: { itemStyle: { color } },
         };
       }),
-      label: { show: false },
+      label: { show: true, formatter: sliceLabel },
     }],
   };
 }

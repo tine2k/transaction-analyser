@@ -2,6 +2,7 @@ import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { ref } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  formatEuroAmount,
   getLastTwelveCalendarMonths,
   getLocalDateString,
   type CategorySpendingTransaction,
@@ -56,6 +57,7 @@ describe('category spending page', () => {
       { bookingDate: today, amount: '-12.50', category: { id: '1', name: 'Groceries' } },
       { bookingDate: today, amount: '4.00', category: { id: '1', name: 'Groceries' } },
       { bookingDate: today, amount: '-3.25', category: null },
+      { bookingDate: today, amount: '-1234567.89', category: { id: '3', name: 'Rent' } },
       { bookingDate: previousMonth.startDate, amount: '-2.00', category: { id: '2', name: 'Transport' } },
       { bookingDate: previousMonth.startDate, amount: '-7.00', category: { id: '1', name: 'Groceries' } },
     ]));
@@ -69,27 +71,44 @@ describe('category spending page', () => {
       .toEqual(getLastTwelveCalendarMonths(today).map(({ key }) => key));
     expect(charts).toHaveLength(12);
     expect(panels[0]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
-      .toEqual(['Groceries€16.50', 'Uncategorised€3.25']);
+      .toEqual([
+        `Rent${formatEuroAmount('1234567.89')}`,
+        `Groceries${formatEuroAmount('16.50')}`,
+        `Uncategorised${formatEuroAmount('3.25')}`,
+      ]);
     expect(panels[1]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
-      .toEqual(['Transport€2.00', 'Groceries€7.00']);
+      .toEqual([`Groceries${formatEuroAmount('7.00')}`, `Transport${formatEuroAmount('2.00')}`]);
 
     const currentOption = charts[0]?.props('option');
     expect(currentOption.series[0].type).toBe('pie');
     expect(currentOption.series[0].data.map(({ name, amount }) => [name, amount]))
-      .toEqual([['Groceries', '16.50'], ['Uncategorised', '3.25']]);
+      .toEqual([['Rent', '1234567.89'], ['Groceries', '16.50'], ['Uncategorised', '3.25']]);
     const previousOption = charts[1]?.props('option');
     expect(previousOption.series[0].data.map(({ name, amount }) => [name, amount]))
-      .toEqual([['Transport', '2.00'], ['Groceries', '7.00']]);
+      .toEqual([['Groceries', '7.00'], ['Transport', '2.00']]);
 
-    const currentGroceries = currentOption.series[0].data[0];
-    const previousGroceries = previousOption.series[0].data[1];
+    const currentLabel = currentOption.series[0].label;
+    expect(currentLabel.show).toBe(true);
+    expect(currentOption.series[0].minShowLabelAngle).toBe(0);
+    expect(currentOption.series[0].labelLayout.hideOverlap).toBe(false);
+    expect(currentOption.series[0].data.map((datum) => currentLabel.formatter({ data: datum })))
+      .toEqual([
+        `Rent\n${formatEuroAmount('1234567.89')}`,
+        `Groceries\n${formatEuroAmount('16.50')}`,
+        `Uncategorised\n${formatEuroAmount('3.25')}`,
+      ]);
+    expect(currentOption.tooltip.formatter({ data: currentOption.series[0].data[1] }))
+      .toBe(`Groceries: ${formatEuroAmount('16.50')}`);
+
+    const currentGroceries = currentOption.series[0].data[1];
+    const previousGroceries = previousOption.series[0].data[0];
     expect(currentGroceries.itemStyle.color).toBe(previousGroceries.itemStyle.color);
     expect(currentGroceries.emphasis.itemStyle.color).toBe(currentGroceries.itemStyle.color);
     expect(previousGroceries.emphasis.itemStyle.color).toBe(previousGroceries.itemStyle.color);
-    expect(panels[0]?.findAll('[data-testid="category-total"]')[0]
+    expect(panels[0]?.findAll('[data-testid="category-total"]')[1]
       ?.find('[data-testid="category-color"]').element.style.backgroundColor)
       .toBe(currentGroceries.itemStyle.color);
-    expect(panels[1]?.findAll('[data-testid="category-total"]')[1]
+    expect(panels[1]?.findAll('[data-testid="category-total"]')[0]
       ?.find('[data-testid="category-color"]').element.style.backgroundColor)
       .toBe(previousGroceries.itemStyle.color);
   });
@@ -112,7 +131,11 @@ describe('category spending page', () => {
     expect((hideControl.element as HTMLInputElement).checked).toBe(false);
     expect(wrapper.findAll('[data-testid="month-panel"]')).toHaveLength(12);
     expect(wrapper.findAll('[data-testid="category-total"]').map((item) => item.text()))
-      .toEqual(['Groceries€10.00', 'Uncategorised€3.00', 'Uncategorised€5.00']);
+      .toEqual([
+        `Groceries${formatEuroAmount('10.00')}`,
+        `Uncategorised${formatEuroAmount('3.00')}`,
+        `Uncategorised${formatEuroAmount('5.00')}`,
+      ]);
     const groceryColorBeforeHide = wrapper.find('[data-testid="category-color"]').element.style.backgroundColor;
 
     await hideControl.setValue(true);
@@ -121,7 +144,7 @@ describe('category spending page', () => {
     expect((hideControl.element as HTMLInputElement).checked).toBe(true);
     expect(panelsWhenHidden).toHaveLength(12);
     expect(panelsWhenHidden[0]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
-      .toEqual(['Groceries€10.00']);
+      .toEqual([`Groceries${formatEuroAmount('10.00')}`]);
     expect(panelsWhenHidden[1]?.findAll('[data-testid="category-total"]')).toHaveLength(0);
     expect(panelsWhenHidden[1]?.text()).toContain(`No category data for ${previousMonth.label}`);
     expect(chartsWhenHidden[0]?.props('option').series[0].data.map(({ name }) => name))
@@ -132,7 +155,11 @@ describe('category spending page', () => {
 
     await hideControl.setValue(false);
     expect(wrapper.findAll('[data-testid="category-total"]').map((item) => item.text()))
-      .toEqual(['Groceries€10.00', 'Uncategorised€3.00', 'Uncategorised€5.00']);
+      .toEqual([
+        `Groceries${formatEuroAmount('10.00')}`,
+        `Uncategorised${formatEuroAmount('3.00')}`,
+        `Uncategorised${formatEuroAmount('5.00')}`,
+      ]);
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
     expect(transactions).toEqual([
       { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries' } },

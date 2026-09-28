@@ -13,8 +13,23 @@ const matrix = computed(() => createMonthlyCategoryMatrixData(
   groupTransactionsByAvailableMonth(transactions.value ?? []),
 ));
 
+function hasAmount(amount: string | undefined): amount is string {
+  return amount !== undefined && !isZeroAmountString(amount);
+}
+
 function displayTotal(amount: string | undefined): string {
-  return amount === undefined || isZeroAmountString(amount) ? '' : formatEuroAmount(amount);
+  return hasAmount(amount) ? formatEuroAmount(amount) : '';
+}
+
+function categoryFilterValue(key: string): string {
+  return key === 'uncategorised' ? 'uncategorised' : key.replace(/^category:/, '');
+}
+
+function transactionLocation(month: string, categoryKey: string) {
+  return {
+    path: '/',
+    query: { month, category: categoryFilterValue(categoryKey) },
+  };
 }
 </script>
 
@@ -64,12 +79,20 @@ function displayTotal(amount: string | undefined): string {
               <td
                 v-for="category in matrix.categories"
                 :key="category.key"
-                class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900"
+                class="whitespace-nowrap text-right tabular-nums text-slate-900"
+                :class="hasAmount(month.totals.get(category.key)) ? 'p-0' : 'px-3 py-2'"
                 data-testid="category-total-cell"
                 :data-category-key="category.key"
                 :data-month-key="month.key"
               >
-                {{ displayTotal(month.totals.get(category.key)) }}
+                <NuxtLink
+                  v-if="hasAmount(month.totals.get(category.key))"
+                  :to="transactionLocation(month.key, category.key)"
+                  class="block px-3 py-2 transition-colors hover:bg-slate-200"
+                  data-testid="category-total-link"
+                >
+                  {{ displayTotal(month.totals.get(category.key)) }}
+                </NuxtLink>
               </td>
             </tr>
           </tbody>

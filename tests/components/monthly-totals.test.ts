@@ -76,6 +76,47 @@ describe('monthly category totals page', () => {
       .toBe(true);
   });
 
+  it('links populated cells to their month and category and leaves blank cells inert', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: '2026-09-02', amount: '-12.50', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2026-09-03', amount: '4.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2026-09-04', amount: '-3.25', category: null },
+      { bookingDate: '2026-09-05', amount: '1234567.89', category: { id: '3', name: 'Rent' } },
+      { bookingDate: '2026-09-06', amount: '0.00', category: { id: '4', name: 'Zero-only' } },
+      { bookingDate: '2026-08-12', amount: '-2.00', category: { id: '2', name: 'Transport' } },
+      { bookingDate: '2020-01-15', amount: '-5.00', category: { id: '1', name: 'Groceries' } },
+    ]));
+
+    const wrapper = await mountSuspended(MonthlyTotals);
+    const rows = wrapper.findAll('[data-testid="month-row"]');
+
+    const targets = rows.map((row) => row.findAll('[data-testid="category-total-link"]').map((link) => {
+      const url = new URL(link.attributes('href'), 'http://localhost');
+      return [url.pathname, url.searchParams.get('month'), url.searchParams.get('category')];
+    }));
+    expect(targets).toEqual([
+      [['/', '2026-09', '1'], ['/', '2026-09', '3'], ['/', '2026-09', 'uncategorised']],
+      [['/', '2026-08', '2']],
+      [['/', '2020-01', '1']],
+    ]);
+
+    const allCells = rows.flatMap((row) => row.findAll('[data-testid="category-total-cell"]'));
+    const populatedCells = allCells.filter((cell) => cell.text() !== '');
+    const blankCells = allCells.filter((cell) => cell.text() === '');
+    expect(populatedCells).toHaveLength(5);
+    expect(populatedCells.every((cell) => cell.findAll('[data-testid="category-total-link"]').length === 1))
+      .toBe(true);
+    expect(blankCells.length).toBeGreaterThan(0);
+    expect(blankCells.every((cell) => cell.find('[data-testid="category-total-link"]').exists() === false))
+      .toBe(true);
+
+    const linked = populatedCells[0]?.find('[data-testid="category-total-link"]');
+    expect(linked?.classes()).toContain('hover:bg-slate-200');
+    expect(linked?.classes()).toContain('transition-colors');
+    expect(blankCells.every((cell) => cell.classes().every((name) => !name.startsWith('hover:')))).toBe(true);
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('distinguishes loading, failed, and empty transaction results', async () => {
     mocks.useFetch.mockReturnValue(response(null, { pending: true }));
     const loading = await mountSuspended(MonthlyTotals);

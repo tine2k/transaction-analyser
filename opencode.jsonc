@@ -10,6 +10,7 @@
     { "action": "shell", "resource": "git diff *", "effect": "allow" },
 
     // Filesystem inspection
+    { "action": "shell", "resource": "pwd *", "effect": "allow" },
     { "action": "shell", "resource": "ls *", "effect": "allow" },
     { "action": "shell", "resource": "cat *", "effect": "allow" },
     { "action": "shell", "resource": "head *", "effect": "allow" },
@@ -18,6 +19,7 @@
     { "action": "shell", "resource": "grep *", "effect": "allow" },
     { "action": "shell", "resource": "cut *", "effect": "allow" },
     { "action": "shell", "resource": "sed *", "effect": "allow" },
+    { "action": "shell", "resource": "rg *", "effect": "allow" },
     { "action": "shell", "resource": "wc *", "effect": "allow" },
     { "action": "shell", "resource": "find *", "effect": "allow" },
     { "action": "shell", "resource": "pgrep *", "effect": "allow" },

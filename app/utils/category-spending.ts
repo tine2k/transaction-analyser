@@ -100,6 +100,28 @@ export function sumAbsoluteAmountStrings(amounts: string[]): string {
   return `${digits.slice(0, -scale)}.${digits.slice(-scale)}`;
 }
 
+export function sumSignedAmountStrings(amounts: string[]): string {
+  let coefficient = 0n;
+  let scale = 0;
+
+  for (const amount of amounts) {
+    const parsed = parseDecimal(amount);
+    if (parsed.scale > scale) {
+      coefficient *= powerOfTen(parsed.scale - scale);
+      scale = parsed.scale;
+    }
+    coefficient += parsed.coefficient * powerOfTen(scale - parsed.scale);
+  }
+
+  const negative = coefficient < 0n;
+  const digits = (negative ? -coefficient : coefficient).toString().padStart(scale + 1, '0');
+  const sign = negative ? '-' : '';
+  if (scale === 0) {
+    return `${sign}${digits}`;
+  }
+  return `${sign}${digits.slice(0, -scale)}.${digits.slice(-scale)}`;
+}
+
 export function getCategorySpendingTotals(
   groups: CategoryTransactionGroup[],
 ): CategorySpendingTotal[] {

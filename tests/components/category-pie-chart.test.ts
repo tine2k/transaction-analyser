@@ -4,9 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('vue-echarts', () => ({
   default: defineComponent({
-    name: 'VChart',
-    props: ['option'],
-    template: '<div data-testid="echarts-chart" />',
+      name: 'VChart',
+      props: ['option'],
+      emits: ['click'],
+      template: '<div data-testid="echarts-chart" />',
   }),
 }));
 
@@ -23,5 +24,16 @@ describe('category pie chart adapter', () => {
     expect(wrapper.get('[data-testid="echarts-chart"]').element.parentElement?.className)
       .toContain('h-96');
     expect(wrapper.findComponent({ name: 'VChart' }).props('option')).toEqual(option);
+  });
+
+  it('forwards pie slice click events to its parent', async () => {
+    const wrapper = await mountSuspended(CategoryPieChart, {
+      props: { option: { series: [{ type: 'pie' as const, data: [] }] } },
+    });
+    const parameter = { data: { key: 'category:1' } };
+
+    wrapper.findComponent({ name: 'VChart' }).vm.$emit('click', parameter);
+
+    expect(wrapper.emitted('click')).toEqual([[parameter]]);
   });
 });

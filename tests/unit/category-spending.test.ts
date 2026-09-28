@@ -9,6 +9,7 @@ import {
   getMonthlyCategorySpendingTotals,
   groupTransactionsByMonth,
   sumAbsoluteAmountStrings,
+  sumSignedAmountStrings,
   type CategorySpendingTransaction,
 } from '../../app/utils/category-spending';
 
@@ -94,6 +95,21 @@ describe('decimal-safe category totals', () => {
       { key: 'category:2', name: 'Transport', amount: '25.00', value: 0.25 },
     ]);
     expect(createCategoryPieData([])).toEqual([]);
+  });
+});
+
+describe('decimal-safe signed transaction totals', () => {
+  it('adds incoming and outgoing amounts while preserving exact scale', () => {
+    expect(sumSignedAmountStrings(['-12.50', '4.00'])).toBe('-8.50');
+    expect(sumSignedAmountStrings(['1.2', '1.20'])).toBe('2.40');
+    expect(sumSignedAmountStrings(['0.01', '-0.02'])).toBe('-0.01');
+  });
+
+  it('preserves precision beyond JavaScript number accuracy and returns zero for no amounts', () => {
+    expect(sumSignedAmountStrings(['9007199254740993.01', '0.01', '-0.002']))
+      .toBe('9007199254740993.018');
+    expect(sumSignedAmountStrings([])).toBe('0');
+    expect(sumSignedAmountStrings(['-0.00'])).toBe('0.00');
   });
 });
 

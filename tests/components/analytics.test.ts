@@ -1,4 +1,5 @@
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
+import { flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -18,6 +19,7 @@ vi.mock('vue-echarts', async () => {
     default: defineComponent({
       name: 'VChart',
       props: ['option'],
+      emits: ['click'],
       template: '<div data-testid="echarts-chart" />',
     }),
   };
@@ -45,6 +47,50 @@ describe('category spending page', () => {
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
     expect(mocks.useFetch.mock.calls[0]?.[0]).toBe('/api/transactions');
     expect(wrapper.findAll('[data-testid="month-panel"]')).toHaveLength(12);
+
+    const today = getLocalDateString(new Date());
+    const monthLink = wrapper.find('[data-testid="month-link"]');
+    const monthTarget = new URL(monthLink.attributes('href'), 'http://localhost');
+    expect(monthTarget.pathname).toBe('/');
+    expect(monthTarget.searchParams.get('month')).toBe(today.slice(0, 7));
+    expect(monthTarget.searchParams.get('category')).toBe('all');
+  });
+
+  it('links category totals and routes named and uncategorised slice activations', async () => {
+    const today = getLocalDateString(new Date());
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: today, amount: '-10.00', category: { id: '7', name: 'Groceries' } },
+      { bookingDate: today, amount: '-2.00', category: null },
+    ]));
+
+    const wrapper = await mountSuspended(Analytics);
+    const links = wrapper.findAll('[data-testid="category-transaction-link"]');
+    const targets = links.map((link) => new URL(link.attributes('href'), 'http://localhost'));
+    expect(targets.map((target) => [target.searchParams.get('month'), target.searchParams.get('category')]))
+      .toEqual([[today.slice(0, 7), '7'], [today.slice(0, 7), 'uncategorised']]);
+
+    const chart = wrapper.findAllComponents({ name: 'VChart' })[0];
+    if (chart === undefined) {
+      throw new Error('expected current month pie chart');
+    }
+    const push = vi.spyOn(wrapper.vm.$router, 'push');
+    const emitSlice = async (key: string) => {
+      chart.vm.$emit('click', { data: { key } });
+      await flushPromises();
+    };
+
+    await emitSlice('category:7');
+    expect(push).toHaveBeenLastCalledWith({
+      path: '/',
+      query: { month: today.slice(0, 7), category: '7' },
+    });
+
+    await emitSlice('uncategorised');
+    expect(push).toHaveBeenLastCalledWith({
+      path: '/',
+      query: { month: today.slice(0, 7), category: 'uncategorised' },
+    });
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 
   it('shows twelve separate monthly pies and exact absolute euro totals', async () => {

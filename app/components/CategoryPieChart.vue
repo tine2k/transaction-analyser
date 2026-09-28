@@ -12,10 +12,11 @@ import type { EChartsOption } from 'echarts';
 import VChart from 'vue-echarts';
 
 defineProps<{ option: EChartsOption }>();
+const emit = defineEmits<{ click: [parameter: unknown] }>();
 </script>
 
 <template>
   <div class="h-96 w-full">
-    <VChart class="w-full" :option="option" autoresize />
+    <VChart class="w-full" :option="option" autoresize @click="emit('click', $event)" />
   </div>
 </template>

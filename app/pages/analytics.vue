@@ -14,6 +14,7 @@ import {
 } from '../utils/category-spending';
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
+const router = useRouter();
 const today = getLocalDateString(new Date());
 const hideUncategorised = ref(false);
 
@@ -57,6 +58,29 @@ function sliceLabel(parameter: unknown): string {
     return '';
   }
   return `${item.data.name}\n${formatEuroAmount(item.data.amount)}`;
+}
+
+function categoryFilterValue(key: string): string {
+  return key === 'uncategorised' ? 'uncategorised' : key.replace(/^category:/, '');
+}
+
+function transactionLocation(month: string, categoryKey: string) {
+  return {
+    path: '/',
+    query: { month, category: categoryFilterValue(categoryKey) },
+  };
+}
+
+function onPieSliceClick(parameter: unknown, month: string): void {
+  const item = parameter as { data?: { key?: unknown } } | undefined;
+  if (typeof item?.data?.key !== 'string') {
+    return;
+  }
+  const key = item.data.key;
+  if (key !== 'uncategorised' && !key.startsWith('category:')) {
+    return;
+  }
+  void router.push(transactionLocation(month, key));
 }
 
 function chartOption(month: MonthlyCategoryChartData): EChartsOption {
@@ -115,11 +139,20 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
           data-testid="month-panel"
           :data-month-key="month.key"
         >
-          <h2 class="text-lg font-semibold text-slate-900">{{ month.label }}</h2>
+          <h2 class="text-lg font-semibold text-slate-900">
+            <NuxtLink
+              :to="{ path: '/', query: { month: month.key, category: 'all' } }"
+              :aria-label="`View all transactions for ${month.label}`"
+              class="hover:underline"
+              data-testid="month-link"
+            >
+              {{ month.label }}
+            </NuxtLink>
+          </h2>
           <figure class="mt-3">
             <figcaption class="sr-only">Pie chart of absolute transaction totals for {{ month.label }}</figcaption>
             <ClientOnly>
-              <CategoryPieChart :option="chartOption(month)" />
+              <CategoryPieChart :option="chartOption(month)" @click="onPieSliceClick($event, month.key)" />
             </ClientOnly>
           </figure>
 
@@ -133,16 +166,23 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
               class="flex items-center justify-between gap-4"
               data-testid="category-total"
             >
-              <span class="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  class="h-3 w-3 shrink-0 rounded-full"
-                  data-testid="category-color"
-                  :style="{ backgroundColor: categoryColor(total.key) }"
-                />
-                <span class="text-slate-700">{{ total.name }}</span>
-              </span>
-              <span class="tabular-nums font-medium text-slate-900">{{ formatEuroAmount(total.amount) }}</span>
+              <NuxtLink
+                :to="transactionLocation(month.key, total.key)"
+                :aria-label="`View ${total.name} transactions for ${month.label}`"
+                class="flex w-full items-center justify-between gap-4 hover:underline"
+                data-testid="category-transaction-link"
+              >
+                <span class="flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    class="h-3 w-3 shrink-0 rounded-full"
+                    data-testid="category-color"
+                    :style="{ backgroundColor: categoryColor(total.key) }"
+                  />
+                  <span class="text-slate-700">{{ total.name }}</span>
+                </span>
+                <span class="tabular-nums font-medium text-slate-900">{{ formatEuroAmount(total.amount) }}</span>
+              </NuxtLink>
             </li>
           </ul>
         </section>

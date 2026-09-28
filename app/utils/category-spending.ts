@@ -33,6 +33,11 @@ export type MonthlyCategoryTotals = CalendarMonth & {
   totals: CategorySpendingTotal[];
 };
 
+export type MonthlyCategoryMatrixData = {
+  categories: Array<Pick<CategorySpendingTotal, 'key' | 'name'>>;
+  months: Array<CalendarMonth & { totals: Map<string, string> }>;
+};
+
 export type MonthlyCategoryChartData = MonthlyCategoryTotals & {
   pieData: CategoryPieDatum[];
 };
@@ -100,6 +105,10 @@ export function sumAbsoluteAmountStrings(amounts: string[]): string {
   return `${digits.slice(0, -scale)}.${digits.slice(-scale)}`;
 }
 
+export function isZeroAmountString(amount: string): boolean {
+  return parseDecimal(amount).coefficient === 0n;
+}
+
 export function sumSignedAmountStrings(amounts: string[]): string {
   let coefficient = 0n;
   let scale = 0;
@@ -144,6 +153,48 @@ export function getMonthlyCategorySpendingTotals(
     ...month,
     totals: getCategorySpendingTotals(groups),
   }));
+}
+
+export function createMonthlyCategoryMatrixData(
+  months: MonthlyCategoryGroups[],
+): MonthlyCategoryMatrixData {
+  const monthlyTotals = getMonthlyCategorySpendingTotals(months);
+  const categoriesByKey = new Map<string, Pick<CategorySpendingTotal, 'key' | 'name'>>();
+
+  for (const { totals } of monthlyTotals) {
+    for (const { key, name } of totals) {
+      categoriesByKey.set(key, { key, name });
+    }
+  }
+
+  const categories = [...categoriesByKey.values()].sort((left, right) => {
+    if (left.key === 'uncategorised') {
+      return right.key === 'uncategorised' ? 0 : 1;
+    }
+    if (right.key === 'uncategorised') {
+      return -1;
+    }
+
+    const byName = left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+    if (byName !== 0) {
+      return byName;
+    }
+
+    const leftId = BigInt(left.key.slice('category:'.length));
+    const rightId = BigInt(right.key.slice('category:'.length));
+    return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+  });
+
+  return {
+    categories,
+    months: monthlyTotals.map(({ totals, ...month }) => {
+      const monthTotals = new Map(categories.map(({ key }) => [key, '0']));
+      for (const total of totals) {
+        monthTotals.set(total.key, total.amount);
+      }
+      return { ...month, totals: monthTotals };
+    }),
+  };
 }
 
 export function createCategoryPieData(totals: CategorySpendingTotal[]): CategoryPieDatum[] {
@@ -296,6 +347,61 @@ export function groupTransactionsByMonth(
     ...month,
     groups: [...groupsByKey.values()],
   }));
+}
+
+export function groupTransactionsByAvailableMonth(
+  transactions: CategorySpendingTransaction[],
+): MonthlyCategoryGroups[] {
+  const monthsByKey = new Map<string, {
+    month: CalendarMonth;
+    groupsByKey: Map<string, CategoryTransactionGroup>;
+  }>();
+
+  for (const transaction of transactions) {
+    const key = transaction.bookingDate.slice(0, 7);
+    let month = monthsByKey.get(key);
+    if (month === undefined) {
+      const [yearPart, monthPart] = key.split('-');
+      const year = Number(yearPart);
+      const monthNumber = Number(monthPart);
+      const date = new Date(Date.UTC(year, monthNumber - 1, 1));
+      const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+      const monthStart = `${key}-01`;
+      month = {
+        month: {
+          key,
+          label: new Intl.DateTimeFormat('en', {
+            month: 'long',
+            year: 'numeric',
+            timeZone: 'UTC',
+          }).format(date),
+          startDate: monthStart,
+          endDate: `${key}-${String(lastDay).padStart(2, '0')}`,
+        },
+        groupsByKey: new Map(),
+      };
+      monthsByKey.set(key, month);
+    }
+
+    const categoryKey = transaction.category === null ? 'uncategorised' : `category:${transaction.category.id}`;
+    let group = month.groupsByKey.get(categoryKey);
+    if (group === undefined) {
+      group = {
+        key: categoryKey,
+        name: transaction.category?.name ?? 'Uncategorised',
+        transactions: [],
+      };
+      month.groupsByKey.set(categoryKey, group);
+    }
+    group.transactions.push(transaction);
+  }
+
+  return [...monthsByKey.values()]
+    .sort((left, right) => right.month.key.localeCompare(left.month.key))
+    .map(({ month, groupsByKey }) => ({
+      ...month,
+      groups: [...groupsByKey.values()],
+    }));
 }
 
 export function getLocalDateString(date: Date): string {

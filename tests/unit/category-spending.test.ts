@@ -3,11 +3,14 @@ import {
   CATEGORY_COLOR_PALETTE,
   createCategoryPieData,
   createCategoryColorMap,
+  createMonthlyCategoryMatrixData,
   createMonthlyCategoryChartData,
   formatEuroAmount,
   getLastTwelveCalendarMonths,
   getMonthlyCategorySpendingTotals,
+  groupTransactionsByAvailableMonth,
   groupTransactionsByMonth,
+  isZeroAmountString,
   sumAbsoluteAmountStrings,
   sumSignedAmountStrings,
   type CategorySpendingTransaction,
@@ -23,6 +26,13 @@ describe('decimal-safe category totals', () => {
     expect(sumAbsoluteAmountStrings(['9007199254740993.01', '0.01', '-0.002']))
       .toBe('9007199254740993.022');
     expect(sumAbsoluteAmountStrings([])).toBe('0');
+  });
+
+  it('recognizes exact zero decimal strings without floating-point conversion', () => {
+    expect(isZeroAmountString('0')).toBe(true);
+    expect(isZeroAmountString('-0.000')).toBe(true);
+    expect(isZeroAmountString('0.001')).toBe(false);
+    expect(isZeroAmountString('9007199254740993.01')).toBe(false);
   });
 
   it('sorts category totals numerically in descending order with name-based ties', () => {
@@ -160,6 +170,23 @@ describe('calendar-month transaction buckets', () => {
     expect(monthlyGroups.slice(1, 11).every((month) => month.groups.length === 0)).toBe(true);
   });
 
+  it('groups every represented booking month newest-first without adding empty months', () => {
+    const months = groupTransactionsByAvailableMonth([
+      { bookingDate: '2020-01-31', amount: '-1.00', category: { id: '1', name: 'Old' } },
+      { bookingDate: '2026-08-03', amount: '-2.00', category: { id: '2', name: 'Recent' } },
+      { bookingDate: '2026-08-29', amount: '3.00', category: { id: '2', name: 'Recent' } },
+      { bookingDate: '2026-09-02', amount: '-4.00', category: null },
+    ]);
+
+    expect(months.map(({ key, label }) => [key, label])).toEqual([
+      ['2026-09', 'September 2026'],
+      ['2026-08', 'August 2026'],
+      ['2020-01', 'January 2020'],
+    ]);
+    expect(months[1]?.groups[0]?.transactions).toHaveLength(2);
+    expect(months[2]?.groups[0]?.name).toBe('Old');
+  });
+
   it('keeps exact absolute category totals separate by month, including uncategorised amounts', () => {
     const transactions: CategorySpendingTransaction[] = [
       { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries' } },
@@ -179,6 +206,44 @@ describe('calendar-month transaction buckets', () => {
     expect(totals[1]?.totals).toEqual([
       { key: 'category:1', name: 'Groceries', amount: '9007199254740993.02' },
     ]);
+  });
+
+  it('builds a zero-filled category-by-month matrix with stable category columns and exact amounts', () => {
+    const matrix = createMonthlyCategoryMatrixData(groupTransactionsByAvailableMonth([
+      { bookingDate: '2026-09-01', amount: '9007199254740993.01', category: { id: '10', name: 'Alpha' } },
+      { bookingDate: '2026-09-02', amount: '-0.002', category: { id: '10', name: 'Alpha' } },
+      { bookingDate: '2026-09-03', amount: '-12.50', category: { id: '2', name: 'alpha' } },
+      { bookingDate: '2026-09-04', amount: '-3.25', category: null },
+      { bookingDate: '2026-08-01', amount: '4.00', category: { id: '2', name: 'alpha' } },
+      { bookingDate: '2026-08-02', amount: '-8.00', category: { id: '3', name: 'Groceries' } },
+      { bookingDate: '2018-03-17', amount: '5.00', category: { id: '3', name: 'Groceries' } },
+    ]));
+
+    expect(matrix.categories).toEqual([
+      { key: 'category:2', name: 'alpha' },
+      { key: 'category:10', name: 'Alpha' },
+      { key: 'category:3', name: 'Groceries' },
+      { key: 'uncategorised', name: 'Uncategorised' },
+    ]);
+    expect(matrix.months.map(({ key }) => key)).toEqual(['2026-09', '2026-08', '2018-03']);
+    expect(matrix.months[0]?.totals).toEqual(new Map([
+      ['category:2', '12.50'],
+      ['category:10', '9007199254740993.012'],
+      ['category:3', '0'],
+      ['uncategorised', '3.25'],
+    ]));
+    expect(matrix.months[1]?.totals).toEqual(new Map([
+      ['category:2', '4.00'],
+      ['category:10', '0'],
+      ['category:3', '8.00'],
+      ['uncategorised', '0'],
+    ]));
+    expect(matrix.months[2]?.totals).toEqual(new Map([
+      ['category:2', '0'],
+      ['category:10', '0'],
+      ['category:3', '5.00'],
+      ['uncategorised', '0'],
+    ]));
   });
 
   it('creates twelve chart datasets and retains empty months without fake slices', () => {

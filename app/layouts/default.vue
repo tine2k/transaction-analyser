@@ -18,6 +18,7 @@ const screens = [
   { to: '/', label: 'Transactions' },
   { to: '/categories', label: 'Categories' },
   { to: '/analytics', label: 'Analytics' },
+  { to: '/monthly-totals', label: 'Monthly totals' },
 ] as const;
 
 function isCurrent(to: string): boolean {

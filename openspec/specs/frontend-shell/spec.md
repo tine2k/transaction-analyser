@@ -35,14 +35,16 @@ The system SHALL render every route inside one default layout, which supplies th
 The system SHALL provide a browser route at `/` that presents the transactions table defined by
 the `transaction-table` capability, a browser route that presents the category management screen
 defined by the `category-management-screen` capability, and a browser route at `/analytics` that
-presents the category spending chart defined by the `category-spending-chart` capability. The
-layout SHALL carry a menu bar, as `category-management-screen` defines, through which all three
-routes are reached. Neither route SHALL show invented data presented as though it were the user's
-own. All routes SHALL be rendered by the browser rather than by the server, so the document
-delivered first carries the application shell and each screen's content is assembled by the
-browser afterwards. The server SHALL serve the application shell for any path, including a path no
-route matches, and SHALL NOT answer an unknown path as a missing resource; the browser SHALL
-render the failure page for a path its router cannot match.
+presents the category spending chart defined by the `category-spending-chart` capability, and a
+browser route at `/monthly-totals` that presents the monthly category totals table defined by the
+`monthly-category-totals-table` capability. The layout SHALL carry a menu bar, as
+`category-management-screen` defines, through which all four routes are reached. Neither route
+SHALL show invented data presented as though it were the user's own. All routes SHALL be rendered
+by the browser rather than by the server, so the document delivered first carries the application
+shell and each screen's content is assembled by the browser afterwards. The server SHALL serve the
+application shell for any path, including a path no route matches, and SHALL NOT answer an unknown
+path as a missing resource; the browser SHALL render the failure page for a path its router cannot
+match.
 
 #### Scenario: The index route presents the table
 
@@ -74,10 +76,15 @@ render the failure page for a path its router cannot match.
 - **WHEN** the `/analytics` route is requested
 - **THEN** a page is delivered that presents the category spending chart
 
+#### Scenario: The monthly totals route presents the category-by-month table
+
+- **WHEN** the `/monthly-totals` route is requested
+- **THEN** a page is delivered that presents the monthly category totals table
+
 #### Scenario: Each route is reached from the menu bar
 
 - **WHEN** the application is shown
-- **THEN** the menu bar links to the transactions route, the category management route, and the analytics route, and following each link reaches that screen
+- **THEN** the menu bar links to the transactions route, the category management route, the analytics route, and the monthly totals route, and following each link reaches that screen
 
 ### Requirement: Styling arrives through one stylesheet, with no component library
 
@@ -148,17 +155,19 @@ The system SHALL NOT compute, derive, aggregate, or infer values about transacti
 except for the transaction page's filter counts: the total number of transactions returned by its
 one read request and the number of those transactions whose category is null; and the category
 spending chart's per-category sums of absolute transaction amounts grouped into twelve calendar
-months by booking date: the current month and the eleven preceding months. The transaction page
-MAY use category presence to select which returned rows to display, but SHALL NOT alter the
-returned data or evaluate any category's regular expression. The category spending chart MAY
-group and aggregate the transactions returned by its single read request into its twelve monthly
-charts as its capability defines. The system SHALL NOT create, alter, or delete any stored data.
-The shell's relationship to stored data SHALL be through same-origin read-only API requests and
-SHALL NOT run a statement against the database itself. The transaction table SHALL present
-transaction values exactly as the endpoint returned them. Apart from the two transaction filter
-counts, the selected view of returned transactions, and the monthly chart aggregation defined by
-`category-spending-chart`, the shell SHALL NOT total, average, group, or otherwise derive a value
-from transaction data for display.
+months by booking date: the current month and the eleven preceding months; and the monthly category
+totals table's per-category sums of absolute transaction amounts grouped by booking month for every
+month represented by a transaction returned from the endpoint. The transaction page MAY use
+category presence to select which returned rows to display, but SHALL NOT alter the returned data or
+evaluate any category's regular expression. The category spending chart and monthly category totals
+table MAY group and aggregate the transactions returned by their single read request as their
+capabilities define. The system SHALL NOT create, alter, or delete any stored data. The shell's
+relationship to stored data SHALL be through same-origin read-only API requests and SHALL NOT run a
+statement against the database itself. The transaction table SHALL present transaction values
+exactly as the endpoint returned them. Apart from the two transaction filter counts, the selected
+view of returned transactions, and the monthly aggregations defined by `category-spending-chart`
+and `monthly-category-totals-table`, the shell SHALL NOT total, average, group, or otherwise derive
+a value from transaction data for display.
 
 #### Scenario: No category pattern is evaluated
 
@@ -167,8 +176,8 @@ from transaction data for display.
 
 #### Scenario: Only the filter counts are derived from transactions
 
-- **WHEN** the index route renders its filter options
-- **THEN** the index route displays only the total returned transaction count and count with a null category, and the analytics route displays only the twelve per-month category absolute totals defined by its capability
+- **WHEN** the index route or an analytics route renders its transaction-derived values
+- **THEN** the index route displays only the total returned transaction count and count with a null category, the analytics route displays only the twelve per-month category absolute totals defined by its capability, and the monthly totals route displays only the per-month category absolute totals defined by its capability for months represented in returned transactions
 
 #### Scenario: Filtering does not alter returned values or data
 

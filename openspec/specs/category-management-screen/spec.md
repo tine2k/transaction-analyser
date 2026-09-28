@@ -12,19 +12,25 @@ browser.
 ### Requirement: The layout carries a menu bar linking the screens
 
 The shared layout SHALL carry a menu bar, present on every route, holding a link to the
-transactions screen and a link to the category management screen. Each link SHALL be an
-in-application navigation to that screen on the same origin. The menu bar SHALL distinguish the
-link for the screen currently shown from the other. Adding the menu bar SHALL NOT remove the
-frame's other properties, which remain as `frontend-shell` defines.
+transactions screen, a link to the category management screen, and a link to the category
+spending analytics screen. Each link SHALL be an in-application navigation to that screen on the
+same origin. The menu bar SHALL distinguish the link for the screen currently shown from the
+other links. Adding the menu bar SHALL NOT remove the frame's other properties, which remain as
+`frontend-shell` defines.
 
 #### Scenario: The menu bar is on the transactions screen
 
 - **WHEN** the transactions screen is shown
-- **THEN** a menu bar is present holding a link to the transactions screen and a link to the category management screen
+- **THEN** a menu bar is present holding links to the transactions screen, the category management screen, and the category spending analytics screen
 
 #### Scenario: The menu bar is on the category management screen
 
 - **WHEN** the category management screen is shown
+- **THEN** the same menu bar is present
+
+#### Scenario: The menu bar is on the analytics screen
+
+- **WHEN** the category spending analytics screen is shown
 - **THEN** the same menu bar is present
 
 #### Scenario: The current screen is distinguished
@@ -34,8 +40,8 @@ frame's other properties, which remain as `frontend-shell` defines.
 
 #### Scenario: Each link reaches its screen
 
-- **WHEN** the link to the category management screen is followed, and the link to the transactions screen is followed
-- **THEN** each navigation reaches that screen without a full page load from another origin
+- **WHEN** any menu link is followed
+- **THEN** its screen is reached through in-application navigation on the same origin
 
 ### Requirement: The category screen lists every category with its name and expression
 

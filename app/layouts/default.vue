@@ -17,6 +17,7 @@ const route = useRoute();
 const screens = [
   { to: '/', label: 'Transactions' },
   { to: '/categories', label: 'Categories' },
+  { to: '/analytics', label: 'Analytics' },
 ] as const;
 
 function isCurrent(to: string): boolean {

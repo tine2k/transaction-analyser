@@ -2,3 +2,5 @@
    no content configuration: it scans the source tree itself. Design tokens and
    a theme are deferred to the first change that renders real content. */
 @import 'tailwindcss';
+/* Gives Vue ECharts' custom element and its internal host explicit dimensions. */
+@import 'vue-echarts/style.css';

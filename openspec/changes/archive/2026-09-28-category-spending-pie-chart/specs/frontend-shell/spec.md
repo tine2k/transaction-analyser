@@ -1,34 +1,6 @@
-# Frontend Shell Specification
+# Spec Delta
 
-## Purpose
-
-Defines the browser half of the application: that every route renders inside one default layout, that the only route is an index route holding placeholder text, that a failure renders a defined page rather than a blank screen, that styling arrives through one stylesheet with no component library, and that the browser is never given a database address and reaches the server only through the same-origin API.
-
-## Requirements
-
-### Requirement: Every route renders inside one default layout
-
-The system SHALL render every route inside one default layout, which supplies the application's frame: the document's shared metadata, the page container, and the shared heading area. No route SHALL be able to render outside that layout. The layout SHALL apply to the failure page as well as to the routes, so that a failure is presented in the same frame as a successful page. The system SHALL NOT add a second layout, and SHALL NOT let a route opt out of the default one. The frame's page container SHALL span the full width of the viewport, and SHALL NOT constrain itself to a centered maximum-width column, so that the frame uses the horizontal room a large display provides. The frame SHALL hold a horizontal padding inset so its content is not flush against the viewport edge.
-
-#### Scenario: A route renders inside the frame
-
-- **WHEN** the index route is requested
-- **THEN** the response contains the shared frame with the page's content inside it
-
-#### Scenario: The failure page uses the same frame
-
-- **WHEN** a request fails, or names a route that does not exist
-- **THEN** the failure page is delivered inside the same frame as a successful page
-
-#### Scenario: There is exactly one layout and no route escapes it
-
-- **WHEN** the application's layouts and routes are inspected
-- **THEN** exactly one layout is defined, it is the one every route renders in, and no route declares that it renders without it
-
-#### Scenario: The frame spans the viewport width
-
-- **WHEN** a route is rendered on a display wider than the frame's content
-- **THEN** the frame's container extends to the full width of the viewport rather than stopping at a centered maximum-width column, with only a horizontal padding inset between the content and the viewport edge
+## MODIFIED Requirements
 
 ### Requirement: The browser routes are rendered by the browser and reached from the menu bar
 
@@ -97,50 +69,12 @@ conventions for reusable components are deferred to the first change that render
 #### Scenario: The failure page is styled by the same stylesheet
 
 - **WHEN** the failure page is delivered
-- **THEN** it is styled by the same stylesheet as every other route, with no separate styling of its own
+- **THEN** it is styled by the same stylesheet as every other page, with no separate styling of its own
 
 #### Scenario: No component library is present
 
 - **WHEN** the project's dependencies are inspected
 - **THEN** no general-purpose component library, design system, icon set, or headless component kit is present, while a charting library may be used only for the category spending visualization
-
-### Requirement: The browser is never given a database address
-
-The system SHALL NOT deliver the database address, a user name, a password, or any part of a connection string to the browser, whether in a rendered document, in a delivered client asset, or in any response. The system SHALL NOT deliver any configuration value intended for the server alone. The browser SHALL reach the server's functionality only through same-origin requests to the API, and the system SHALL NOT require a cross-origin request from the page.
-
-#### Scenario: No credential is in the delivered document
-
-- **WHEN** the index route is requested
-- **THEN** the delivered document contains no database address, no user name, and no password
-
-#### Scenario: No credential is in the delivered assets
-
-- **WHEN** the application's client assets are inspected
-- **THEN** they contain no database address, no user name, and no password, and no configuration value meant for the server alone
-
-#### Scenario: The page talks only to its own origin
-
-- **WHEN** the page makes a request for data or for a status
-- **THEN** the request is a same-origin request to the API, and no request to another origin is required or made
-
-### Requirement: The browser holds no identity and no credential
-
-The system SHALL present no login, no account, no sign-in control, and no user identity, and the browser SHALL store no credential for this application in a cookie, in local storage, or in session storage. The shell SHALL NOT send a stored token with a request.
-
-#### Scenario: No sign-in exists
-
-- **WHEN** any page is rendered
-- **THEN** no control asks the user to identify themselves, and the application names no user
-
-#### Scenario: Nothing is stored in the browser
-
-- **WHEN** a page is used
-- **THEN** the application writes no cookie, no local storage entry, and no session storage entry
-
-#### Scenario: No token is sent
-
-- **WHEN** the page makes a request to the API
-- **THEN** the request carries no token and no authorization header of the application's own
 
 ### Requirement: The shell performs no domain work
 
@@ -167,18 +101,18 @@ from transaction data for display.
 
 #### Scenario: Only the filter counts are derived from transactions
 
-- **WHEN** the index route renders its filter options
+- **WHEN** the index route renders its filter options and the analytics route renders its chart
 - **THEN** the index route displays only the total returned transaction count and count with a null category, and the analytics route displays only the twelve per-month category absolute totals defined by its capability
 
 #### Scenario: Filtering does not alter returned values or data
 
 - **WHEN** the user selects the uncategorised-only view
-- **THEN** the page only chooses which returned transactions to show, presents their values unchanged, and writes no data
+- **THEN** the page only chooses which returned rows to show, presents their values unchanged, and writes no data
 
 #### Scenario: The shell reads only through the read endpoint
 
-- **WHEN** the shell obtains transaction data
-- **THEN** it does so through the one read request to the transactions endpoint and runs no statement against the database itself
+- **WHEN** a screen obtains transaction data
+- **THEN** it does so through a same-origin read-only API request and runs no statement against the database itself
 
 #### Scenario: No row is written
 

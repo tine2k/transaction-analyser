@@ -501,4 +501,90 @@ describe('API integration', () => {
         transactions.find((transaction) => transaction.purpose === 'Bookshop')?.category);
     expect(bookshop).toMatchObject({ id: '4', name: 'Overlap small' });
   });
+
+  it('previews the transactions a window claims, excluding those an expression matches', async () => {
+    const before = await storedRows();
+    const response = await request('/api/categories/window-match-count', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ windows: [{ from: '2026-02-01', to: '2026-02-05' }] }),
+    });
+
+    expect(response.status).toBe(200);
+    // REWE Market, Rail ticket, and Internal transfer are claimed by a stored
+    // expression; only Bookshop is left for the window to claim.
+    expect(await response.json()).toEqual({ count: 1 });
+    assert.deepEqual(await storedRows(), before);
+  });
+
+  it('counts a window inclusively on both endpoints and ignores the value date', async () => {
+    // Remove the transport expression so Rail ticket (booking 2026-02-04, value
+    // 2026-02-03) can only be claimed by a window.
+    await request('/api/categories/2', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Transport', patterns: ['zzzz'], hidden: false }),
+    });
+
+    const count = (windows: Array<{ from: string; to: string }>) =>
+      request('/api/categories/window-match-count', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ windows }),
+      }).then((result) => result.json()).then((body: { count: number }) => body.count);
+
+    // Bookshop is on 2026-02-01; a window whose from or to endpoint is that day counts it.
+    expect(await count([{ from: '2026-02-01', to: '2026-02-01' }])).toBe(1);
+    expect(await count([{ from: '2026-01-31', to: '2026-02-01' }])).toBe(1);
+    // A window that covers the value date but not the booking date does not count it.
+    expect(await count([{ from: '2026-02-03', to: '2026-02-03' }])).toBe(0);
+    // The booking date itself does decide it.
+    expect(await count([{ from: '2026-02-04', to: '2026-02-04' }])).toBe(1);
+  });
+
+  it('counts each transaction once across several windows, including overlapping ones', async () => {
+    const before = await storedRows();
+    const response = await request('/api/categories/window-match-count', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        windows: [
+          { from: '2026-01-31', to: '2026-02-01' },
+          { from: '2026-02-01', to: '2026-02-02' },
+          { from: '2026-02-01', to: '2026-02-05' },
+        ],
+      }),
+    });
+
+    // Only Bookshop is unclaimed; three covering windows still count it once.
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ count: 1 });
+    assert.deepEqual(await storedRows(), before);
+  });
+
+  it('rejects a missing, empty, or malformed window list without changing stored data', async () => {
+    const before = await storedRows();
+    const bodies = [
+      {},
+      { windows: [] },
+      { windows: 'nope' },
+      { windows: [null] },
+      { windows: [{ from: '2026-02-01', to: '2026-02-05', extra: true }] },
+      { windows: [{ from: '2026-02-01T00:00:00', to: '2026-02-05' }] },
+      { windows: [{ from: '2026-02-30', to: '2026-03-01' }] },
+      { windows: [{ from: '2026-02-05', to: '2026-02-01' }] },
+      { windows: [{ from: '2026-02-01' }] },
+    ];
+
+    for (const body of bodies) {
+      const response = await request('/api/categories/window-match-count', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(400);
+    }
+
+    assert.deepEqual(await storedRows(), before);
+  });
 });

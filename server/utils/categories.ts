@@ -84,6 +84,28 @@ const COUNT_MATCHING_TRANSACTIONS = `
   )
 `;
 
+// The window preview counts the transactions a candidate window set would claim:
+// its booking date falls inclusively in at least one window, and no stored
+// category's expression matches its purpose line. The exclusion mirrors the first
+// tier of the recompute, so a transaction an expression explains is never claimed
+// by a window; `count(*)` counts each transaction once even when several windows
+// cover it. It reads only.
+const COUNT_CLAIMED_TRANSACTIONS = `
+  SELECT count(*)::text AS count
+  FROM transactions AS t
+  WHERE EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements($1::jsonb) AS candidate(win)
+    WHERE t.booking_date BETWEEN (candidate.win->>'from')::date AND (candidate.win->>'to')::date
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM categories AS c
+    CROSS JOIN LATERAL unnest(c.patterns) AS expression(pattern)
+    WHERE t.purpose ~* expression.pattern
+  )
+`;
+
 // The global recompute, in two tiers. A category matches when at least one of its
 // expressions matches the purpose line, so the first scalar subquery tests existence
 // across the category's expressions with `unnest`; `ORDER BY c.id LIMIT 1` makes the
@@ -204,6 +226,29 @@ export async function countCategoryMatches(input: unknown): Promise<number> {
   await assertPatternsCompile(database, patterns);
 
   const result = await database.query(COUNT_MATCHING_TRANSACTIONS, [patterns]);
+  const count = Number(result.rows[0]?.count);
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error('the transaction match count is outside the supported range');
+  }
+  return count;
+}
+
+// Previews the transactions a candidate window set would claim. It reads only:
+// unlike create and edit, it stores nothing and triggers no reassignment. It
+// validates the windows exactly as a write does, but deliberately does not apply
+// the stored non-overlap rule, because it creates no stored window and overlapping
+// candidates are counted once.
+export async function countWindowClaims(input: unknown): Promise<number> {
+  if (typeof input !== 'object' || input === null) {
+    throw new CategoryError(400, 'a preview needs at least one date window');
+  }
+  const windows = readWindows(input);
+  if (windows.length === 0) {
+    throw new CategoryError(400, 'a preview needs at least one date window');
+  }
+
+  const database = useDatabase();
+  const result = await database.query(COUNT_CLAIMED_TRANSACTIONS, [JSON.stringify(windows)]);
   const count = Number(result.rows[0]?.count);
   if (!Number.isSafeInteger(count) || count < 0) {
     throw new Error('the transaction match count is outside the supported range');

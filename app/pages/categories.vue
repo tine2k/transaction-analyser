@@ -50,8 +50,12 @@ const formError = ref<string | null>(null);
 const listError = ref<string | null>(null);
 const matchCount = ref<number | null>(null);
 const matchCountState = ref<'empty' | 'loading' | 'ready' | 'unavailable'>('empty');
+const windowMatchCount = ref<number | null>(null);
+const windowMatchState = ref<'empty' | 'loading' | 'ready' | 'unavailable'>('empty');
 let previewGeneration = 0;
 let previewTimer: ReturnType<typeof setTimeout> | null = null;
+let windowPreviewGeneration = 0;
+let windowPreviewTimer: ReturnType<typeof setTimeout> | null = null;
 
 function messageOf(failure: unknown): string {
   const message = (failure as { data?: { message?: unknown } }).data?.message;
@@ -111,6 +115,14 @@ function enteredWindows(): CategoryWindow[] {
     .map((window) => ({ from: window.from, to: window.to }));
 }
 
+// The complete windows, both dates entered, which the window-claim preview sends.
+// A partial window is not previewed, because the server would only reject it.
+function completeWindows(): CategoryWindow[] {
+  return windows.value
+    .filter((window) => window.from !== '' && window.to !== '')
+    .map((window) => ({ from: window.from, to: window.to }));
+}
+
 async function loadMatchCount(generation: number, submitted: string[]): Promise<void> {
   try {
     const result = await $fetch<{ count: number }>('/api/categories/match-count', {
@@ -156,10 +168,64 @@ watch(patterns, (currentPatterns) => {
   }, 250);
 }, { deep: true, flush: 'sync' });
 
+// The window-claim preview is separate from the expression preview. It sends only
+// the complete windows the user entered and shows the server's combined count of
+// the transactions those windows would claim — those whose booking date falls in a
+// window and whose purpose line no stored expression matches. The browser tests no
+// date and evaluates no expression.
+async function loadWindowMatchCount(generation: number, submitted: CategoryWindow[]): Promise<void> {
+  try {
+    const result = await $fetch<{ count: number }>('/api/categories/window-match-count', {
+      method: 'POST',
+      body: { windows: submitted },
+    });
+    if (generation !== windowPreviewGeneration) {
+      return;
+    }
+    if (!Number.isSafeInteger(result.count) || result.count < 0) {
+      windowMatchCount.value = null;
+      windowMatchState.value = 'unavailable';
+      return;
+    }
+    windowMatchCount.value = result.count;
+    windowMatchState.value = 'ready';
+  } catch {
+    if (generation === windowPreviewGeneration) {
+      windowMatchCount.value = null;
+      windowMatchState.value = 'unavailable';
+    }
+  }
+}
+
+watch(windows, (currentWindows) => {
+  const generation = ++windowPreviewGeneration;
+  if (windowPreviewTimer !== null) {
+    clearTimeout(windowPreviewTimer);
+    windowPreviewTimer = null;
+  }
+
+  const submitted = currentWindows.filter((window) => window.from !== '' && window.to !== '');
+  windowMatchCount.value = null;
+  if (submitted.length === 0) {
+    windowMatchState.value = 'empty';
+    return;
+  }
+
+  windowMatchState.value = 'loading';
+  windowPreviewTimer = setTimeout(() => {
+    windowPreviewTimer = null;
+    void loadWindowMatchCount(generation, submitted.map((window) => ({ ...window })));
+  }, 250);
+}, { deep: true, flush: 'sync' });
+
 onBeforeUnmount(() => {
   previewGeneration += 1;
+  windowPreviewGeneration += 1;
   if (previewTimer !== null) {
     clearTimeout(previewTimer);
+  }
+  if (windowPreviewTimer !== null) {
+    clearTimeout(windowPreviewTimer);
   }
 });
 
@@ -323,7 +389,7 @@ async function remove(category: Category): Promise<void> {
         Hidden from the analysis
       </label>
 
-      <p class="mt-3 text-sm text-slate-600" role="status" aria-live="polite">
+      <p class="mt-3 text-sm text-slate-600" role="status" aria-live="polite" data-testid="pattern-match-count">
         <template v-if="matchCountState === 'empty'">
           Enter an expression to preview matching transactions.
         </template>
@@ -335,6 +401,21 @@ async function remove(category: Category): Promise<void> {
         </template>
         <template v-else>
           Match count unavailable. You can still save this category.
+        </template>
+      </p>
+
+      <p class="mt-2 text-sm text-slate-600" role="status" aria-live="polite" data-testid="window-match-count">
+        <template v-if="windowMatchState === 'empty'">
+          Enter a from and a to date to preview transactions the windows would claim.
+        </template>
+        <template v-else-if="windowMatchState === 'loading'">
+          Checking transactions the windows claim…
+        </template>
+        <template v-else-if="windowMatchState === 'ready'">
+          Windows claim {{ windowMatchCount }} stored transaction{{ windowMatchCount === 1 ? '' : 's' }}.
+        </template>
+        <template v-else>
+          Window claim count unavailable. You can still save this category.
         </template>
       </p>
 

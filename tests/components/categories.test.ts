@@ -1,7 +1,7 @@
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ useFetch: vi.fn(), fetch: vi.fn() }));
 
@@ -38,6 +38,10 @@ describe('category management page', () => {
     mocks.useFetch.mockReset();
     mocks.fetch.mockReset();
     mocks.useFetch.mockReturnValue(response());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('sorts category rows and loads the selected category into the edit form', async () => {
@@ -184,5 +188,113 @@ describe('category management page', () => {
 
     expect(mocks.fetch).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('Enter at least one regular expression or date window.');
+  });
+
+  it('previews the transactions the entered windows claim', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    mocks.fetch.mockResolvedValue({ count: 3 });
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('[data-testid="add-window"]').trigger('click');
+    await wrapper.get('[data-testid="window-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="window-to"]').setValue('2026-07-14');
+    await vi.advanceTimersByTimeAsync(250);
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/categories/window-match-count', expect.objectContaining({
+      method: 'POST',
+      body: { windows: [{ from: '2026-07-01', to: '2026-07-14' }] },
+    }));
+    expect(wrapper.get('[data-testid="window-match-count"]').text())
+      .toContain('Windows claim 3 stored transactions');
+  });
+
+  it('refreshes the window preview as the windows change', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    mocks.fetch.mockResolvedValue({ count: 1 });
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('[data-testid="add-window"]').trigger('click');
+    await wrapper.get('[data-testid="window-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="window-to"]').setValue('2026-07-14');
+    await vi.advanceTimersByTimeAsync(250);
+    await flushPromises();
+    expect(mocks.fetch).toHaveBeenLastCalledWith('/api/categories/window-match-count', expect.objectContaining({
+      body: { windows: [{ from: '2026-07-01', to: '2026-07-14' }] },
+    }));
+
+    await wrapper.get('[data-testid="window-to"]').setValue('2026-07-20');
+    await vi.advanceTimersByTimeAsync(250);
+    await flushPromises();
+    expect(mocks.fetch).toHaveBeenLastCalledWith('/api/categories/window-match-count', expect.objectContaining({
+      body: { windows: [{ from: '2026-07-01', to: '2026-07-20' }] },
+    }));
+  });
+
+  it('does not preview an incomplete or empty window set', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    mocks.fetch.mockResolvedValue({ count: 1 });
+    const wrapper = await mountSuspended(Categories);
+
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(mocks.fetch).not.toHaveBeenCalledWith('/api/categories/window-match-count', expect.anything());
+
+    await wrapper.get('[data-testid="add-window"]').trigger('click');
+    await wrapper.get('[data-testid="window-from"]').setValue('2026-07-01');
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(mocks.fetch).not.toHaveBeenCalledWith('/api/categories/window-match-count', expect.anything());
+    expect(wrapper.get('[data-testid="window-match-count"]').text())
+      .toContain('Enter a from and a to date');
+  });
+
+  it('shows an unavailable window preview without blocking a save', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/categories/window-match-count') {
+        return Promise.reject(new Error('unavailable'));
+      }
+      return Promise.resolve({});
+    });
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('form label input').setValue('Urlaub');
+    await wrapper.get('[data-testid="add-window"]').trigger('click');
+    await wrapper.get('[data-testid="window-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="window-to"]').setValue('2026-07-14');
+    await vi.advanceTimersByTimeAsync(250);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="window-match-count"]').text()).toContain('unavailable');
+
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/categories', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('shows the expression and window previews separately', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/categories/match-count') {
+        return Promise.resolve({ count: 2 });
+      }
+      if (url === '/api/categories/window-match-count') {
+        return Promise.resolve({ count: 5 });
+      }
+      return Promise.resolve({});
+    });
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('[data-testid="pattern-input"]').setValue('rewe');
+    await wrapper.get('[data-testid="add-window"]').trigger('click');
+    await wrapper.get('[data-testid="window-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="window-to"]').setValue('2026-07-14');
+    await vi.advanceTimersByTimeAsync(250);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="pattern-match-count"]').text()).toContain('Matches 2');
+    expect(wrapper.get('[data-testid="window-match-count"]').text()).toContain('Windows claim 5');
   });
 });

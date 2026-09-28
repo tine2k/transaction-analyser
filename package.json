@@ -14,17 +14,23 @@
     "import": "node tools/import-transactions.ts",
     "postinstall": "nuxt prepare",
     "preview": "nuxt preview",
-    "test:category-match-count": "node --loader ./tests/resolve-typescript-imports.mjs --test tests/category-match-count.integration.test.ts",
-    "test:category-match-count:ui": "playwright test --config tests/playwright.config.ts"
+    "test": "npm run test:unit && npm run test:components && npm run test:integration",
+    "test:unit": "vitest run tests/unit",
+    "test:components": "vitest run tests/components",
+    "test:integration": "npm run build && bash tests/run-with-test-database.sh npm run test:integration:run",
+    "test:integration:run": "vitest run tests/integration --hookTimeout=30000 --testTimeout=10000"
   },
   "dependencies": {
     "csv-parse": "^7.0.3",
     "pg": "^8.23.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
+    "@nuxt/test-utils": "^4.3.2",
     "@tailwindcss/vite": "^4.3.3",
+    "@vue/test-utils": "^2.5.1",
+    "happy-dom": "^20.14.5",
     "nuxt": "^4.5.2",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "vitest": "^5.0.2"
   }
 }

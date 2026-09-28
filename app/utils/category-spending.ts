@@ -39,6 +39,19 @@ export type MonthlyCategoryChartData = MonthlyCategoryTotals & {
 
 type DecimalParts = { coefficient: bigint; scale: number };
 
+export const CATEGORY_COLOR_PALETTE = [
+  '#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F',
+  '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC',
+] as const;
+
+export function createCategoryColorMap(categoryKeys: string[]): Map<string, string> {
+  const sortedKeys = [...new Set(categoryKeys)].sort();
+  return new Map(sortedKeys.map((key, index) => [
+    key,
+    CATEGORY_COLOR_PALETTE[index % CATEGORY_COLOR_PALETTE.length]!,
+  ]));
+}
+
 function parseDecimal(value: string): DecimalParts {
   const match = /^([+-]?)(\d+)(?:\.(\d+))?$/.exec(value);
   if (match === null) {

@@ -56,6 +56,7 @@ describe('category spending page', () => {
       { bookingDate: today, amount: '-12.50', category: { id: '1', name: 'Groceries' } },
       { bookingDate: today, amount: '4.00', category: { id: '1', name: 'Groceries' } },
       { bookingDate: today, amount: '-3.25', category: null },
+      { bookingDate: previousMonth.startDate, amount: '-2.00', category: { id: '2', name: 'Transport' } },
       { bookingDate: previousMonth.startDate, amount: '-7.00', category: { id: '1', name: 'Groceries' } },
     ]));
 
@@ -70,7 +71,7 @@ describe('category spending page', () => {
     expect(panels[0]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
       .toEqual(['Groceries€16.50', 'Uncategorised€3.25']);
     expect(panels[1]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
-      .toEqual(['Groceries€7.00']);
+      .toEqual(['Transport€2.00', 'Groceries€7.00']);
 
     const currentOption = charts[0]?.props('option');
     expect(currentOption.series[0].type).toBe('pie');
@@ -78,7 +79,66 @@ describe('category spending page', () => {
       .toEqual([['Groceries', '16.50'], ['Uncategorised', '3.25']]);
     const previousOption = charts[1]?.props('option');
     expect(previousOption.series[0].data.map(({ name, amount }) => [name, amount]))
-      .toEqual([['Groceries', '7.00']]);
+      .toEqual([['Transport', '2.00'], ['Groceries', '7.00']]);
+
+    const currentGroceries = currentOption.series[0].data[0];
+    const previousGroceries = previousOption.series[0].data[1];
+    expect(currentGroceries.itemStyle.color).toBe(previousGroceries.itemStyle.color);
+    expect(currentGroceries.emphasis.itemStyle.color).toBe(currentGroceries.itemStyle.color);
+    expect(previousGroceries.emphasis.itemStyle.color).toBe(previousGroceries.itemStyle.color);
+    expect(panels[0]?.findAll('[data-testid="category-total"]')[0]
+      ?.find('[data-testid="category-color"]').element.style.backgroundColor)
+      .toBe(currentGroceries.itemStyle.color);
+    expect(panels[1]?.findAll('[data-testid="category-total"]')[1]
+      ?.find('[data-testid="category-color"]').element.style.backgroundColor)
+      .toBe(previousGroceries.itemStyle.color);
+  });
+
+  it('hides and restores uncategorised totals across all months without reloading data', async () => {
+    const today = getLocalDateString(new Date());
+    const [currentMonth, previousMonth] = getLastTwelveCalendarMonths(today);
+    if (currentMonth === undefined || previousMonth === undefined) {
+      throw new Error('expected twelve calendar month buckets');
+    }
+    const transactions: CategorySpendingTransaction[] = [
+      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: today, amount: '-3.00', category: null },
+      { bookingDate: previousMonth.startDate, amount: '-5.00', category: null },
+    ];
+    mocks.useFetch.mockReturnValue(response(transactions));
+
+    const wrapper = await mountSuspended(Analytics);
+    const hideControl = wrapper.get('[data-testid="hide-uncategorised"]');
+    expect((hideControl.element as HTMLInputElement).checked).toBe(false);
+    expect(wrapper.findAll('[data-testid="month-panel"]')).toHaveLength(12);
+    expect(wrapper.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .toEqual(['Groceries€10.00', 'Uncategorised€3.00', 'Uncategorised€5.00']);
+    const groceryColorBeforeHide = wrapper.find('[data-testid="category-color"]').element.style.backgroundColor;
+
+    await hideControl.setValue(true);
+    const panelsWhenHidden = wrapper.findAll('[data-testid="month-panel"]');
+    const chartsWhenHidden = wrapper.findAllComponents({ name: 'VChart' });
+    expect((hideControl.element as HTMLInputElement).checked).toBe(true);
+    expect(panelsWhenHidden).toHaveLength(12);
+    expect(panelsWhenHidden[0]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .toEqual(['Groceries€10.00']);
+    expect(panelsWhenHidden[1]?.findAll('[data-testid="category-total"]')).toHaveLength(0);
+    expect(panelsWhenHidden[1]?.text()).toContain(`No category data for ${previousMonth.label}`);
+    expect(chartsWhenHidden[0]?.props('option').series[0].data.map(({ name }) => name))
+      .toEqual(['Groceries']);
+    expect(chartsWhenHidden[1]?.props('option').series[0].data).toEqual([]);
+    expect(panelsWhenHidden[0]?.find('[data-testid="category-color"]')
+      .element.style.backgroundColor).toBe(groceryColorBeforeHide);
+
+    await hideControl.setValue(false);
+    expect(wrapper.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .toEqual(['Groceries€10.00', 'Uncategorised€3.00', 'Uncategorised€5.00']);
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+    expect(transactions).toEqual([
+      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: today, amount: '-3.00', category: null },
+      { bookingDate: previousMonth.startDate, amount: '-5.00', category: null },
+    ]);
   });
 
   it('shows loading and failure states and keeps all empty-month charts', async () => {

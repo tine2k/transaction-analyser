@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { EChartsOption } from 'echarts';
 import {
+  CATEGORY_COLOR_PALETTE,
+  createCategoryColorMap,
   createMonthlyCategoryChartData,
   formatEuroAmount,
   getLocalDateString,
@@ -13,12 +15,31 @@ import {
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
 const today = getLocalDateString(new Date());
+const hideUncategorised = ref(false);
 
 const monthlyCharts = computed(() =>
   createMonthlyCategoryChartData(
     getMonthlyCategorySpendingTotals(groupTransactionsByMonth(transactions.value ?? [], today)),
   ),
 );
+
+const categoryColorMap = computed(() => createCategoryColorMap(
+  monthlyCharts.value.flatMap(({ totals }) => totals.map(({ key }) => key)),
+));
+
+const displayedMonthlyCharts = computed(() => monthlyCharts.value.map((month) => ({
+  ...month,
+  totals: hideUncategorised.value
+    ? month.totals.filter(({ key }) => key !== 'uncategorised')
+    : month.totals,
+  pieData: hideUncategorised.value
+    ? month.pieData.filter(({ key }) => key !== 'uncategorised')
+    : month.pieData,
+})));
+
+function categoryColor(key: string): string {
+  return categoryColorMap.value.get(key) ?? CATEGORY_COLOR_PALETTE[0];
+}
 
 function tooltipLabel(parameter: unknown): string {
   const item = (Array.isArray(parameter) ? parameter[0] : parameter) as {
@@ -40,7 +61,14 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
     series: [{
       type: 'pie',
       radius: '68%',
-      data: month.pieData,
+      data: month.pieData.map((datum) => {
+        const color = categoryColor(datum.key);
+        return {
+          ...datum,
+          itemStyle: { color },
+          emphasis: { itemStyle: { color } },
+        };
+      }),
       label: { show: false },
     }],
   };
@@ -59,9 +87,19 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
     </p>
     <p v-else-if="pending" class="mt-4 text-slate-600">Loading monthly category totals…</p>
     <template v-else-if="transactions">
+      <label class="mt-4 inline-flex items-center gap-2 text-sm text-slate-700">
+        <input
+          v-model="hideUncategorised"
+          type="checkbox"
+          data-testid="hide-uncategorised"
+          class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+        >
+        Hide uncategorised
+      </label>
+
       <div class="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-3" data-testid="monthly-charts">
         <section
-          v-for="month in monthlyCharts"
+          v-for="month in displayedMonthlyCharts"
           :key="month.key"
           class="rounded-md border border-slate-200 bg-white p-4"
           data-testid="month-panel"
@@ -85,7 +123,15 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
               class="flex items-center justify-between gap-4"
               data-testid="category-total"
             >
-              <span class="text-slate-700">{{ total.name }}</span>
+              <span class="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  class="h-3 w-3 shrink-0 rounded-full"
+                  data-testid="category-color"
+                  :style="{ backgroundColor: categoryColor(total.key) }"
+                />
+                <span class="text-slate-700">{{ total.name }}</span>
+              </span>
               <span class="tabular-nums font-medium text-slate-900">{{ formatEuroAmount(total.amount) }}</span>
             </li>
           </ul>

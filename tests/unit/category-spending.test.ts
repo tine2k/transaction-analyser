@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CATEGORY_COLOR_PALETTE,
   createCategoryPieData,
+  createCategoryColorMap,
   createMonthlyCategoryChartData,
   formatEuroAmount,
   getLastTwelveCalendarMonths,
@@ -46,6 +48,18 @@ describe('decimal-safe category totals', () => {
       { key: 'category:2', name: 'Transport', amount: '25.00', value: 0.25 },
     ]);
     expect(createCategoryPieData([])).toEqual([]);
+  });
+});
+
+describe('stable category colors', () => {
+  it('assigns distinct palette colors by sorted identity regardless of input order', () => {
+    const keys = ['category:1', 'category:2', 'uncategorised'];
+    const colorsInOrder = createCategoryColorMap(keys);
+    const colorsInReverseOrder = createCategoryColorMap([...keys].reverse());
+
+    expect(colorsInReverseOrder).toEqual(colorsInOrder);
+    expect(new Set(colorsInOrder.values()).size).toBe(keys.length);
+    expect([...colorsInOrder.values()]).toEqual(CATEGORY_COLOR_PALETTE.slice(0, keys.length));
   });
 });
 

@@ -17,6 +17,7 @@
     { "action": "shell", "resource": "tail *", "effect": "allow" },
     { "action": "shell", "resource": "od *", "effect": "allow" },
     { "action": "shell", "resource": "grep *", "effect": "allow" },
+    { "action": "shell", "resource": "tar *", "effect": "allow" },
     { "action": "shell", "resource": "cut *", "effect": "allow" },
     { "action": "shell", "resource": "sed *", "effect": "allow" },
     { "action": "shell", "resource": "rg *", "effect": "allow" },

@@ -68,7 +68,7 @@ async function storedRows(): Promise<{ transactions: unknown[]; categories: unkn
     SELECT id, booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id
     FROM transactions ORDER BY id
   `);
-  const categories = await database.query('SELECT id, name, patterns, hidden FROM categories ORDER BY id');
+  const categories = await database.query('SELECT id, name, patterns, hidden, windows FROM categories ORDER BY id');
   return { transactions: transactions.rows, categories: categories.rows };
 }
 
@@ -170,7 +170,7 @@ describe('API integration', () => {
 
     expect(response.status).toBe(201);
     expect(await response.json())
-      .toEqual({ id: '4', name: 'Reading', patterns: ['bookshop'], hidden: false });
+      .toEqual({ id: '4', name: 'Reading', patterns: ['bookshop'], hidden: false, windows: [] });
     const transactions = await request('/api/transactions').then((result) => result.json());
     expect(transactions.find((transaction: { purpose: string }) => transaction.purpose === 'Bookshop').category)
       .toEqual({ id: '4', name: 'Reading', hidden: false });
@@ -185,7 +185,7 @@ describe('API integration', () => {
     });
     expect(created.status).toBe(201);
     expect(await created.json())
-      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: true });
+      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: true, windows: [] });
 
     const listed = await request('/api/categories').then((result) => result.json());
     expect(listed.find((category: { name: string }) => category.name === 'Internal 2').hidden).toBe(true);
@@ -197,7 +197,7 @@ describe('API integration', () => {
     });
     expect(edited.status).toBe(200);
     expect(await edited.json())
-      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: false });
+      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: false, windows: [] });
 
     const after = await storedRows();
     expect(after.transactions).toEqual(before.transactions);
@@ -212,7 +212,7 @@ describe('API integration', () => {
 
     expect(response.status).toBe(201);
     expect(await response.json())
-      .toEqual({ id: '4', name: 'Visible default', patterns: ['bookshop'], hidden: false });
+      .toEqual({ id: '4', name: 'Visible default', patterns: ['bookshop'], hidden: false, windows: [] });
   });
 
   it('rejects a non-boolean hidden flag without changing stored data', async () => {
@@ -264,5 +264,241 @@ describe('API integration', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ count: 1 });
     assert.deepEqual(await storedRows(), before);
+  });
+
+  it('stores date windows in order and accepts a date-only category', async () => {
+    const created = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Urlaub',
+        patterns: [],
+        windows: [
+          { from: '2026-07-01', to: '2026-07-14' },
+          { from: '2026-08-01', to: '2026-08-14' },
+        ],
+      }),
+    });
+
+    expect(created.status).toBe(201);
+    expect(await created.json()).toEqual({
+      id: '4',
+      name: 'Urlaub',
+      patterns: [],
+      hidden: false,
+      windows: [
+        { from: '2026-07-01', to: '2026-07-14' },
+        { from: '2026-08-01', to: '2026-08-14' },
+      ],
+    });
+  });
+
+  it('defaults an omitted window list to none', async () => {
+    const response = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'No windows', patterns: ['bookshop'] }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      id: '4',
+      name: 'No windows',
+      patterns: ['bookshop'],
+      hidden: false,
+      windows: [],
+    });
+  });
+
+  it('rejects malformed, impossible, and reversed window dates without changing stored data', async () => {
+    const before = await storedRows();
+    const cases = [
+      { from: '2026-07-01T00:00:00', to: '2026-07-14' },
+      { from: '2026-02-30', to: '2026-03-01' },
+      { from: '2026-07-14', to: '2026-07-01' },
+      { from: '2026-07-01' },
+    ];
+
+    for (const [index, window] of cases.entries()) {
+      const response = await request('/api/categories', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: `Bad window ${index}`, patterns: ['bookshop'], windows: [window] }),
+      });
+      expect(response.status).toBe(400);
+    }
+
+    expect(await storedRows()).toEqual(before);
+  });
+
+  it('rejects overlapping windows and accepts adjacent ones', async () => {
+    const first = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Urlaub', patterns: [], windows: [{ from: '2026-07-01', to: '2026-07-14' }] }),
+    });
+    expect(first.status).toBe(201);
+    const firstId = (await first.json()).id as string;
+
+    const overlapping = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Trip', patterns: [], windows: [{ from: '2026-07-01', to: '2026-07-10' }] }),
+    });
+    expect(overlapping.status).toBe(400);
+
+    const sharedEndpoint = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Trip', patterns: [], windows: [{ from: '2026-07-14', to: '2026-07-28' }] }),
+    });
+    expect(sharedEndpoint.status).toBe(400);
+
+    const withinCandidateSet = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Trip',
+        patterns: [],
+        windows: [
+          { from: '2026-09-01', to: '2026-09-10' },
+          { from: '2026-09-05', to: '2026-09-15' },
+        ],
+      }),
+    });
+    expect(withinCandidateSet.status).toBe(400);
+
+    const adjacent = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Trip', patterns: [], windows: [{ from: '2026-07-15', to: '2026-07-28' }] }),
+    });
+    expect(adjacent.status).toBe(201);
+
+    const keepsOwnWindow = await request(`/api/categories/${firstId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Urlaub', patterns: [], windows: [{ from: '2026-07-01', to: '2026-07-14' }] }),
+    });
+    expect(keepsOwnWindow.status).toBe(200);
+  });
+
+  it('rejects a category with neither an expression nor a window', async () => {
+    const before = await storedRows();
+    const response = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Empty', patterns: [], windows: [] }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await storedRows()).toEqual(before);
+  });
+
+  it('assigns an expression match before a covering window', async () => {
+    const created = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Urlaub', patterns: [], windows: [{ from: '2026-02-01', to: '2026-02-05' }] }),
+    });
+    expect(created.status).toBe(201);
+
+    const transactions = await request('/api/transactions').then((result) => result.json()) as Array<{
+      purpose: string;
+      category: { id: string; name: string } | null;
+    }>;
+    const byPurpose = Object.fromEntries(
+      transactions.map((transaction) => [transaction.purpose, transaction.category]),
+    );
+
+    expect(byPurpose['REWE Market']).toMatchObject({ id: '1', name: 'Groceries' });
+    expect(byPurpose['Rail ticket']).toMatchObject({ id: '2', name: 'Transport' });
+    expect(byPurpose['Internal transfer']).toMatchObject({ id: '3', name: 'Internal' });
+    expect(byPurpose['Bookshop']).toMatchObject({ id: '4', name: 'Urlaub' });
+  });
+
+  it('covers a transaction by a window on each inclusive endpoint and drops it outside', async () => {
+    const created = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Urlaub', patterns: [], windows: [{ from: '2026-02-01', to: '2026-02-01' }] }),
+    });
+    expect(created.status).toBe(201);
+    const id = (await created.json()).id as string;
+    const bookshopCategory = () =>
+      request('/api/transactions').then((result) => result.json())
+        .then((transactions: Array<{ purpose: string; category: { id: string; name: string } | null }>) =>
+          transactions.find((transaction) => transaction.purpose === 'Bookshop')?.category);
+
+    // 2026-02-01 is both the from and the to endpoint of the window and is covered.
+    expect(await bookshopCategory()).toMatchObject({ id, name: 'Urlaub' });
+
+    // A window whose to endpoint is still 2026-02-01 keeps covering it.
+    const onToEndpoint = await request(`/api/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Urlaub', patterns: [], windows: [{ from: '2026-01-31', to: '2026-02-01' }] }),
+    });
+    expect(onToEndpoint.status).toBe(200);
+    expect(await bookshopCategory()).toMatchObject({ id, name: 'Urlaub' });
+
+    // A window entirely after the booking date leaves it uncategorised.
+    const outside = await request(`/api/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Urlaub', patterns: [], windows: [{ from: '2026-02-02', to: '2026-02-03' }] }),
+    });
+    expect(outside.status).toBe(200);
+    expect(await bookshopCategory()).toBeNull();
+  });
+
+  it('does not decide a window by the value date', async () => {
+    // Rail ticket's booking date is 2026-02-04 and its value date is 2026-02-03.
+    // Remove its expression so only a window could categorise it.
+    const edited = await request('/api/categories/2', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Transport', patterns: ['zzzz'], hidden: false }),
+    });
+    expect(edited.status).toBe(200);
+
+    const created = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Vacation', patterns: [], windows: [{ from: '2026-02-03', to: '2026-02-03' }] }),
+    });
+    expect(created.status).toBe(201);
+
+    const rail = await request('/api/transactions').then((result) => result.json())
+      .then((transactions: Array<{ purpose: string; category: unknown }>) =>
+        transactions.find((transaction) => transaction.purpose === 'Rail ticket')?.category);
+    expect(rail).toBeNull();
+  });
+
+  it('assigns the smallest identity when stored windows overlap', async () => {
+    // The surface refuses overlaps, so store two overlapping windows directly to
+    // exercise the deterministic tie-break the recompute keeps as a fallback.
+    await database?.query(
+      `INSERT INTO categories (name, patterns, hidden, windows) VALUES
+         ('Overlap small', ARRAY[]::text[], false, $1::jsonb),
+         ('Overlap large', ARRAY[]::text[], false, $2::jsonb)`,
+      [
+        JSON.stringify([{ from: '2026-02-01', to: '2026-02-05' }]),
+        JSON.stringify([{ from: '2026-02-01', to: '2026-02-05' }]),
+      ],
+    );
+
+    // Any category change re-evaluates every transaction, including these rows.
+    const trigger = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Trigger', patterns: [], windows: [{ from: '2026-12-01', to: '2026-12-02' }] }),
+    });
+    expect(trigger.status).toBe(201);
+
+    const bookshop = await request('/api/transactions').then((result) => result.json())
+      .then((transactions: Array<{ purpose: string; category: { id: string; name: string } | null }>) =>
+        transactions.find((transaction) => transaction.purpose === 'Bookshop')?.category);
+    expect(bookshop).toMatchObject({ id: '4', name: 'Overlap small' });
   });
 });

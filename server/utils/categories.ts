@@ -1,13 +1,17 @@
 // Category management and assignment.
 //
 // Categories are listed, created, edited, and deleted here, and every change to the
-// category set re-evaluates the transactions it can affect. A category holds one or
-// more regular expressions, and matches a purpose line when any one of them matches;
-// the matching rule is the database's case-insensitive match operator `~*`, applied
-// to each expression and matching a part of the purpose line rather than anchoring to
-// the whole of it. The winning category is the matching one with the smallest
-// identity. Validation compiles every candidate expression by probing the same
-// operator, so the engine that validates is the engine that evaluates.
+// category set re-evaluates the transactions it can affect. A category holds zero or
+// more regular expressions and zero or more date windows, with at least one of the
+// two. It matches a purpose line when any expression matches — using the database's
+// case-insensitive match operator `~*`, matching a part of the line rather than
+// anchoring to the whole of it — and it covers a booking date when one of its
+// inclusive from/to windows contains it. Expressions are considered first: a date
+// window is applied only when no category's expression matches. Among matching
+// categories the winning one has the smallest identity. Validation compiles every
+// candidate expression by probing the same operator, so the engine that validates is
+// the engine that evaluates, and refuses a window set that overlaps a stored one so
+// the calendar is partitioned.
 //
 // Each mutation and the re-evaluation it triggers run inside one transaction on a
 // connection taken from the shared pool, so stored references are never observed
@@ -18,10 +22,22 @@
 import type { Pool, PoolClient } from 'pg';
 import { useDatabase } from './db';
 
+// A category's date window: two full calendar dates at day precision, both
+// inclusive, tested against a transaction's booking date. It is one of the
+// category's domain elements, held together with the others on the category's row.
+export type CategoryWindow = { from: string; to: string };
+
 // A category as the management surface returns it: the identity rendered as a
-// string, and the three domain elements — the name, every regular expression, and
-// the hidden flag that takes the category out of the analysis views.
-export type Category = { id: string; name: string; patterns: string[]; hidden: boolean };
+// string, and the four domain elements — the name, every regular expression, the
+// hidden flag that takes the category out of the analysis views, and the date
+// windows that cover a bounded period.
+export type Category = {
+  id: string;
+  name: string;
+  patterns: string[];
+  hidden: boolean;
+  windows: CategoryWindow[];
+};
 
 // A create or an edit request that the surface refused, carrying the status the
 // caller should answer with. It is thrown so a handler can map it in one place.
@@ -36,22 +52,22 @@ export class CategoryError extends Error {
 }
 
 const SELECT_CATEGORIES = `
-  SELECT id, name, patterns, hidden
+  SELECT id, name, patterns, hidden, windows
   FROM categories
   ORDER BY id
 `;
 
 const INSERT_CATEGORY = `
-  INSERT INTO categories (name, patterns, hidden)
-  VALUES ($1, $2, $3)
-  RETURNING id, name, patterns, hidden
+  INSERT INTO categories (name, patterns, hidden, windows)
+  VALUES ($1, $2, $3, $4::jsonb)
+  RETURNING id, name, patterns, hidden, windows
 `;
 
 const UPDATE_CATEGORY = `
   UPDATE categories
-  SET name = $2, patterns = $3, hidden = $4
+  SET name = $2, patterns = $3, hidden = $4, windows = $5::jsonb
   WHERE id = $1
-  RETURNING id, name, patterns, hidden
+  RETURNING id, name, patterns, hidden, windows
 `;
 
 const DELETE_CATEGORY = 'DELETE FROM categories WHERE id = $1';
@@ -68,44 +84,105 @@ const COUNT_MATCHING_TRANSACTIONS = `
   )
 `;
 
-// The global recompute. A category matches when at least one of its expressions
-// matches the purpose line, so the scalar subquery tests existence across the
-// category's expressions with `unnest`; it is null when no category matches, and
-// `ORDER BY c.id LIMIT 1` makes the smallest matching identity win. It is run after
+// The global recompute, in two tiers. A category matches when at least one of its
+// expressions matches the purpose line, so the first scalar subquery tests existence
+// across the category's expressions with `unnest`; `ORDER BY c.id LIMIT 1` makes the
+// smallest matching identity win. The second subquery does the same over the
+// category's date windows, testing the booking date inclusively with `BETWEEN`. The
+// two are joined by `COALESCE`, so a regular-expression match always wins and a
+// window is consulted only when no expression matches any category. It is run after
 // a create or an edit and is idempotent.
 const RECOMPUTE_ASSIGNMENTS = `
   UPDATE transactions AS t
-  SET category_id = (
-    SELECT c.id
-    FROM categories AS c
-    WHERE EXISTS (
-      SELECT 1
-      FROM unnest(c.patterns) AS expression
-      WHERE t.purpose ~* expression
+  SET category_id = COALESCE(
+    (
+      SELECT c.id
+      FROM categories AS c
+      WHERE EXISTS (
+        SELECT 1
+        FROM unnest(c.patterns) AS expression
+        WHERE t.purpose ~* expression
+      )
+      ORDER BY c.id
+      LIMIT 1
+    ),
+    (
+      SELECT c.id
+      FROM categories AS c
+      WHERE EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(c.windows) AS date_window
+        WHERE t.booking_date BETWEEN (date_window->>'from')::date AND (date_window->>'to')::date
+      )
+      ORDER BY c.id
+      LIMIT 1
     )
-    ORDER BY c.id
-    LIMIT 1
   )
 `;
 
 // The reassignment that lets a category be deleted. The category being retired is
 // excluded from the candidate set, and only the transactions that referenced it are
-// touched. Once this has run, no transaction references the category, so the delete
+// touched. It follows the same two-tier rule as the recompute, so a transaction may
+// fall back to a remaining category's date window when no remaining expression
+// matches. Once this has run, no transaction references the category, so the delete
 // no longer violates the foreign key.
 const REASSIGN_RETIRING_CATEGORY = `
   UPDATE transactions
-  SET category_id = (
-    SELECT c.id
-    FROM categories AS c
-    WHERE c.id <> $1 AND EXISTS (
-      SELECT 1
-      FROM unnest(c.patterns) AS expression
-      WHERE purpose ~* expression
+  SET category_id = COALESCE(
+    (
+      SELECT c.id
+      FROM categories AS c
+      WHERE c.id <> $1 AND EXISTS (
+        SELECT 1
+        FROM unnest(c.patterns) AS expression
+        WHERE purpose ~* expression
+      )
+      ORDER BY c.id
+      LIMIT 1
+    ),
+    (
+      SELECT c.id
+      FROM categories AS c
+      WHERE c.id <> $1 AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(c.windows) AS date_window
+        WHERE booking_date BETWEEN (date_window->>'from')::date AND (date_window->>'to')::date
+      )
+      ORDER BY c.id
+      LIMIT 1
     )
-    ORDER BY c.id
-    LIMIT 1
   )
   WHERE category_id = $1
+`;
+
+// Rejects a candidate window set that overlaps a stored window. `$1` is the
+// candidate windows as JSON; `$2` is the identity of the category being edited, or
+// null on a create, so the edited category's own stored windows are excluded because
+// an edit replaces them. Two inclusive day ranges overlap when neither ends before
+// the other begins, so a shared endpoint day counts. The first branch checks the
+// candidate windows against each other; the second checks them against every other
+// stored category. It runs inside the write transaction so a rejection leaves no
+// change and a concurrent write cannot slip between the check and the write.
+const FIND_OVERLAPPING_WINDOW = `
+  SELECT EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements($1::jsonb) WITH ORDINALITY AS left_window(win, position),
+         jsonb_array_elements($1::jsonb) WITH ORDINALITY AS right_window(win, position)
+    WHERE left_window.position < right_window.position
+      AND (left_window.win->>'from')::date <= (right_window.win->>'to')::date
+      AND (right_window.win->>'from')::date <= (left_window.win->>'to')::date
+  ) OR EXISTS (
+    SELECT 1
+    FROM categories AS c
+    CROSS JOIN LATERAL jsonb_array_elements(c.windows) AS stored_window(win)
+    WHERE ($2::bigint IS NULL OR c.id <> $2)
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements($1::jsonb) AS candidate_window(win)
+        WHERE (candidate_window.win->>'from')::date <= (stored_window.win->>'to')::date
+          AND (stored_window.win->>'from')::date <= (candidate_window.win->>'to')::date
+      )
+  ) AS overlaps
 `;
 
 // Compiles a candidate expression, and matches nothing meaningful: the empty string
@@ -135,12 +212,18 @@ export async function countCategoryMatches(input: unknown): Promise<number> {
 }
 
 export async function createCategory(input: unknown): Promise<Category> {
-  const { name, patterns, hidden } = readCategoryInput(input);
+  const { name, patterns, hidden, windows } = readCategoryInput(input);
   const database = useDatabase();
   await assertPatternsCompile(database, patterns);
 
   return inTransaction(database, async (client) => {
-    const inserted = await client.query(INSERT_CATEGORY, [name, patterns, hidden]);
+    await assertWindowsDoNotOverlap(client, windows, null);
+    const inserted = await client.query(INSERT_CATEGORY, [
+      name,
+      patterns,
+      hidden,
+      JSON.stringify(windows),
+    ]);
     await client.query(RECOMPUTE_ASSIGNMENTS);
     return inserted.rows[0] as Category;
   });
@@ -148,12 +231,19 @@ export async function createCategory(input: unknown): Promise<Category> {
 
 export async function editCategory(id: string, input: unknown): Promise<Category> {
   assertIdentity(id);
-  const { name, patterns, hidden } = readCategoryInput(input);
+  const { name, patterns, hidden, windows } = readCategoryInput(input);
   const database = useDatabase();
   await assertPatternsCompile(database, patterns);
 
   return inTransaction(database, async (client) => {
-    const updated = await client.query(UPDATE_CATEGORY, [id, name, patterns, hidden]);
+    await assertWindowsDoNotOverlap(client, windows, id);
+    const updated = await client.query(UPDATE_CATEGORY, [
+      id,
+      name,
+      patterns,
+      hidden,
+      JSON.stringify(windows),
+    ]);
     if (updated.rowCount === 0) {
       throw new CategoryError(404, 'no category carries that identity');
     }
@@ -220,15 +310,120 @@ async function inTransaction<T>(
   }
 }
 
-function readCategoryInput(input: unknown): { name: string; patterns: string[]; hidden: boolean } {
+function readCategoryInput(input: unknown): {
+  name: string;
+  patterns: string[];
+  hidden: boolean;
+  windows: CategoryWindow[];
+} {
   if (typeof input !== 'object' || input === null) {
-    throw new CategoryError(400, 'a category needs a name and one or more patterns');
+    throw new CategoryError(400, 'a category needs a name and at least one pattern or date window');
   }
   const name = (input as { name?: unknown }).name;
   if (typeof name !== 'string' || name.trim() === '') {
     throw new CategoryError(400, 'a category needs a non-empty name');
   }
-  return { name, patterns: readPatterns(input), hidden: readHidden(input) };
+  const patterns = readOptionalPatterns(input);
+  const windows = readWindows(input);
+  if (patterns.length === 0 && windows.length === 0) {
+    throw new CategoryError(400, 'a category needs at least one pattern or date window');
+  }
+  return { name, patterns, windows, hidden: readHidden(input) };
+}
+
+// The expressions of a create or an edit. Unlike the preview, a category may carry
+// no expression when it carries at least one date window, so an absent value means
+// no expressions and an empty list is accepted; only a shape that is not a list of
+// strings is refused here. The at-least-one rule spans expressions and windows and
+// is enforced by the caller.
+function readOptionalPatterns(input: unknown): string[] {
+  const patterns = (input as { patterns?: unknown }).patterns;
+  if (patterns === undefined) {
+    return [];
+  }
+  if (!Array.isArray(patterns) || patterns.some((pattern) => typeof pattern !== 'string')) {
+    throw new CategoryError(400, 'every pattern must be a string');
+  }
+  return patterns as string[];
+}
+
+// The date windows of a create or an edit. An absent value means no windows,
+// because create and edit replace the stored category. A present value must be a
+// list of objects holding exactly `from` and `to`, each a real day-precision
+// calendar date, and `from` must not be later than `to`.
+function readWindows(input: unknown): CategoryWindow[] {
+  const windows = (input as { windows?: unknown }).windows;
+  if (windows === undefined) {
+    return [];
+  }
+  if (!Array.isArray(windows)) {
+    throw new CategoryError(400, 'the date windows must be a list');
+  }
+  return windows.map((entry) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new CategoryError(400, 'every date window must be an object with a from and a to date');
+    }
+    const keys = Object.keys(entry);
+    if (keys.length !== 2 || !keys.includes('from') || !keys.includes('to')) {
+      throw new CategoryError(400, 'every date window must hold exactly a from and a to date');
+    }
+    const from = (entry as { from?: unknown }).from;
+    const to = (entry as { to?: unknown }).to;
+    if (
+      typeof from !== 'string' ||
+      !isCalendarDate(from) ||
+      typeof to !== 'string' ||
+      !isCalendarDate(to)
+    ) {
+      throw new CategoryError(400, 'a date window needs a from and a to as full YYYY-MM-DD dates');
+    }
+    if (from > to) {
+      throw new CategoryError(400, 'a date window must not start after it ends');
+    }
+    return { from, to };
+  });
+}
+
+// A full day-precision calendar date: a four-digit year, a two-digit month and day,
+// and a day that exists in that month, so 2026-02-30 is refused. A plain regex would
+// accept the impossible day; the Date round-trip rejects it.
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function isCalendarDate(value: string): boolean {
+  const match = CALENDAR_DATE.exec(value);
+  if (match === null) {
+    return false;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+// Refuses a candidate window set that overlaps a stored window. The check runs on
+// the write transaction's connection so a rejected request changes nothing and a
+// concurrent write cannot create an overlap between the check and the write. The
+// edited category's own stored windows are excluded, because an edit replaces them.
+// An empty candidate set cannot overlap, so it skips the query.
+async function assertWindowsDoNotOverlap(
+  client: PoolClient,
+  windows: CategoryWindow[],
+  editedId: string | null,
+): Promise<void> {
+  if (windows.length === 0) {
+    return;
+  }
+  const result = await client.query(FIND_OVERLAPPING_WINDOW, [JSON.stringify(windows), editedId]);
+  if (result.rows[0]?.overlaps === true) {
+    throw new CategoryError(400, "a date window overlaps another category's window");
+  }
 }
 
 // The hidden flag is optional in the body. Absent means visible, because a create

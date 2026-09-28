@@ -5,13 +5,23 @@
 // confirms it, and a failure is reported in its own place. No regular expression is
 // evaluated here — matching is done by the server.
 //
-// A category carries one or more regular expressions, so the form holds a list of
-// expression inputs with add and remove controls. The form is shared by create and
-// edit: with no category being edited it creates, and with one it replaces that
-// category's name and expressions.
+// A category carries regular expressions and date windows, so the form holds a list
+// of expression inputs and a list of windows with add and remove controls. A window
+// is entered with two native date inputs, which produce a full YYYY-MM-DD date with
+// no time of day and no time-zone shift. The form is shared by create and edit: with
+// no category being edited it creates, and with one it replaces that category's name,
+// expressions, and windows.
 //
 // See openspec/changes/allow-multiple-category-expressions/specs/category-management-screen/spec.md
-type Category = { id: string; name: string; patterns: string[]; hidden: boolean };
+// and openspec/changes/add-category-date-windows/specs/category-management-screen/spec.md
+type CategoryWindow = { from: string; to: string };
+type Category = {
+  id: string;
+  name: string;
+  patterns: string[];
+  hidden: boolean;
+  windows: CategoryWindow[];
+};
 
 const { data: categories, error, pending, refresh } = useFetch<Category[]>('/api/categories', {
   default: () => [],
@@ -32,6 +42,7 @@ const sortedCategories = computed(() =>
 
 const name = ref('');
 const patterns = ref<string[]>(['']);
+const windows = ref<CategoryWindow[]>([]);
 const hidden = ref(false);
 const editingId = ref<string | null>(null);
 const saving = ref(false);
@@ -51,6 +62,7 @@ function startEdit(category: Category): void {
   editingId.value = category.id;
   name.value = category.name;
   patterns.value = category.patterns.length > 0 ? [...category.patterns] : [''];
+  windows.value = category.windows.map((window) => ({ ...window }));
   hidden.value = category.hidden;
   formError.value = null;
 }
@@ -59,6 +71,7 @@ function cancelEdit(): void {
   editingId.value = null;
   name.value = '';
   patterns.value = [''];
+  windows.value = [];
   hidden.value = false;
   formError.value = null;
 }
@@ -74,11 +87,28 @@ function removePattern(index: number): void {
   }
 }
 
+function addWindow(): void {
+  windows.value.push({ from: '', to: '' });
+}
+
+function removeWindow(index: number): void {
+  windows.value.splice(index, 1);
+}
+
 // The expressions the user actually entered. A blank field that was never filled
 // in is not an expression, so it is not sent; every entered expression is sent
 // exactly as typed.
 function enteredPatterns(): string[] {
   return patterns.value.filter((pattern) => pattern !== '');
+}
+
+// The windows the user actually entered. A window row that was never filled in at
+// all is not a window, so it is not sent; a partially filled row is sent as entered
+// and the server reports it as invalid rather than the browser guessing.
+function enteredWindows(): CategoryWindow[] {
+  return windows.value
+    .filter((window) => window.from !== '' || window.to !== '')
+    .map((window) => ({ from: window.from, to: window.to }));
 }
 
 async function loadMatchCount(generation: number, submitted: string[]): Promise<void> {
@@ -136,8 +166,9 @@ onBeforeUnmount(() => {
 async function submit(): Promise<void> {
   formError.value = null;
   const submitted = enteredPatterns();
-  if (submitted.length === 0) {
-    formError.value = 'Enter at least one regular expression.';
+  const submittedWindows = enteredWindows();
+  if (submitted.length === 0 && submittedWindows.length === 0) {
+    formError.value = 'Enter at least one regular expression or date window.';
     return;
   }
   saving.value = true;
@@ -145,12 +176,12 @@ async function submit(): Promise<void> {
     if (editingId.value === null) {
       await $fetch('/api/categories', {
         method: 'POST',
-        body: { name: name.value, patterns: submitted, hidden: hidden.value },
+        body: { name: name.value, patterns: submitted, hidden: hidden.value, windows: submittedWindows },
       });
     } else {
       await $fetch(`/api/categories/${editingId.value}`, {
         method: 'PUT',
-        body: { name: name.value, patterns: submitted, hidden: hidden.value },
+        body: { name: name.value, patterns: submitted, hidden: hidden.value, windows: submittedWindows },
       });
     }
     cancelEdit();
@@ -183,8 +214,10 @@ async function remove(category: Category): Promise<void> {
   <div>
     <h1 class="text-2xl font-bold text-slate-900">Categories</h1>
     <p class="mt-2 text-slate-600">
-      A category is a name and one or more regular expressions matched against a transaction's
-      purpose line. A transaction is categorised when any one of them matches.
+      A category is a name with regular expressions matched against a transaction's purpose line
+      and optional from/to date windows matched against its booking date. An expression is applied
+      first; a date window is applied only when no expression matches. Both window dates are
+      inclusive.
     </p>
 
     <form class="mt-6 max-w-2xl rounded-lg border border-slate-200 bg-white p-4" @submit.prevent="submit">
@@ -211,6 +244,7 @@ async function remove(category: Category): Promise<void> {
           <input
             v-model="patterns[index]"
             type="text"
+            data-testid="pattern-input"
             class="flex-1 rounded-md border border-slate-300 px-3 py-2 font-mono text-slate-900"
           />
           <button
@@ -228,6 +262,54 @@ async function remove(category: Category): Promise<void> {
           @click="addPattern"
         >
           Add expression
+        </button>
+      </fieldset>
+
+      <fieldset class="mt-3">
+        <legend class="text-sm text-slate-700">Date windows</legend>
+        <p class="mt-1 text-xs text-slate-500">
+          A transaction whose booking date falls on or between the two dates is assigned to this
+          category when no regular expression matches it.
+        </p>
+        <div
+          v-for="(_, index) in windows"
+          :key="index"
+          class="mt-2 flex items-center gap-2"
+        >
+          <label class="flex items-center gap-1 text-xs text-slate-600">
+            From
+            <input
+              v-model="windows[index].from"
+              type="date"
+              data-testid="window-from"
+              class="rounded-md border border-slate-300 px-2 py-1 text-slate-900"
+            >
+          </label>
+          <label class="flex items-center gap-1 text-xs text-slate-600">
+            To
+            <input
+              v-model="windows[index].to"
+              type="date"
+              data-testid="window-to"
+              class="rounded-md border border-slate-300 px-2 py-1 text-slate-900"
+            >
+          </label>
+          <button
+            type="button"
+            data-testid="remove-window"
+            class="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
+            @click="removeWindow(index)"
+          >
+            Remove
+          </button>
+        </div>
+        <button
+          type="button"
+          data-testid="add-window"
+          class="mt-2 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
+          @click="addWindow"
+        >
+          Add window
         </button>
       </fieldset>
 
@@ -294,6 +376,7 @@ async function remove(category: Category): Promise<void> {
           <tr class="border-b border-slate-200">
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Name</th>
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Expression count</th>
+            <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Window count</th>
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Analysis</th>
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Actions</th>
           </tr>
@@ -302,6 +385,9 @@ async function remove(category: Category): Promise<void> {
           <tr v-for="category in sortedCategories" :key="category.id" class="border-b border-slate-100">
             <td class="px-3 py-2 align-top text-slate-900">{{ category.name }}</td>
             <td class="px-3 py-2 align-top text-slate-900">{{ category.patterns.length }}</td>
+            <td class="px-3 py-2 align-top text-slate-900" data-testid="category-window-count">
+              {{ category.windows.length }}
+            </td>
             <td class="px-3 py-2 align-top text-slate-900" data-testid="category-hidden-state">
               {{ category.hidden ? 'Hidden' : 'Visible' }}
             </td>

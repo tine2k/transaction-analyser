@@ -10,17 +10,27 @@ mockNuxtImport('$fetch', () => mocks.fetch);
 
 import Categories from '../../app/pages/categories.vue';
 
-function response() {
-  return {
+type PageState = {
+  data: ReturnType<typeof ref>;
+  error: ReturnType<typeof ref>;
+  pending: ReturnType<typeof ref>;
+  refresh: ReturnType<typeof vi.fn>;
+};
+
+let pageState: PageState;
+
+function response(): PageState {
+  pageState = {
     data: ref([
-      { id: '10', name: 'Groceries', patterns: ['food', 'market'], hidden: false },
-      { id: '3', name: 'alpha', patterns: ['^lower$'], hidden: true },
-      { id: '7', name: 'Alpha', patterns: ['^upper$'], hidden: false },
+      { id: '10', name: 'Groceries', patterns: ['food', 'market'], hidden: false, windows: [{ from: '2026-07-01', to: '2026-07-14' }] },
+      { id: '3', name: 'alpha', patterns: ['^lower$'], hidden: true, windows: [] },
+      { id: '7', name: 'Alpha', patterns: ['^upper$'], hidden: false, windows: [] },
     ]),
     error: ref(null),
     pending: ref(false),
     refresh: vi.fn(),
   };
+  return pageState;
 }
 
 describe('category management page', () => {
@@ -40,8 +50,12 @@ describe('category management page', () => {
 
     expect(wrapper.find('form h2').text()).toBe('Edit category');
     expect(wrapper.find('label input').element).toHaveProperty('value', 'Groceries');
-    expect(wrapper.findAll('fieldset input').map((input) => (input.element as HTMLInputElement).value))
+    expect(wrapper.findAll('[data-testid="pattern-input"]').map((input) => (input.element as HTMLInputElement).value))
       .toEqual(['food', 'market']);
+    expect(wrapper.get('[data-testid="window-from"]').element)
+      .toHaveProperty('value', '2026-07-01');
+    expect(wrapper.get('[data-testid="window-to"]').element)
+      .toHaveProperty('value', '2026-07-14');
     expect((wrapper.get('[data-testid="hidden-input"]').element as HTMLInputElement).checked).toBe(false);
   });
 
@@ -50,6 +64,13 @@ describe('category management page', () => {
 
     expect(wrapper.findAll('[data-testid="category-hidden-state"]').map((cell) => cell.text()))
       .toEqual(['Hidden', 'Visible', 'Visible']);
+  });
+
+  it('shows each category window count, not its window values', async () => {
+    const wrapper = await mountSuspended(Categories);
+
+    expect(wrapper.findAll('[data-testid="category-window-count"]').map((cell) => cell.text()))
+      .toEqual(['0', '0', '1']);
   });
 
   it('pre-populates the hidden state when editing a hidden category', async () => {
@@ -62,19 +83,106 @@ describe('category management page', () => {
     expect((wrapper.get('[data-testid="hidden-input"]').element as HTMLInputElement).checked).toBe(true);
   });
 
-  it('sends the entered hidden flag when creating a category', async () => {
+  it('sends the entered hidden flag and an empty window list when creating a category', async () => {
     mocks.fetch.mockResolvedValue({});
     const wrapper = await mountSuspended(Categories);
 
     await wrapper.get('form label input').setValue('Internal');
-    await wrapper.get('fieldset input').setValue('internal');
+    await wrapper.get('[data-testid="pattern-input"]').setValue('internal');
     await wrapper.get('[data-testid="hidden-input"]').setValue(true);
     await wrapper.get('form').trigger('submit');
     await flushPromises();
 
     expect(mocks.fetch).toHaveBeenCalledWith('/api/categories', expect.objectContaining({
       method: 'POST',
-      body: { name: 'Internal', patterns: ['internal'], hidden: true },
+      body: { name: 'Internal', patterns: ['internal'], hidden: true, windows: [] },
     }));
+  });
+
+  it('sends an entered window with the category', async () => {
+    mocks.fetch.mockResolvedValue({});
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('form label input').setValue('Urlaub');
+    await wrapper.get('[data-testid="pattern-input"]').setValue('holiday');
+    await wrapper.get('[data-testid="add-window"]').trigger('click');
+    await wrapper.get('[data-testid="window-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="window-to"]').setValue('2026-07-14');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/categories', expect.objectContaining({
+      method: 'POST',
+      body: {
+        name: 'Urlaub',
+        patterns: ['holiday'],
+        hidden: false,
+        windows: [{ from: '2026-07-01', to: '2026-07-14' }],
+      },
+    }));
+  });
+
+  it('creates a date-only category with no expression', async () => {
+    mocks.fetch.mockResolvedValue({});
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('form label input').setValue('Urlaub');
+    await wrapper.get('[data-testid="add-window"]').trigger('click');
+    await wrapper.get('[data-testid="window-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="window-to"]').setValue('2026-07-14');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/categories', expect.objectContaining({
+      method: 'POST',
+      body: {
+        name: 'Urlaub',
+        patterns: [],
+        hidden: false,
+        windows: [{ from: '2026-07-01', to: '2026-07-14' }],
+      },
+    }));
+  });
+
+  it('removes an existing window before submitting an edit', async () => {
+    mocks.fetch.mockResolvedValue({});
+    const wrapper = await mountSuspended(Categories);
+    const rows = wrapper.findAll('tbody tr');
+
+    await rows[2]?.find('button').trigger('click');
+    await wrapper.get('[data-testid="remove-window"]').trigger('click');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/categories/10', expect.objectContaining({
+      method: 'PUT',
+      body: expect.objectContaining({ windows: [] }),
+    }));
+  });
+
+  it('reports a rejected overlapping window without changing the row', async () => {
+    mocks.fetch.mockRejectedValueOnce({ data: { message: "a date window overlaps another category's window" } });
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('form label input').setValue('Urlaub');
+    await wrapper.get('[data-testid="add-window"]').trigger('click');
+    await wrapper.get('[data-testid="window-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="window-to"]').setValue('2026-07-14');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("a date window overlaps another category's window");
+    expect(pageState.refresh).not.toHaveBeenCalled();
+  });
+
+  it('refuses to submit a category with neither an expression nor a window', async () => {
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('form label input').setValue('Empty');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('Enter at least one regular expression or date window.');
   });
 });

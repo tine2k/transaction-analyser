@@ -17,24 +17,29 @@ type TestTransaction = {
   purpose: string;
   counterpartyName: string;
   counterpartyAccount: string | null;
-  category: { id: string; name: string } | null;
+  category: { id: string; name: string; hidden: boolean } | null;
 };
 
 const transactions: TestTransaction[] = [
   {
     id: '4', bookingDate: '2026-03-03', valueDate: '2026-03-03', amount: '5.00',
     purpose: 'March travel', counterpartyName: 'Rail', counterpartyAccount: null,
-    category: { id: '2', name: 'Travel' },
+    category: { id: '2', name: 'Travel', hidden: false },
   },
   {
     id: '3', bookingDate: '2026-02-20', valueDate: '2026-02-19', amount: '4.00',
     purpose: 'February travel', counterpartyName: 'Rail', counterpartyAccount: null,
-    category: { id: '2', name: 'Travel' },
+    category: { id: '2', name: 'Travel', hidden: false },
   },
   {
     id: '2', bookingDate: '2026-02-15', valueDate: '2026-02-15', amount: '-12.50',
     purpose: 'Groceries', counterpartyName: 'Market', counterpartyAccount: null,
-    category: { id: '1', name: 'Groceries' },
+    category: { id: '1', name: 'Groceries', hidden: false },
+  },
+  {
+    id: '5', bookingDate: '2026-02-10', valueDate: '2026-02-10', amount: '-9.99',
+    purpose: 'Internal transfer', counterpartyName: 'Own account', counterpartyAccount: null,
+    category: { id: '3', name: 'Internal', hidden: true },
   },
   {
     id: '1', bookingDate: '2026-02-01', valueDate: '2026-02-01', amount: '-0.25',
@@ -63,8 +68,23 @@ describe('transaction list filters', () => {
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['1']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain('-0.25');
-    expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('All categories (4)');
+    expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('All categories (5)');
     expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('Uncategorised (1)');
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a hidden category and its transactions visible in the list and filter', async () => {
+    const wrapper = await mountSuspended(Transactions);
+    const categoryFilter = wrapper.get('[data-testid="category-filter"]');
+
+    expect(categoryFilter.text()).toContain('Internal');
+
+    await categoryFilter.setValue('3');
+    await flushPromises();
+
+    expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['5']);
+    expect(wrapper.text()).toContain('Internal transfer');
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 
@@ -97,8 +117,8 @@ describe('transaction list filters', () => {
     await flushPromises();
     expect((monthFilter.element as HTMLSelectElement).value).toBe('2026-02');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
-      .toEqual(['3', '2', '1']);
-    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain('-8.75');
+      .toEqual(['3', '2', '5', '1']);
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain('-18.74');
 
     await categoryFilter.setValue('2');
     await flushPromises();

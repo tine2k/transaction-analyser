@@ -31,9 +31,9 @@ if (currentMonth === undefined || previousMonth === undefined || thirteenthMonth
 
 function sampleTransactions(): CategorySpendingTransaction[] {
   return [
-    { bookingDate: currentMonth.startDate, amount: '-12.00', category: { id: '1', name: 'Groceries' } },
-    { bookingDate: previousMonth.startDate, amount: '-12.00', category: { id: '1', name: 'Groceries' } },
-    { bookingDate: thirteenthMonth.startDate, amount: '-120.00', category: { id: '1', name: 'Groceries' } },
+    { bookingDate: currentMonth.startDate, amount: '-12.00', category: { id: '1', name: 'Groceries', hidden: false } },
+    { bookingDate: previousMonth.startDate, amount: '-12.00', category: { id: '1', name: 'Groceries', hidden: false } },
+    { bookingDate: thirteenthMonth.startDate, amount: '-120.00', category: { id: '1', name: 'Groceries', hidden: false } },
     { bookingDate: currentMonth.startDate, amount: '-2.00', category: null },
   ];
 }
@@ -97,6 +97,26 @@ describe('monthly category average page', () => {
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('excludes a hidden category from the averages while leaving visible categories unchanged', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: currentMonth.startDate, amount: '-12.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: currentMonth.startDate, amount: '-120.00', category: { id: '9', name: 'Internal', hidden: true } },
+      { bookingDate: currentMonth.startDate, amount: '-2.00', category: null },
+    ]));
+
+    const wrapper = await mountSuspended(MonthlyAverage);
+
+    expect(wrapper.findAll('[data-testid="category-average"]').map((item) => [
+      item.attributes('data-category-key'),
+      item.find('[data-testid="category-average-amount"]').text(),
+    ])).toEqual([
+      ['category:1', formatEuroAmount('1.00')],
+      ['uncategorised', formatEuroAmount('0.17')],
+    ]);
+    expect(wrapper.text()).not.toContain('Internal');
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('distinguishes loading, failed, and empty transaction results', async () => {
     mocks.useFetch.mockReturnValue(response(null, { pending: true }));
     const loading = await mountSuspended(MonthlyAverage);
@@ -104,14 +124,14 @@ describe('monthly category average page', () => {
     expect(loading.find('[data-testid="monthly-average-list"]').exists()).toBe(false);
 
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: currentMonth.startDate, amount: '-12.00', category: { id: '1', name: 'Stale' } },
+      { bookingDate: currentMonth.startDate, amount: '-12.00', category: { id: '1', name: 'Stale', hidden: false } },
     ], { error: new Error('failed') }));
     const failed = await mountSuspended(MonthlyAverage);
     expect(failed.text()).toContain('Monthly category averages could not be loaded');
     expect(failed.text()).not.toContain('Stale');
 
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2000-01-01', amount: '-12.00', category: { id: '1', name: 'Old' } },
+      { bookingDate: '2000-01-01', amount: '-12.00', category: { id: '1', name: 'Old', hidden: false } },
     ]));
     const empty = await mountSuspended(MonthlyAverage);
     expect(empty.findAll('[data-testid="category-average"]')).toHaveLength(0);

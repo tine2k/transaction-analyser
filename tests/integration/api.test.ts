@@ -68,7 +68,7 @@ async function storedRows(): Promise<{ transactions: unknown[]; categories: unkn
     SELECT id, booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id
     FROM transactions ORDER BY id
   `);
-  const categories = await database.query('SELECT id, name, patterns FROM categories ORDER BY id');
+  const categories = await database.query('SELECT id, name, patterns, hidden FROM categories ORDER BY id');
   return { transactions: transactions.rows, categories: categories.rows };
 }
 
@@ -119,6 +119,16 @@ describe('API integration', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([
       {
+        id: '3',
+        bookingDate: '2026-02-05',
+        valueDate: '2026-02-05',
+        amount: '-9.99',
+        purpose: 'Internal transfer',
+        counterpartyName: 'Own account',
+        counterpartyAccount: null,
+        category: { id: '3', name: 'Internal', hidden: true },
+      },
+      {
         id: '2',
         bookingDate: '2026-02-04',
         valueDate: '2026-02-03',
@@ -126,7 +136,7 @@ describe('API integration', () => {
         purpose: 'Rail ticket',
         counterpartyName: 'Transit',
         counterpartyAccount: 'DE00000000000000000000',
-        category: { id: '2', name: 'Transport' },
+        category: { id: '2', name: 'Transport', hidden: false },
       },
       {
         id: '1',
@@ -136,10 +146,10 @@ describe('API integration', () => {
         purpose: 'REWE Market',
         counterpartyName: 'REWE',
         counterpartyAccount: null,
-        category: { id: '1', name: 'Groceries' },
+        category: { id: '1', name: 'Groceries', hidden: false },
       },
       {
-        id: '3',
+        id: '4',
         bookingDate: '2026-02-01',
         valueDate: '2026-02-01',
         amount: '-8.20',
@@ -159,10 +169,76 @@ describe('API integration', () => {
     });
 
     expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ id: '3', name: 'Reading', patterns: ['bookshop'] });
+    expect(await response.json())
+      .toEqual({ id: '4', name: 'Reading', patterns: ['bookshop'], hidden: false });
     const transactions = await request('/api/transactions').then((result) => result.json());
     expect(transactions.find((transaction: { purpose: string }) => transaction.purpose === 'Bookshop').category)
-      .toEqual({ id: '3', name: 'Reading' });
+      .toEqual({ id: '4', name: 'Reading', hidden: false });
+  });
+
+  it('stores, lists, and toggles the hidden flag without changing transactions', async () => {
+    const before = await storedRows();
+    const created = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Internal 2', patterns: ['internal'], hidden: true }),
+    });
+    expect(created.status).toBe(201);
+    expect(await created.json())
+      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: true });
+
+    const listed = await request('/api/categories').then((result) => result.json());
+    expect(listed.find((category: { name: string }) => category.name === 'Internal 2').hidden).toBe(true);
+
+    const edited = await request('/api/categories/4', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Internal 2', patterns: ['internal'], hidden: false }),
+    });
+    expect(edited.status).toBe(200);
+    expect(await edited.json())
+      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: false });
+
+    const after = await storedRows();
+    expect(after.transactions).toEqual(before.transactions);
+  });
+
+  it('defaults an omitted hidden flag to visible', async () => {
+    const response = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Visible default', patterns: ['bookshop'] }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json())
+      .toEqual({ id: '4', name: 'Visible default', patterns: ['bookshop'], hidden: false });
+  });
+
+  it('rejects a non-boolean hidden flag without changing stored data', async () => {
+    const before = await storedRows();
+    const response = await request('/api/categories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Bad flag', patterns: ['bookshop'], hidden: 'yes' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await storedRows()).toEqual(before);
+  });
+
+  it('follows a hidden flag change through the transaction category reference', async () => {
+    const hiddenTransaction = () => request('/api/transactions').then((result) => result.json())
+      .then((transactions: Array<{ purpose: string; category: { hidden: boolean } | null }>) =>
+        transactions.find((transaction) => transaction.purpose === 'REWE Market')?.category?.hidden);
+
+    expect(await hiddenTransaction()).toBe(false);
+    await request('/api/categories/1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Groceries', patterns: ['rewe', 'market'], hidden: true }),
+    });
+    expect(await hiddenTransaction()).toBe(true);
   });
 
   it('rejects an invalid category expression without changing stored data', async () => {

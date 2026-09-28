@@ -8,7 +8,7 @@ Provides a read-only comparison of absolute transaction totals across categories
 
 ### Requirement: The monthly totals route presents a category-by-month table
 
-The system SHALL provide a menu-accessible page at `/monthly-totals` and SHALL request the same-origin `GET /api/transactions` endpoint once when the route is loaded. It SHALL use the returned transactions as its only transaction data source. The page SHALL present a table with category column headings and one month row for every distinct calendar month represented by at least one returned transaction, across the returned history, ordered newest to oldest. It SHALL NOT impose a rolling 12-month limit or include months with no returned transactions. The category columns SHALL include each category represented by a returned transaction and a distinct `Uncategorised` column when a returned transaction has no category. Named category columns SHALL be ordered by category name ascending, case-insensitively, with category identity ascending as a tie-breaker; `Uncategorised` SHALL follow named categories. Each cell SHALL represent the exact sum of the absolute amounts of transactions for its month and category, with incoming and outgoing amounts both contributing positively. A cell whose exact sum is zero SHALL remain in the table to preserve row and column alignment but SHALL display no amount. Nonzero amounts SHALL use the browser's active locale's EUR currency and number conventions without rounding the exact value. The table SHALL NOT combine transactions across months or change stored data.
+The system SHALL provide a menu-accessible page at `/monthly-totals` and SHALL request the same-origin `GET /api/transactions` endpoint once when the route is loaded. It SHALL use the returned transactions as its only transaction data source. The page SHALL exclude every returned transaction whose category is hidden before it derives the represented months, category columns, and cell sums: a hidden-category transaction SHALL NOT contribute to any cell, SHALL NOT cause a month to be represented, and SHALL NOT cause its category to appear as a column. The page SHALL present a table with category column headings and one month row for every distinct calendar month represented by at least one included transaction, across the included history, ordered newest to oldest. It SHALL NOT impose a rolling 12-month limit or include months with no included transactions. The category columns SHALL include each category represented by an included transaction and a distinct `Uncategorised` column when an included transaction has no category. Named category columns SHALL be ordered by category name ascending, case-insensitively, with category identity ascending as a tie-breaker; `Uncategorised` SHALL follow named categories. Each cell SHALL represent the exact sum of the absolute amounts of included transactions for its month and category, with incoming and outgoing amounts both contributing positively. A cell whose exact sum is zero SHALL remain in the table to preserve row and column alignment but SHALL display no amount. Nonzero amounts SHALL use the browser's active locale's EUR currency and number conventions without rounding the exact value. The table SHALL NOT combine transactions across months or change stored data.
 
 #### Scenario: Categories are columns and represented months are rows
 
@@ -24,6 +24,16 @@ The system SHALL provide a menu-accessible page at `/monthly-totals` and SHALL r
 
 - **WHEN** returned transactions have named categories and uncategorised transactions
 - **THEN** the table includes columns for the represented named categories and one separate `Uncategorised` column, and does not invent other categories
+
+#### Scenario: A hidden category is excluded from the table
+
+- **WHEN** a returned transaction's category is hidden
+- **THEN** the transaction contributes to no cell, its category appears as no column, and a month represented only by such transactions appears as no row
+
+#### Scenario: Hiding a category leaves other cells unchanged
+
+- **WHEN** a hidden category and a visible category both have transactions in a month
+- **THEN** the visible category's cell shows the same exact total it would without the hidden category, and only the hidden category's amounts are omitted
 
 #### Scenario: Category columns have stable alphabetical order
 

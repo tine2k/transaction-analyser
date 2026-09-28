@@ -59,7 +59,7 @@ describe('category spending page', () => {
   it('links category totals and routes named and uncategorised slice activations', async () => {
     const today = getLocalDateString(new Date());
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: today, amount: '-10.00', category: { id: '7', name: 'Groceries' } },
+      { bookingDate: today, amount: '-10.00', category: { id: '7', name: 'Groceries', hidden: false } },
       { bookingDate: today, amount: '-2.00', category: null },
     ]));
 
@@ -100,12 +100,12 @@ describe('category spending page', () => {
       throw new Error('expected twelve calendar month buckets');
     }
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: today, amount: '-12.50', category: { id: '1', name: 'Groceries' } },
-      { bookingDate: today, amount: '4.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: today, amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: today, amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false } },
       { bookingDate: today, amount: '-3.25', category: null },
-      { bookingDate: today, amount: '-1234567.89', category: { id: '3', name: 'Rent' } },
-      { bookingDate: previousMonth.startDate, amount: '-2.00', category: { id: '2', name: 'Transport' } },
-      { bookingDate: previousMonth.startDate, amount: '-7.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: today, amount: '-1234567.89', category: { id: '3', name: 'Rent', hidden: false } },
+      { bookingDate: previousMonth.startDate, amount: '-2.00', category: { id: '2', name: 'Transport', hidden: false } },
+      { bookingDate: previousMonth.startDate, amount: '-7.00', category: { id: '1', name: 'Groceries', hidden: false } },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -166,7 +166,7 @@ describe('category spending page', () => {
       throw new Error('expected twelve calendar month buckets');
     }
     const transactions: CategorySpendingTransaction[] = [
-      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false } },
       { bookingDate: today, amount: '-3.00', category: null },
       { bookingDate: previousMonth.startDate, amount: '-5.00', category: null },
     ];
@@ -208,10 +208,33 @@ describe('category spending page', () => {
       ]);
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
     expect(transactions).toEqual([
-      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false } },
       { bookingDate: today, amount: '-3.00', category: null },
       { bookingDate: previousMonth.startDate, amount: '-5.00', category: null },
     ]);
+  });
+
+  it('excludes a hidden category from every monthly chart while keeping other totals unchanged', async () => {
+    const today = getLocalDateString(new Date());
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: today, amount: '-99.00', category: { id: '9', name: 'Internal', hidden: true } },
+      { bookingDate: today, amount: '-2.00', category: null },
+    ]));
+
+    const wrapper = await mountSuspended(Analytics);
+    const panels = wrapper.findAll('[data-testid="month-panel"]');
+    const charts = wrapper.findAllComponents({ name: 'VChart' });
+
+    expect(panels[0]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .toEqual([
+        `Groceries${formatEuroAmount('10.00')}`,
+        `Uncategorised${formatEuroAmount('2.00')}`,
+      ]);
+    expect(wrapper.text()).not.toContain('Internal');
+    expect(charts[0]?.props('option').series[0].data.map(({ name }) => name))
+      .toEqual(['Groceries', 'Uncategorised']);
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 
   it('shows loading and failure states and keeps all empty-month charts', async () => {
@@ -220,7 +243,7 @@ describe('category spending page', () => {
     expect(loading.text()).toContain('Loading monthly category totals');
 
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2026-09-28', amount: '-12.50', category: { id: '1', name: 'Stale' } },
+      { bookingDate: '2026-09-28', amount: '-12.50', category: { id: '1', name: 'Stale', hidden: false } },
     ], { error: new Error('failed') }));
     const failed = await mountSuspended(Analytics);
     expect(failed.text()).toContain('Monthly category totals could not be loaded');

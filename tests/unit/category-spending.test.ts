@@ -40,12 +40,12 @@ describe('decimal-safe category totals', () => {
 
   it('sorts category totals numerically in descending order with name-based ties', () => {
     const transactions: CategorySpendingTransaction[] = [
-      { bookingDate: '2026-09-01', amount: '2.000', category: { id: '1', name: 'Two' } },
-      { bookingDate: '2026-09-01', amount: '9007199254740993.02', category: { id: '2', name: 'Large lower' } },
-      { bookingDate: '2026-09-01', amount: '5.0', category: { id: '3', name: 'Zulu' } },
-      { bookingDate: '2026-09-01', amount: '9007199254740993.1', category: { id: '4', name: 'Largest' } },
-      { bookingDate: '2026-09-01', amount: '5.00', category: { id: '5', name: 'Alpha' } },
-      { bookingDate: '2026-09-01', amount: '10.00', category: { id: '6', name: 'Ten' } },
+      { bookingDate: '2026-09-01', amount: '2.000', category: { id: '1', name: 'Two', hidden: false } },
+      { bookingDate: '2026-09-01', amount: '9007199254740993.02', category: { id: '2', name: 'Large lower', hidden: false } },
+      { bookingDate: '2026-09-01', amount: '5.0', category: { id: '3', name: 'Zulu', hidden: false } },
+      { bookingDate: '2026-09-01', amount: '9007199254740993.1', category: { id: '4', name: 'Largest', hidden: false } },
+      { bookingDate: '2026-09-01', amount: '5.00', category: { id: '5', name: 'Alpha', hidden: false } },
+      { bookingDate: '2026-09-01', amount: '10.00', category: { id: '6', name: 'Ten', hidden: false } },
     ];
     const [month] = getMonthlyCategorySpendingTotals(
       groupTransactionsByMonth(transactions, '2026-09-28'),
@@ -63,8 +63,8 @@ describe('decimal-safe category totals', () => {
 
   it('produces exact category totals and euro labels', () => {
     const transactions: CategorySpendingTransaction[] = [
-      { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries' } },
-      { bookingDate: '2026-09-02', amount: '4.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-09-02', amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false } },
     ];
     const [month] = getMonthlyCategorySpendingTotals(
       groupTransactionsByMonth(transactions, '2026-09-28'),
@@ -178,10 +178,10 @@ describe('calendar-month transaction buckets', () => {
 
   it('assigns eligible bookings to their month and excludes dates outside the range', () => {
     const monthlyGroups = groupTransactionsByMonth([
-      { bookingDate: '2025-09-30', amount: '-1.00', category: { id: '1', name: 'Too old' } },
-      { bookingDate: '2025-10-01', amount: '-2.00', category: { id: '2', name: 'Earliest' } },
-      { bookingDate: '2026-09-28', amount: '-3.00', category: { id: '3', name: 'Today' } },
-      { bookingDate: '2026-09-29', amount: '-4.00', category: { id: '4', name: 'Future' } },
+      { bookingDate: '2025-09-30', amount: '-1.00', category: { id: '1', name: 'Too old', hidden: false } },
+      { bookingDate: '2025-10-01', amount: '-2.00', category: { id: '2', name: 'Earliest', hidden: false } },
+      { bookingDate: '2026-09-28', amount: '-3.00', category: { id: '3', name: 'Today', hidden: false } },
+      { bookingDate: '2026-09-29', amount: '-4.00', category: { id: '4', name: 'Future', hidden: false } },
     ], '2026-09-28');
 
     expect(monthlyGroups).toHaveLength(12);
@@ -192,9 +192,9 @@ describe('calendar-month transaction buckets', () => {
 
   it('groups every represented booking month newest-first without adding empty months', () => {
     const months = groupTransactionsByAvailableMonth([
-      { bookingDate: '2020-01-31', amount: '-1.00', category: { id: '1', name: 'Old' } },
-      { bookingDate: '2026-08-03', amount: '-2.00', category: { id: '2', name: 'Recent' } },
-      { bookingDate: '2026-08-29', amount: '3.00', category: { id: '2', name: 'Recent' } },
+      { bookingDate: '2020-01-31', amount: '-1.00', category: { id: '1', name: 'Old', hidden: false } },
+      { bookingDate: '2026-08-03', amount: '-2.00', category: { id: '2', name: 'Recent', hidden: false } },
+      { bookingDate: '2026-08-29', amount: '3.00', category: { id: '2', name: 'Recent', hidden: false } },
       { bookingDate: '2026-09-02', amount: '-4.00', category: null },
     ]);
 
@@ -207,13 +207,39 @@ describe('calendar-month transaction buckets', () => {
     expect(months[2]?.groups[0]?.name).toBe('Old');
   });
 
+  it('drops hidden-category transactions from month groups while keeping visible and uncategorised ones', () => {
+    const groups = groupTransactionsByMonth([
+      { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-09-02', amount: '-99.00', category: { id: '2', name: 'Internal', hidden: true } },
+      { bookingDate: '2026-09-03', amount: '-3.25', category: null },
+    ], '2026-09-28');
+    const totals = getMonthlyCategorySpendingTotals(groups);
+
+    expect(totals[0]?.totals).toEqual([
+      { key: 'category:1', name: 'Groceries', amount: '12.50' },
+      { key: 'uncategorised', name: 'Uncategorised', amount: '3.25' },
+    ]);
+  });
+
+  it('drops hidden-category transactions from the available-month matrix while keeping visible ones', () => {
+    const matrix = createMonthlyCategoryMatrixData(groupTransactionsByAvailableMonth([
+      { bookingDate: '2026-09-01', amount: '-7.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-09-02', amount: '-9.00', category: { id: '2', name: 'Internal', hidden: true } },
+      { bookingDate: '2026-08-01', amount: '-5.00', category: { id: '2', name: 'Internal', hidden: true } },
+    ]));
+
+    expect(matrix.categories).toEqual([{ key: 'category:1', name: 'Groceries' }]);
+    expect(matrix.months.map(({ key }) => key)).toEqual(['2026-09']);
+    expect(matrix.months[0]?.totals).toEqual(new Map([['category:1', '7.00']]));
+  });
+
   it('keeps exact absolute category totals separate by month, including uncategorised amounts', () => {
     const transactions: CategorySpendingTransaction[] = [
-      { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries' } },
-      { bookingDate: '2026-09-02', amount: '4.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-09-02', amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false } },
       { bookingDate: '2026-09-03', amount: '-0.01', category: null },
-      { bookingDate: '2026-08-01', amount: '9007199254740993.01', category: { id: '1', name: 'Groceries' } },
-      { bookingDate: '2026-08-02', amount: '-0.01', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2026-08-01', amount: '9007199254740993.01', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-08-02', amount: '-0.01', category: { id: '1', name: 'Groceries', hidden: false } },
     ];
     const totals = getMonthlyCategorySpendingTotals(
       groupTransactionsByMonth(transactions, '2026-09-28'),
@@ -230,13 +256,13 @@ describe('calendar-month transaction buckets', () => {
 
   it('builds a zero-filled category-by-month matrix with stable category columns and exact amounts', () => {
     const matrix = createMonthlyCategoryMatrixData(groupTransactionsByAvailableMonth([
-      { bookingDate: '2026-09-01', amount: '9007199254740993.01', category: { id: '10', name: 'Alpha' } },
-      { bookingDate: '2026-09-02', amount: '-0.002', category: { id: '10', name: 'Alpha' } },
-      { bookingDate: '2026-09-03', amount: '-12.50', category: { id: '2', name: 'alpha' } },
+      { bookingDate: '2026-09-01', amount: '9007199254740993.01', category: { id: '10', name: 'Alpha', hidden: false } },
+      { bookingDate: '2026-09-02', amount: '-0.002', category: { id: '10', name: 'Alpha', hidden: false } },
+      { bookingDate: '2026-09-03', amount: '-12.50', category: { id: '2', name: 'alpha', hidden: false } },
       { bookingDate: '2026-09-04', amount: '-3.25', category: null },
-      { bookingDate: '2026-08-01', amount: '4.00', category: { id: '2', name: 'alpha' } },
-      { bookingDate: '2026-08-02', amount: '-8.00', category: { id: '3', name: 'Groceries' } },
-      { bookingDate: '2018-03-17', amount: '5.00', category: { id: '3', name: 'Groceries' } },
+      { bookingDate: '2026-08-01', amount: '4.00', category: { id: '2', name: 'alpha', hidden: false } },
+      { bookingDate: '2026-08-02', amount: '-8.00', category: { id: '3', name: 'Groceries', hidden: false } },
+      { bookingDate: '2018-03-17', amount: '5.00', category: { id: '3', name: 'Groceries', hidden: false } },
     ]));
 
     expect(matrix.categories).toEqual([
@@ -269,7 +295,7 @@ describe('calendar-month transaction buckets', () => {
   it('creates twelve chart datasets and retains empty months without fake slices', () => {
     const months = getMonthlyCategorySpendingTotals(
       groupTransactionsByMonth([
-        { bookingDate: '2026-09-02', amount: '-5.00', category: { id: '1', name: 'Groceries' } },
+        { bookingDate: '2026-09-02', amount: '-5.00', category: { id: '1', name: 'Groceries', hidden: false } },
       ], '2026-09-28'),
     );
     const charts = createMonthlyCategoryChartData(months);
@@ -296,10 +322,10 @@ describe('monthly category averages', () => {
 
   it('averages absolute in-window amounts over the configured months, counting empty months as zero', () => {
     const averages = getCategoryMonthlyAverages([
-      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '1', name: 'Groceries' } },
-      { bookingDate: '2026-08-01', amount: '-12.00', category: { id: '1', name: 'Groceries' } },
-      { bookingDate: '2026-09-20', amount: '3.00', category: { id: '1', name: 'Groceries' } },
-      { bookingDate: '2020-01-15', amount: '-100.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-08-01', amount: '-12.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-09-20', amount: '3.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2020-01-15', amount: '-100.00', category: { id: '1', name: 'Groceries', hidden: false } },
       { bookingDate: '2026-09-02', amount: '-2.00', category: null },
     ], '2026-09-28', 12);
 
@@ -309,11 +335,24 @@ describe('monthly category averages', () => {
     ]);
   });
 
+  it('excludes hidden categories from the averages while leaving visible categories unchanged', () => {
+    const averages = getCategoryMonthlyAverages([
+      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-09-02', amount: '-120.00', category: { id: '2', name: 'Internal', hidden: true } },
+      { bookingDate: '2026-09-03', amount: '-2.00', category: null },
+    ], '2026-09-28', 12);
+
+    expect(averages).toEqual([
+      { key: 'category:1', name: 'Groceries', amount: '1.00' },
+      { key: 'uncategorised', name: 'Uncategorised', amount: '0.17' },
+    ]);
+  });
+
   it('excludes transactions outside the window and future dates in the current month', () => {
     const averages = getCategoryMonthlyAverages([
-      { bookingDate: '2025-09-30', amount: '-100.00', category: { id: '1', name: 'Too old' } },
-      { bookingDate: '2026-09-29', amount: '-100.00', category: { id: '2', name: 'Future' } },
-      { bookingDate: '2026-09-28', amount: '-6.00', category: { id: '3', name: 'Today' } },
+      { bookingDate: '2025-09-30', amount: '-100.00', category: { id: '1', name: 'Too old', hidden: false } },
+      { bookingDate: '2026-09-29', amount: '-100.00', category: { id: '2', name: 'Future', hidden: false } },
+      { bookingDate: '2026-09-28', amount: '-6.00', category: { id: '3', name: 'Today', hidden: false } },
     ], '2026-09-28', 12);
 
     expect(averages).toEqual([
@@ -323,9 +362,9 @@ describe('monthly category averages', () => {
 
   it('orders categories by name case-insensitively with identity tie-breaks and uncategorised last', () => {
     const averages = getCategoryMonthlyAverages([
-      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '10', name: 'alpha' } },
-      { bookingDate: '2026-09-02', amount: '-12.00', category: { id: '2', name: 'Alpha' } },
-      { bookingDate: '2026-09-03', amount: '-12.00', category: { id: '3', name: 'Zulu' } },
+      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '10', name: 'alpha', hidden: false } },
+      { bookingDate: '2026-09-02', amount: '-12.00', category: { id: '2', name: 'Alpha', hidden: false } },
+      { bookingDate: '2026-09-03', amount: '-12.00', category: { id: '3', name: 'Zulu', hidden: false } },
       { bookingDate: '2026-09-04', amount: '-12.00', category: null },
     ], '2026-09-28', 12);
 

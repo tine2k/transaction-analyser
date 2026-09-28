@@ -20,7 +20,8 @@ const SELECT_TRANSACTIONS = `
          t.counterparty_name,
          t.counterparty_account,
          c.id AS category_id,
-         c.name AS category_name
+         c.name AS category_name,
+         c.hidden AS category_hidden
   FROM transactions AS t
   LEFT JOIN categories AS c ON c.id = t.category_id
   ORDER BY t.booking_date DESC, t.id DESC
@@ -38,6 +39,7 @@ type TransactionRow = {
   counterparty_account: string | null;
   category_id: string | null;
   category_name: string | null;
+  category_hidden: boolean | null;
 };
 
 // A driver's error message can carry the host and port, which are parts of the
@@ -82,6 +84,6 @@ export default defineEventHandler(async () => {
     category:
       row.category_id === null
         ? null
-        : { id: row.category_id, name: row.category_name },
+        : { id: row.category_id, name: row.category_name, hidden: row.category_hidden === true },
   }));
 });

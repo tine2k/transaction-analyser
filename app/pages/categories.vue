@@ -11,7 +11,7 @@
 // category's name and expressions.
 //
 // See openspec/changes/allow-multiple-category-expressions/specs/category-management-screen/spec.md
-type Category = { id: string; name: string; patterns: string[] };
+type Category = { id: string; name: string; patterns: string[]; hidden: boolean };
 
 const { data: categories, error, pending, refresh } = useFetch<Category[]>('/api/categories', {
   default: () => [],
@@ -32,6 +32,7 @@ const sortedCategories = computed(() =>
 
 const name = ref('');
 const patterns = ref<string[]>(['']);
+const hidden = ref(false);
 const editingId = ref<string | null>(null);
 const saving = ref(false);
 const formError = ref<string | null>(null);
@@ -50,6 +51,7 @@ function startEdit(category: Category): void {
   editingId.value = category.id;
   name.value = category.name;
   patterns.value = category.patterns.length > 0 ? [...category.patterns] : [''];
+  hidden.value = category.hidden;
   formError.value = null;
 }
 
@@ -57,6 +59,7 @@ function cancelEdit(): void {
   editingId.value = null;
   name.value = '';
   patterns.value = [''];
+  hidden.value = false;
   formError.value = null;
 }
 
@@ -142,12 +145,12 @@ async function submit(): Promise<void> {
     if (editingId.value === null) {
       await $fetch('/api/categories', {
         method: 'POST',
-        body: { name: name.value, patterns: submitted },
+        body: { name: name.value, patterns: submitted, hidden: hidden.value },
       });
     } else {
       await $fetch(`/api/categories/${editingId.value}`, {
         method: 'PUT',
-        body: { name: name.value, patterns: submitted },
+        body: { name: name.value, patterns: submitted, hidden: hidden.value },
       });
     }
     cancelEdit();
@@ -228,6 +231,16 @@ async function remove(category: Category): Promise<void> {
         </button>
       </fieldset>
 
+      <label class="mt-3 flex items-center gap-2 text-sm text-slate-700">
+        <input
+          v-model="hidden"
+          type="checkbox"
+          data-testid="hidden-input"
+          class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+        >
+        Hidden from the analysis
+      </label>
+
       <p class="mt-3 text-sm text-slate-600" role="status" aria-live="polite">
         <template v-if="matchCountState === 'empty'">
           Enter an expression to preview matching transactions.
@@ -281,6 +294,7 @@ async function remove(category: Category): Promise<void> {
           <tr class="border-b border-slate-200">
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Name</th>
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Expression count</th>
+            <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Analysis</th>
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Actions</th>
           </tr>
         </thead>
@@ -288,6 +302,9 @@ async function remove(category: Category): Promise<void> {
           <tr v-for="category in sortedCategories" :key="category.id" class="border-b border-slate-100">
             <td class="px-3 py-2 align-top text-slate-900">{{ category.name }}</td>
             <td class="px-3 py-2 align-top text-slate-900">{{ category.patterns.length }}</td>
+            <td class="px-3 py-2 align-top text-slate-900" data-testid="category-hidden-state">
+              {{ category.hidden ? 'Hidden' : 'Visible' }}
+            </td>
             <td class="px-3 py-2 align-top">
               <div class="flex gap-2">
                 <button

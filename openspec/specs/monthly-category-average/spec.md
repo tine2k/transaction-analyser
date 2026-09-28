@@ -8,11 +8,11 @@ Provides a read-only summary of each category's average monthly absolute spend o
 
 ### Requirement: The monthly average route presents each category's average monthly spend
 
-The system SHALL provide a menu-accessible page at `/monthly-average` and SHALL request the same-origin `GET /api/transactions` endpoint once when the route is loaded. It SHALL use the returned transactions as its only transaction data source.
+The system SHALL provide a menu-accessible page at `/monthly-average` and SHALL request the same-origin `GET /api/transactions` endpoint once when the route is loaded. It SHALL use the returned transactions as its only transaction data source. The page SHALL exclude every returned transaction whose category is hidden before it forms any average: a hidden-category transaction SHALL NOT contribute to any category's sum or average, and a hidden category SHALL NOT be listed.
 
-The page SHALL cover a rolling window of the last configured number of calendar months, ending with the calendar month that contains the current date. The window SHALL default to 12 months. For each category represented by at least one returned transaction whose booking date falls within the window, the page SHALL show the category's name and its average monthly absolute spend over the window. The page SHALL include a distinct `Uncategorised` entry when a returned transaction within the window has no category, and SHALL list every such represented category without dropping any. Named categories SHALL be ordered by name ascending, case-insensitively, with category identity ascending as a tie-breaker; `Uncategorised` SHALL follow named categories.
+The page SHALL cover a rolling window of the last configured number of calendar months, ending with the calendar month that contains the current date. The window SHALL default to 12 months. For each category represented by at least one included returned transaction whose booking date falls within the window, the page SHALL show the category's name and its average monthly absolute spend over the window. The page SHALL include a distinct `Uncategorised` entry when an included returned transaction within the window has no category, and SHALL list every such represented category without dropping any. Named categories SHALL be ordered by name ascending, case-insensitively, with category identity ascending as a tie-breaker; `Uncategorised` SHALL follow named categories.
 
-The average monthly amount for a category SHALL be the exact sum of the absolute amounts of that category's transactions whose booking date falls within the window, divided by the configured number of months, so that a month in the window with no such transaction contributes zero. The average SHALL be rounded to two decimal places (the euro cent), with a half rounded away from zero, and SHALL be displayed using the browser's active locale's EUR currency and number conventions. Incoming and outgoing amounts SHALL both contribute positively. The page SHALL NOT change stored data, SHALL NOT combine transactions across categories, and SHALL NOT include transactions whose booking date falls outside the window.
+The average monthly amount for a category SHALL be the exact sum of the absolute amounts of that category's included transactions whose booking date falls within the window, divided by the configured number of months, so that a month in the window with no such transaction contributes zero. The average SHALL be rounded to two decimal places (the euro cent), with a half rounded away from zero, and SHALL be displayed using the browser's active locale's EUR currency and number conventions. Incoming and outgoing amounts SHALL both contribute positively. The page SHALL NOT change stored data, SHALL NOT combine transactions across categories, and SHALL NOT include transactions whose booking date falls outside the window.
 
 #### Scenario: Categories are listed with their monthly averages
 
@@ -33,6 +33,16 @@ The average monthly amount for a category SHALL be the exact sum of the absolute
 
 - **WHEN** a category has incoming and outgoing amounts whose window sum divided by the configured months is not an exact cent value
 - **THEN** the average is formed from the absolute sum and rounded to two decimal places, halves away from zero
+
+#### Scenario: A hidden category is excluded from the averages
+
+- **WHEN** a returned transaction within the window has a hidden category
+- **THEN** it contributes to no category's sum or average, and its hidden category is not listed
+
+#### Scenario: Hiding a category leaves other averages unchanged
+
+- **WHEN** a hidden category and a visible category both have window transactions
+- **THEN** the visible category's average is unchanged and only the hidden category is omitted
 
 #### Scenario: Uncategorised is listed separately
 

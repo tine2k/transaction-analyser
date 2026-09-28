@@ -19,8 +19,9 @@ import type { Pool, PoolClient } from 'pg';
 import { useDatabase } from './db';
 
 // A category as the management surface returns it: the identity rendered as a
-// string, and the two domain elements — the name and every regular expression.
-export type Category = { id: string; name: string; patterns: string[] };
+// string, and the three domain elements — the name, every regular expression, and
+// the hidden flag that takes the category out of the analysis views.
+export type Category = { id: string; name: string; patterns: string[]; hidden: boolean };
 
 // A create or an edit request that the surface refused, carrying the status the
 // caller should answer with. It is thrown so a handler can map it in one place.
@@ -35,22 +36,22 @@ export class CategoryError extends Error {
 }
 
 const SELECT_CATEGORIES = `
-  SELECT id, name, patterns
+  SELECT id, name, patterns, hidden
   FROM categories
   ORDER BY id
 `;
 
 const INSERT_CATEGORY = `
-  INSERT INTO categories (name, patterns)
-  VALUES ($1, $2)
-  RETURNING id, name, patterns
+  INSERT INTO categories (name, patterns, hidden)
+  VALUES ($1, $2, $3)
+  RETURNING id, name, patterns, hidden
 `;
 
 const UPDATE_CATEGORY = `
   UPDATE categories
-  SET name = $2, patterns = $3
+  SET name = $2, patterns = $3, hidden = $4
   WHERE id = $1
-  RETURNING id, name, patterns
+  RETURNING id, name, patterns, hidden
 `;
 
 const DELETE_CATEGORY = 'DELETE FROM categories WHERE id = $1';
@@ -134,12 +135,12 @@ export async function countCategoryMatches(input: unknown): Promise<number> {
 }
 
 export async function createCategory(input: unknown): Promise<Category> {
-  const { name, patterns } = readCategoryInput(input);
+  const { name, patterns, hidden } = readCategoryInput(input);
   const database = useDatabase();
   await assertPatternsCompile(database, patterns);
 
   return inTransaction(database, async (client) => {
-    const inserted = await client.query(INSERT_CATEGORY, [name, patterns]);
+    const inserted = await client.query(INSERT_CATEGORY, [name, patterns, hidden]);
     await client.query(RECOMPUTE_ASSIGNMENTS);
     return inserted.rows[0] as Category;
   });
@@ -147,12 +148,12 @@ export async function createCategory(input: unknown): Promise<Category> {
 
 export async function editCategory(id: string, input: unknown): Promise<Category> {
   assertIdentity(id);
-  const { name, patterns } = readCategoryInput(input);
+  const { name, patterns, hidden } = readCategoryInput(input);
   const database = useDatabase();
   await assertPatternsCompile(database, patterns);
 
   return inTransaction(database, async (client) => {
-    const updated = await client.query(UPDATE_CATEGORY, [id, name, patterns]);
+    const updated = await client.query(UPDATE_CATEGORY, [id, name, patterns, hidden]);
     if (updated.rowCount === 0) {
       throw new CategoryError(404, 'no category carries that identity');
     }
@@ -219,7 +220,7 @@ async function inTransaction<T>(
   }
 }
 
-function readCategoryInput(input: unknown): { name: string; patterns: string[] } {
+function readCategoryInput(input: unknown): { name: string; patterns: string[]; hidden: boolean } {
   if (typeof input !== 'object' || input === null) {
     throw new CategoryError(400, 'a category needs a name and one or more patterns');
   }
@@ -227,7 +228,21 @@ function readCategoryInput(input: unknown): { name: string; patterns: string[] }
   if (typeof name !== 'string' || name.trim() === '') {
     throw new CategoryError(400, 'a category needs a non-empty name');
   }
-  return { name, patterns: readPatterns(input) };
+  return { name, patterns: readPatterns(input), hidden: readHidden(input) };
+}
+
+// The hidden flag is optional in the body. Absent means visible, because a create
+// and an edit replace the stored category and a category is visible by default. A
+// value that is present and not a boolean is refused rather than coerced.
+function readHidden(input: unknown): boolean {
+  const hidden = (input as { hidden?: unknown }).hidden;
+  if (hidden === undefined) {
+    return false;
+  }
+  if (typeof hidden !== 'boolean') {
+    throw new CategoryError(400, 'the hidden flag must be a boolean');
+  }
+  return hidden;
 }
 
 function readPatterns(input: unknown): string[] {

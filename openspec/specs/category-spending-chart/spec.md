@@ -8,7 +8,7 @@ Defines the browser analytics page that presents a separate category spending pi
 
 ### Requirement: The analytics route presents twelve monthly category pie charts
 
-The system SHALL provide an analytics page at `/analytics` and SHALL request the same-origin `GET /api/transactions` endpoint once when the route is loaded. The page SHALL use the returned transactions as its only transaction data source. It SHALL present exactly twelve month-labelled chart panels, ordered newest to oldest: the current calendar month and the eleven preceding calendar months. For each month, the page SHALL include transactions whose booking date falls within that calendar month, through today for the current month. Each panel SHALL contain one pie chart whose slices group only that month's transactions by category and sum the absolute value of their amounts; incoming and outgoing amounts SHALL both contribute positively. Transactions without a category SHALL contribute to a distinct `Uncategorised` slice by default. Each month's visible category totals and pie slices SHALL be ordered from the greatest exact absolute total to the least; categories with equal totals SHALL be ordered by category name ascending. Every pie slice SHALL have a visible label that identifies its category and displays its exact absolute euro total. All displayed euro totals, including category totals, slice labels, and tooltips, SHALL use the browser's active locale's number and currency conventions, including locale-appropriate thousands grouping, without rounding the exact total. A page-wide control SHALL allow the user to hide or show the `Uncategorised` category; when hidden, uncategorised totals SHALL be omitted from every chart and its visible category totals, without changing stored data. The control SHALL show `Uncategorised` by default. Transactions SHALL NOT be combined across months.
+The system SHALL provide an analytics page at `/analytics` and SHALL request the same-origin `GET /api/transactions` endpoint once when the route is loaded. The page SHALL use the returned transactions as its only transaction data source. It SHALL present exactly twelve month-labelled chart panels, ordered newest to oldest: the current calendar month and the eleven preceding calendar months. For each month, the page SHALL include transactions whose booking date falls within that calendar month, through today for the current month. Each panel SHALL contain one pie chart whose slices group only that month's transactions by category and sum the absolute value of their amounts; incoming and outgoing amounts SHALL both contribute positively. A transaction whose category is hidden SHALL NOT contribute to any panel, slice, or visible category total, and a hidden category SHALL NOT appear as a slice or a visible total in any of the twelve months. Transactions without a category SHALL contribute to a distinct `Uncategorised` slice by default. Each month's visible category totals and pie slices SHALL be ordered from the greatest exact absolute total to the least; categories with equal totals SHALL be ordered by category name ascending. Every pie slice SHALL have a visible label that identifies its category and displays its exact absolute euro total. All displayed euro totals, including category totals, slice labels, and tooltips, SHALL use the browser's active locale's number and currency conventions, including locale-appropriate thousands grouping, without rounding the exact total. A page-wide control SHALL allow the user to hide or show the `Uncategorised` category; when hidden, uncategorised totals SHALL be omitted from every chart and its visible category totals, without changing stored data. The control SHALL show `Uncategorised` by default. Transactions SHALL NOT be combined across months.
 
 #### Scenario: Exactly twelve monthly charts are presented
 
@@ -29,6 +29,16 @@ The system SHALL provide an analytics page at `/analytics` and SHALL request the
 
 - **WHEN** a category has amounts `-12.50` and `4.00` in one month
 - **THEN** that month's chart shows their absolute-value sum, `16.50`
+
+#### Scenario: A hidden category is excluded from every chart
+
+- **WHEN** a transaction falls in one of the twelve months and its category is hidden
+- **THEN** it contributes to no slice and no visible category total in any of the twelve panels, and its hidden category is absent from every panel
+
+#### Scenario: Hiding a category leaves other totals unchanged
+
+- **WHEN** a hidden category has monthly totals and other categories have totals in the same months
+- **THEN** the other categories' slices and visible totals are unchanged, and only the hidden category's amounts are omitted
 
 #### Scenario: Uncategorised transactions have a monthly slice by default
 

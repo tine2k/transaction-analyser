@@ -56,15 +56,16 @@ SHALL NOT remove the frame's other properties, which remain as `frontend-shell` 
 ### Requirement: The category screen lists every category with its name and expression
 
 When the category management screen is loaded, the browser SHALL request `GET /api/categories`
-from the same origin and SHALL show a row for each returned category carrying its name and the
-count of regular expressions in that category's `patterns` array. The list SHALL NOT display the
-regular-expression values themselves; they remain available in the create and edit forms. It SHALL
-show every returned category, dropping none. The rows SHALL be ordered by category name in
-ascending, case-insensitive alphabetical order, with category identity in ascending order as a
-tie-breaker for equal names. It SHALL show a defined state when no category is returned, stating
-that there are no categories rather than an empty list. It SHALL show a distinct state when the
-request fails, stating that the categories could not be loaded. It SHALL NOT invent a category or
-a count, or show a category that the endpoint did not return.
+from the same origin and SHALL show a row for each returned category carrying its name, the
+count of regular expressions in that category's `patterns` array, and whether the category is
+hidden. The list SHALL NOT display the regular-expression values themselves; they remain
+available in the create and edit forms. It SHALL show every returned category, dropping none,
+including hidden categories. The rows SHALL be ordered by category name in ascending,
+case-insensitive alphabetical order, with category identity in ascending order as a tie-breaker
+for equal names. It SHALL show a defined state when no category is returned, stating that there
+are no categories rather than an empty list. It SHALL show a distinct state when the request
+fails, stating that the categories could not be loaded. It SHALL NOT invent a category, a count,
+or a hidden state, or show a category that the endpoint did not return.
 
 #### Scenario: Every category gets a row
 
@@ -75,6 +76,11 @@ a count, or show a category that the endpoint did not return.
 
 - **WHEN** a returned category carries two regular expressions
 - **THEN** its row shows the count `2` and neither regular-expression value
+
+#### Scenario: Every row states whether the category is hidden
+
+- **WHEN** the endpoint returns both hidden and visible categories
+- **THEN** each row distinguishes a hidden category from a visible one, using the returned `hidden` value
 
 #### Scenario: Categories are ordered by name
 
@@ -93,18 +99,23 @@ a count, or show a category that the endpoint did not return.
 
 ### Requirement: The screen creates a category
 
-The screen SHALL offer a form with one field for the name and one or more fields for the regular
-expressions, and a control that submits them. The form SHALL let an expression field be added so
-that a category can be given more than one expression. Submitting SHALL send `POST
-/api/categories` with the values as entered, and SHALL send every expression that was entered.
-On success the new category SHALL appear in the list, and on failure the screen SHALL report the
-failure rather than showing the category as created. The screen SHALL NOT send an empty
-expression list.
+The screen SHALL offer a form with one field for the name, one or more fields for the regular
+expressions, and a control for the hidden flag, and a control that submits them. The form SHALL
+let an expression field be added so that a category can be given more than one expression.
+Submitting SHALL send `POST /api/categories` with the values as entered, including the hidden
+flag, and SHALL send every expression that was entered. On success the new category SHALL appear
+in the list, and on failure the screen SHALL report the failure rather than showing the category
+as created. The screen SHALL NOT send an empty expression list.
 
 #### Scenario: A category is created from the form
 
-- **WHEN** a name and one or more expressions are entered and the form is submitted
-- **THEN** `POST /api/categories` is sent with those values and, on success, the category appears in the list with its expression count
+- **WHEN** a name, one or more expressions, and a hidden setting are entered and the form is submitted
+- **THEN** `POST /api/categories` is sent with those values and, on success, the category appears in the list with its expression count and hidden state
+
+#### Scenario: The hidden flag is sent as entered
+
+- **WHEN** the hidden control is set on and the form is submitted
+- **THEN** `POST /api/categories` carries `hidden` as `true`
 
 #### Scenario: Several expressions are created together
 
@@ -123,17 +134,24 @@ expression list.
 
 ### Requirement: The screen edits a category
 
-The screen SHALL offer a way to change an existing category's name and its regular expressions.
-It SHALL present every expression the category carries for editing, and SHALL let an expression
-be added or removed. Submitting an edit SHALL send `PUT /api/categories/:id` with the changed
-values, sending the expressions that remain. On success the list SHALL reflect the new name and
-expressions, and on failure the screen SHALL report the failure rather than showing the change as
-applied. The screen SHALL NOT submit an empty expression list.
+The screen SHALL offer a way to change an existing category's name, its regular expressions, and
+its hidden flag. It SHALL present every expression the category carries for editing and SHALL
+present the category's current hidden state, and SHALL let an expression be added or removed and
+the hidden state be changed. Submitting an edit SHALL send `PUT /api/categories/:id` with the
+changed values, including the hidden flag, sending the expressions that remain. On success the
+list SHALL reflect the new name, expressions, and hidden state, and on failure the screen SHALL
+report the failure rather than showing the change as applied. The screen SHALL NOT submit an empty
+expression list.
 
 #### Scenario: A category is edited from the screen
 
 - **WHEN** a category's name or expressions are changed and the change is submitted
 - **THEN** `PUT /api/categories/:id` is sent and, on success, the row shows the new name and expression count
+
+#### Scenario: The hidden state is edited from the screen
+
+- **WHEN** a category's hidden state is changed in the edit form and the change is submitted
+- **THEN** `PUT /api/categories/:id` carries the changed `hidden` value and, on success, the row shows the new hidden state
 
 #### Scenario: An expression is added to an existing category
 

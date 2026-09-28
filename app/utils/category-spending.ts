@@ -1,7 +1,7 @@
 export type CategorySpendingTransaction = {
   bookingDate: string;
   amount: string;
-  category: { id: string; name: string } | null;
+  category: { id: string; name: string; hidden: boolean } | null;
 };
 
 export type CategoryTransactionGroup = {
@@ -150,6 +150,16 @@ export function getCategorySpendingTotals(
       compareDecimalStrings(right.amount, left.amount)
       || (left.name < right.name ? -1 : left.name > right.name ? 1 : 0),
     );
+}
+
+// A hidden category is out of scope for the analysis views: its transactions are
+// dropped before grouping or averaging, while its transactions stay in the
+// transactions table and its membership is unchanged. The filter is applied once
+// here so every analysis view excludes hidden categories the same way.
+export function excludeHiddenCategoryTransactions(
+  transactions: CategorySpendingTransaction[],
+): CategorySpendingTransaction[] {
+  return transactions.filter(({ category }) => category?.hidden !== true);
 }
 
 export function getMonthlyCategorySpendingTotals(
@@ -361,7 +371,7 @@ export function getCategoryMonthlyAverages(
   const months = getLastCalendarMonths(today, monthCount);
   const amountsByKey = new Map<string, { name: string; amounts: string[] }>();
 
-  for (const transaction of transactions) {
+  for (const transaction of excludeHiddenCategoryTransactions(transactions)) {
     const inWindow = months.some(({ startDate, endDate }) =>
       transaction.bookingDate >= startDate && transaction.bookingDate <= endDate,
     );
@@ -396,7 +406,7 @@ export function groupTransactionsByMonth(
     groupsByKey: new Map<string, CategoryTransactionGroup>(),
   }));
 
-  for (const transaction of transactions) {
+  for (const transaction of excludeHiddenCategoryTransactions(transactions)) {
     const month = months.find(({ startDate, endDate }) =>
       transaction.bookingDate >= startDate && transaction.bookingDate <= endDate,
     );
@@ -431,7 +441,7 @@ export function groupTransactionsByAvailableMonth(
     groupsByKey: Map<string, CategoryTransactionGroup>;
   }>();
 
-  for (const transaction of transactions) {
+  for (const transaction of excludeHiddenCategoryTransactions(transactions)) {
     const key = transaction.bookingDate.slice(0, 7);
     let month = monthsByKey.get(key);
     if (month === undefined) {

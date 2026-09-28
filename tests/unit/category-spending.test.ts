@@ -98,6 +98,14 @@ describe('decimal-safe category totals', () => {
     }).format(-0.01));
   });
 
+  it('formats a signed decimal-safe sum without losing its sign or precision', () => {
+    const locale = 'de-DE';
+    const sum = sumSignedAmountStrings(['-9007199254740993.02', '-0.002']);
+
+    expect(sum).toBe('-9007199254740993.022');
+    expect(formatEuroAmount(sum, locale)).toBe('-9.007.199.254.740.993,022\u00a0€');
+  });
+
   it('builds positive pie values only for completed category totals', () => {
     expect(createCategoryPieData([
       { key: 'category:1', name: 'Groceries', amount: '100.00' },

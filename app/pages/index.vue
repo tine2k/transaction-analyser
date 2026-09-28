@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { sumSignedAmountStrings } from '../utils/category-spending';
+import { formatEuroAmount, sumSignedAmountStrings } from '../utils/category-spending';
 
 // The index route reads stored transactions from the read-only GET
 // /api/transactions endpoint. Category and booking-month filters are derived
@@ -189,7 +189,7 @@ const visibleTotal = computed(() =>
       </div>
 
       <p class="mt-4 text-sm font-semibold text-slate-900" data-testid="visible-total">
-        Sum of displayed transactions: <span class="tabular-nums">{{ visibleTotal }}</span>
+        Sum of displayed transactions: <span class="tabular-nums">{{ formatEuroAmount(visibleTotal) }}</span>
       </p>
 
       <p v-if="transactions.length === 0" class="mt-4 text-slate-600">

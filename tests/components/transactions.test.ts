@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({ useFetch: vi.fn() }));
 mockNuxtImport('useFetch', () => mocks.useFetch);
 
 import Transactions from '../../app/pages/index.vue';
+import { formatEuroAmount } from '../../app/utils/category-spending';
 
 type TestTransaction = {
   id: string;
@@ -67,7 +68,7 @@ describe('transaction list filters', () => {
       .toBe('all');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['1']);
-    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain('-0.25');
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-0.25'));
     expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('All categories (5)');
     expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('Uncategorised (1)');
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
@@ -99,7 +100,8 @@ describe('transaction list filters', () => {
       .toBe('2026-02');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['2']);
-    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain('-12.50');
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-12.50'));
+    expect(wrapper.findAll('tbody tr')[0]?.findAll('td')[2]?.text()).toBe('-12.50');
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 
@@ -118,18 +120,18 @@ describe('transaction list filters', () => {
     expect((monthFilter.element as HTMLSelectElement).value).toBe('2026-02');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['3', '2', '5', '1']);
-    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain('-18.74');
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-18.74'));
 
     await categoryFilter.setValue('2');
     await flushPromises();
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['3']);
-    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain('4.00');
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('4.00'));
 
     await categoryFilter.setValue('uncategorised');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['1']);
-    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain('-0.25');
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-0.25'));
     await monthFilter.setValue('all');
     await flushPromises();
     expect((monthFilter.element as HTMLSelectElement).value).toBe('all');
@@ -140,7 +142,7 @@ describe('transaction list filters', () => {
     await monthFilter.setValue('2026-03');
     await flushPromises();
     expect(wrapper.findAll('tbody tr')).toHaveLength(0);
-    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain('0');
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('0'));
   });
 
   it('falls back safely for unknown query values', async () => {

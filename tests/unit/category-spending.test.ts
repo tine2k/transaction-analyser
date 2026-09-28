@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   CATEGORY_COLOR_PALETTE,
+  averageDecimalString,
   createCategoryPieData,
   createCategoryColorMap,
   createMonthlyCategoryMatrixData,
   createMonthlyCategoryChartData,
   formatEuroAmount,
+  getCategoryMonthlyAverages,
+  getLastCalendarMonths,
   getLastTwelveCalendarMonths,
   getMonthlyCategorySpendingTotals,
   groupTransactionsByAvailableMonth,
@@ -156,6 +159,23 @@ describe('calendar-month transaction buckets', () => {
     });
   });
 
+  it('creates a configurable window of months from the current partial month backwards', () => {
+    const months = getLastCalendarMonths('2026-09-28', 3);
+
+    expect(months.map(({ key }) => key)).toEqual(['2026-09', '2026-08', '2026-07']);
+    expect(months[0]).toMatchObject({
+      label: 'September 2026',
+      startDate: '2026-09-01',
+      endDate: '2026-09-28',
+    });
+    expect(months[2]).toMatchObject({
+      label: 'July 2026',
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+    });
+    expect(getLastTwelveCalendarMonths('2026-09-28')).toEqual(getLastCalendarMonths('2026-09-28', 12));
+  });
+
   it('assigns eligible bookings to their month and excludes dates outside the range', () => {
     const monthlyGroups = groupTransactionsByMonth([
       { bookingDate: '2025-09-30', amount: '-1.00', category: { id: '1', name: 'Too old' } },
@@ -260,5 +280,57 @@ describe('calendar-month transaction buckets', () => {
     ]);
     expect(charts.slice(1).every(({ totals, pieData }) => totals.length === 0 && pieData.length === 0))
       .toBe(true);
+  });
+});
+
+describe('monthly category averages', () => {
+  it('rounds an exact decimal sum to the cent with halves away from zero', () => {
+    expect(averageDecimalString('1.00', 8)).toBe('0.13');
+    expect(averageDecimalString('-1.00', 8)).toBe('-0.13');
+    expect(averageDecimalString('1.00', 4)).toBe('0.25');
+    expect(averageDecimalString('16.50', 3)).toBe('5.50');
+    expect(averageDecimalString('0.01', 3)).toBe('0.00');
+    expect(averageDecimalString('9007199254740993.00', 12)).toBe('750599937895082.75');
+    expect(() => averageDecimalString('1.00', 0)).toThrow();
+  });
+
+  it('averages absolute in-window amounts over the configured months, counting empty months as zero', () => {
+    const averages = getCategoryMonthlyAverages([
+      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2026-08-01', amount: '-12.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2026-09-20', amount: '3.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2020-01-15', amount: '-100.00', category: { id: '1', name: 'Groceries' } },
+      { bookingDate: '2026-09-02', amount: '-2.00', category: null },
+    ], '2026-09-28', 12);
+
+    expect(averages).toEqual([
+      { key: 'category:1', name: 'Groceries', amount: '2.25' },
+      { key: 'uncategorised', name: 'Uncategorised', amount: '0.17' },
+    ]);
+  });
+
+  it('excludes transactions outside the window and future dates in the current month', () => {
+    const averages = getCategoryMonthlyAverages([
+      { bookingDate: '2025-09-30', amount: '-100.00', category: { id: '1', name: 'Too old' } },
+      { bookingDate: '2026-09-29', amount: '-100.00', category: { id: '2', name: 'Future' } },
+      { bookingDate: '2026-09-28', amount: '-6.00', category: { id: '3', name: 'Today' } },
+    ], '2026-09-28', 12);
+
+    expect(averages).toEqual([
+      { key: 'category:3', name: 'Today', amount: '0.50' },
+    ]);
+  });
+
+  it('orders categories by name case-insensitively with identity tie-breaks and uncategorised last', () => {
+    const averages = getCategoryMonthlyAverages([
+      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '10', name: 'alpha' } },
+      { bookingDate: '2026-09-02', amount: '-12.00', category: { id: '2', name: 'Alpha' } },
+      { bookingDate: '2026-09-03', amount: '-12.00', category: { id: '3', name: 'Zulu' } },
+      { bookingDate: '2026-09-04', amount: '-12.00', category: null },
+    ], '2026-09-28', 12);
+
+    expect(averages.map(({ key }) => key)).toEqual([
+      'category:2', 'category:10', 'category:3', 'uncategorised',
+    ]);
   });
 });

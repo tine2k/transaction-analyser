@@ -12,16 +12,16 @@ browser.
 ### Requirement: The layout carries a menu bar linking the screens
 
 The shared layout SHALL carry a menu bar, present on every route, holding a link to the
-transactions screen, a link to the category management screen, and a link to the category
-spending analytics screen, and a link to the monthly totals screen. Each link SHALL be an
-in-application navigation to that screen on the same origin. The menu bar SHALL distinguish the
-link for the screen currently shown from the other links. Adding the menu bar SHALL NOT remove the
-frame's other properties, which remain as `frontend-shell` defines.
+transactions screen, a link to the category management screen, a link to the category spending
+analytics screen, a link to the monthly totals screen, and a link to the monthly average screen.
+Each link SHALL be an in-application navigation to that screen on the same origin. The menu bar
+SHALL distinguish the link for the screen currently shown from the other links. Adding the menu bar
+SHALL NOT remove the frame's other properties, which remain as `frontend-shell` defines.
 
 #### Scenario: The menu bar is on the transactions screen
 
 - **WHEN** the transactions screen is shown
-- **THEN** a menu bar is present holding links to the transactions screen, the category management screen, the category spending analytics screen, and the monthly totals screen
+- **THEN** a menu bar is present holding links to the transactions screen, the category management screen, the category spending analytics screen, the monthly totals screen, and the monthly average screen
 
 #### Scenario: The menu bar is on the category management screen
 
@@ -36,6 +36,11 @@ frame's other properties, which remain as `frontend-shell` defines.
 #### Scenario: The menu bar is on the monthly totals screen
 
 - **WHEN** the monthly totals screen is shown
+- **THEN** the same menu bar is present
+
+#### Scenario: The menu bar is on the monthly average screen
+
+- **WHEN** the monthly average screen is shown
 - **THEN** the same menu bar is present
 
 #### Scenario: The current screen is distinguished

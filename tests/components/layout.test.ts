@@ -18,6 +18,7 @@ describe('default layout navigation', () => {
       ['Categories', '/categories'],
       ['Analytics', '/analytics'],
       ['Monthly totals', '/monthly-totals'],
+      ['Monthly average', '/monthly-average'],
     ]);
     expect(links[0]?.attributes('aria-current')).toBe('page');
     await transactions.unmount();
@@ -30,5 +31,11 @@ describe('default layout navigation', () => {
     route.path = '/monthly-totals';
     const monthlyTotals = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
     expect(monthlyTotals.findAll('nav a')[3]?.attributes('aria-current')).toBe('page');
+    await monthlyTotals.unmount();
+
+    route.path = '/monthly-average';
+    const monthlyAverage = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
+    expect(monthlyAverage.findAll('nav a')[4]?.text()).toBe('Monthly average');
+    expect(monthlyAverage.findAll('nav a')[4]?.attributes('aria-current')).toBe('page');
   });
 });

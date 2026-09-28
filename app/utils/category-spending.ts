@@ -42,6 +42,12 @@ export type MonthlyCategoryChartData = MonthlyCategoryTotals & {
   pieData: CategoryPieDatum[];
 };
 
+export type CategoryMonthlyAverage = {
+  key: string;
+  name: string;
+  amount: string;
+};
+
 type DecimalParts = { coefficient: bigint; scale: number };
 
 export const CATEGORY_COLOR_PALETTE = [
@@ -155,6 +161,27 @@ export function getMonthlyCategorySpendingTotals(
   }));
 }
 
+function compareCategoryEntries(
+  left: Pick<CategorySpendingTotal, 'key' | 'name'>,
+  right: Pick<CategorySpendingTotal, 'key' | 'name'>,
+): number {
+  if (left.key === 'uncategorised') {
+    return right.key === 'uncategorised' ? 0 : 1;
+  }
+  if (right.key === 'uncategorised') {
+    return -1;
+  }
+
+  const byName = left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+  if (byName !== 0) {
+    return byName;
+  }
+
+  const leftId = BigInt(left.key.slice('category:'.length));
+  const rightId = BigInt(right.key.slice('category:'.length));
+  return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+}
+
 export function createMonthlyCategoryMatrixData(
   months: MonthlyCategoryGroups[],
 ): MonthlyCategoryMatrixData {
@@ -167,23 +194,7 @@ export function createMonthlyCategoryMatrixData(
     }
   }
 
-  const categories = [...categoriesByKey.values()].sort((left, right) => {
-    if (left.key === 'uncategorised') {
-      return right.key === 'uncategorised' ? 0 : 1;
-    }
-    if (right.key === 'uncategorised') {
-      return -1;
-    }
-
-    const byName = left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
-    if (byName !== 0) {
-      return byName;
-    }
-
-    const leftId = BigInt(left.key.slice('category:'.length));
-    const rightId = BigInt(right.key.slice('category:'.length));
-    return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
-  });
+  const categories = [...categoriesByKey.values()].sort(compareCategoryEntries);
 
   return {
     categories,
@@ -285,12 +296,12 @@ export function formatEuroAmount(amount: string, locale?: string): string {
   return result.join('');
 }
 
-export function getLastTwelveCalendarMonths(today: string): CalendarMonth[] {
+export function getLastCalendarMonths(today: string, count: number): CalendarMonth[] {
   const [yearPart, monthPart] = today.split('-');
   const year = Number(yearPart);
   const month = Number(monthPart);
 
-  return Array.from({ length: 12 }, (_, offset) => {
+  return Array.from({ length: count }, (_, offset) => {
     const date = new Date(Date.UTC(year, month - 1 - offset, 1));
     const monthYear = date.getUTCFullYear();
     const monthNumber = date.getUTCMonth() + 1;
@@ -311,6 +322,69 @@ export function getLastTwelveCalendarMonths(today: string): CalendarMonth[] {
       endDate: monthEnd,
     };
   });
+}
+
+export function getLastTwelveCalendarMonths(today: string): CalendarMonth[] {
+  return getLastCalendarMonths(today, 12);
+}
+
+export function averageDecimalString(sum: string, count: number): string {
+  if (!Number.isInteger(count) || count <= 0) {
+    throw new Error('month count must be a positive integer');
+  }
+
+  const { coefficient, scale } = parseDecimal(sum);
+  const numerator = scale <= 2 ? coefficient * powerOfTen(2 - scale) : coefficient;
+  const denominator = scale <= 2
+    ? BigInt(count)
+    : BigInt(count) * powerOfTen(scale - 2);
+
+  const negative = numerator < 0n;
+  const magnitude = negative ? -numerator : numerator;
+  const quotient = magnitude / denominator;
+  const remainder = magnitude % denominator;
+  const rounded = 2n * remainder >= denominator ? quotient + 1n : quotient;
+  const cents = negative ? -rounded : rounded;
+  const negativeResult = cents < 0n;
+  const absoluteCents = negativeResult ? -cents : cents;
+  const integer = absoluteCents / 100n;
+  const fraction = (absoluteCents % 100n).toString().padStart(2, '0');
+
+  return `${negativeResult ? '-' : ''}${integer}.${fraction}`;
+}
+
+export function getCategoryMonthlyAverages(
+  transactions: CategorySpendingTransaction[],
+  today: string,
+  monthCount: number,
+): CategoryMonthlyAverage[] {
+  const months = getLastCalendarMonths(today, monthCount);
+  const amountsByKey = new Map<string, { name: string; amounts: string[] }>();
+
+  for (const transaction of transactions) {
+    const inWindow = months.some(({ startDate, endDate }) =>
+      transaction.bookingDate >= startDate && transaction.bookingDate <= endDate,
+    );
+    if (!inWindow) {
+      continue;
+    }
+
+    const key = transaction.category === null ? 'uncategorised' : `category:${transaction.category.id}`;
+    let entry = amountsByKey.get(key);
+    if (entry === undefined) {
+      entry = { name: transaction.category?.name ?? 'Uncategorised', amounts: [] };
+      amountsByKey.set(key, entry);
+    }
+    entry.amounts.push(transaction.amount);
+  }
+
+  return [...amountsByKey.entries()]
+    .map(([key, { name, amounts }]) => ({
+      key,
+      name,
+      amount: averageDecimalString(sumAbsoluteAmountStrings(amounts), monthCount),
+    }))
+    .sort(compareCategoryEntries);
 }
 
 export function groupTransactionsByMonth(

@@ -8,7 +8,7 @@ if (databaseUrl === undefined || databaseUrl === '') {
 
 export default defineConfig({
   testDir: '.',
-  testMatch: ['category-match-count.spec.ts', 'transaction-filter.spec.ts'],
+  testMatch: ['category-list.spec.ts', 'category-match-count.spec.ts', 'transaction-filter.spec.ts'],
   fullyParallel: false,
   workers: 1,
   reporter: 'list',

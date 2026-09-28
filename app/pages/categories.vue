@@ -17,6 +17,19 @@ const { data: categories, error, pending, refresh } = useFetch<Category[]>('/api
   default: () => [],
 });
 
+const sortedCategories = computed(() =>
+  [...(categories.value ?? [])].sort((left, right) => {
+    const byName = left.name.localeCompare(right.name, undefined, { sensitivity: 'accent' });
+    if (byName !== 0) {
+      return byName;
+    }
+
+    const leftId = BigInt(left.id);
+    const rightId = BigInt(right.id);
+    return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+  }),
+);
+
 const name = ref('');
 const patterns = ref<string[]>(['']);
 const editingId = ref<string | null>(null);
@@ -267,16 +280,14 @@ async function remove(category: Category): Promise<void> {
         <thead>
           <tr class="border-b border-slate-200">
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Name</th>
-            <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Regular expressions</th>
+            <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Expression count</th>
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="category in categories" :key="category.id" class="border-b border-slate-100">
+          <tr v-for="category in sortedCategories" :key="category.id" class="border-b border-slate-100">
             <td class="px-3 py-2 align-top text-slate-900">{{ category.name }}</td>
-            <td class="px-3 py-2 align-top font-mono text-slate-900">
-              <div v-for="(pattern, index) in category.patterns" :key="index">{{ pattern }}</div>
-            </td>
+            <td class="px-3 py-2 align-top text-slate-900">{{ category.patterns.length }}</td>
             <td class="px-3 py-2 align-top">
               <div class="flex gap-2">
                 <button

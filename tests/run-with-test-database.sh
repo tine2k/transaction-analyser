@@ -9,15 +9,18 @@ if (($# == 0)); then
   exit 2
 fi
 
-container_name="transaction-analyser-test-${PPID}-${RANDOM}-${RANDOM}"
-database_user='transaction_test'
-database_password='transaction_test_only'
-database_name='transaction_test'
+database_name="transaction_analyser_test_${PPID}_${RANDOM}_${RANDOM}"
+database_created=false
 
 cleanup() {
   exit_code=$?
   trap - EXIT INT TERM
-  docker rm --force "$container_name" >/dev/null 2>&1 || true
+  if [[ "$database_created" == true ]] && ! dropdb --if-exists --force --maintenance-db=postgres "$database_name"; then
+    echo "Could not remove disposable PostgreSQL database '$database_name'. Remove it manually after checking no test process is using it." >&2
+    if ((exit_code == 0)); then
+      exit_code=1
+    fi
+  fi
   exit "$exit_code"
 }
 
@@ -25,55 +28,84 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-docker run --detach \
-  --name "$container_name" \
-  --publish 127.0.0.1::5432 \
-  --env "POSTGRES_USER=$database_user" \
-  --env "POSTGRES_PASSWORD=$database_password" \
-  --env "POSTGRES_DB=$database_name" \
-  --health-cmd "pg_isready --username=$database_user --dbname=$database_name" \
-  --health-interval 1s \
-  --health-timeout 3s \
-  --health-retries 30 \
-  postgres:17-alpine >/dev/null
-
-ready=false
-for _ in {1..60}; do
-  if docker exec "$container_name" pg_isready \
-    --username="$database_user" \
-    --dbname="$database_name" >/dev/null 2>&1; then
-    ready=true
-    break
+for command_name in pg_isready createdb dropdb psql node; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "Required local PostgreSQL tool '$command_name' was not found in PATH." >&2
+    exit 127
   fi
-  sleep 1
 done
 
-if [[ "$ready" != true ]]; then
-  echo "Disposable PostgreSQL did not become ready; container logs follow:" >&2
-  docker logs "$container_name" >&2 || true
+if ! pg_isready --dbname=postgres >/dev/null 2>&1; then
+  echo "Local PostgreSQL is not ready. Start the local PostgreSQL server and confirm 'pg_isready --dbname=postgres' succeeds, then retry." >&2
   exit 1
 fi
 
-port_binding=$(docker port "$container_name" 5432/tcp | head -n 1)
-if [[ "$port_binding" != 127.0.0.1:* ]]; then
-  echo "Expected PostgreSQL to be published on loopback, got: $port_binding" >&2
+connection_settings=$(psql --no-psqlrc --no-align --tuples-only --field-separator=$'\t' \
+  --set ON_ERROR_STOP=1 \
+  --dbname=postgres \
+  --command="SELECT current_user, current_setting('port'), COALESCE(host(inet_server_addr()), btrim(split_part(current_setting('unix_socket_directories'), ',', 1)))")
+IFS=$'\t' read -r database_user database_port database_host <<< "$connection_settings"
+if [[ -z "$database_user" || -z "$database_port" || -z "$database_host" ]]; then
+  echo "Could not determine the active local PostgreSQL connection settings." >&2
   exit 1
 fi
-host_port=${port_binding##*:}
+
+if ! createdb --maintenance-db=postgres --encoding=UTF8 "$database_name"; then
+  echo "Could not create disposable PostgreSQL database '$database_name'. The configured role must have permission to create databases." >&2
+  exit 1
+fi
+database_created=true
 
 for migration in db/migrations/*.sql; do
-  docker exec -i "$container_name" psql \
+  psql --no-psqlrc \
     --set ON_ERROR_STOP=1 \
-    --username="$database_user" \
-    --dbname="$database_name" < "$migration"
+    --dbname="$database_name" \
+    --file="$migration"
 done
 
-docker exec -i "$container_name" psql \
+psql --no-psqlrc \
   --set ON_ERROR_STOP=1 \
-  --username="$database_user" \
-  --dbname="$database_name" < tests/fixtures/integration.sql
+  --dbname="$database_name" \
+  --file=tests/fixtures/integration.sql
+
+database_is_ready=$(psql --no-psqlrc --no-align --tuples-only \
+  --set ON_ERROR_STOP=1 \
+  --dbname="$database_name" \
+  --command="SELECT
+    to_regclass('public.transactions') IS NOT NULL
+    AND to_regclass('public.categories') IS NOT NULL
+    AND (SELECT count(*) FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'transactions'
+        AND column_name IN ('id', 'booking_date', 'value_date', 'amount', 'purpose', 'counterparty_name', 'counterparty_account', 'category_id')) = 8
+    AND (SELECT count(*) FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'categories'
+        AND column_name IN ('id', 'name', 'patterns', 'hidden', 'windows')) = 5
+    AND (SELECT count(*) FROM categories
+      WHERE name IN ('Groceries', 'Transport', 'Internal')) = 3
+    AND (SELECT count(*) FROM transactions
+      WHERE purpose IN ('REWE Market', 'Rail ticket', 'Internal transfer', 'Bookshop')) = 4")
+if [[ "$database_is_ready" != "t" ]]; then
+  echo "Disposable PostgreSQL database '$database_name' is missing the migrated schema or integration fixture rows." >&2
+  exit 1
+fi
+
+test_database_url=$(TEST_DATABASE_NAME="$database_name" \
+  TEST_DATABASE_HOST="$database_host" \
+  TEST_DATABASE_PORT="$database_port" \
+  TEST_DATABASE_USER="$database_user" \
+  TEST_DATABASE_PASSWORD="${PGPASSWORD-}" \
+  node --input-type=commonjs --eval='
+    const url = new URL("postgresql:///");
+    url.pathname = `/${process.env.TEST_DATABASE_NAME}`;
+    url.searchParams.set("host", process.env.TEST_DATABASE_HOST);
+    url.searchParams.set("port", process.env.TEST_DATABASE_PORT);
+    url.searchParams.set("user", process.env.TEST_DATABASE_USER);
+    if (process.env.TEST_DATABASE_PASSWORD !== "") {
+      url.searchParams.set("password", process.env.TEST_DATABASE_PASSWORD);
+    }
+    process.stdout.write(url.toString());
+  ')
 
 # Never allow application-configured credentials to leak into a test process.
 unset DATABASE_URL
-TEST_DATABASE_URL="postgresql://${database_user}:${database_password}@127.0.0.1:${host_port}/${database_name}" \
-  "$@"
+TEST_DATABASE_URL="$test_database_url" "$@"

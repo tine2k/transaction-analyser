@@ -13,9 +13,9 @@
 
 ## Database Tests
 
-- For PostgreSQL-backed tests, create a disposable PostgreSQL database in Docker and seed it only with test fixtures. Do not use the project's configured database or real transaction data.
-- Give the container a unique test-specific name, bind its port to loopback only, and use no persistent volume. Pass its connection string through `TEST_DATABASE_URL`.
-- Remove the container after the test run, including when tests fail. Keep test setup and teardown repeatable so the database can be recreated on demand.
+- For PostgreSQL-backed tests, use the locally installed PostgreSQL server and create a uniquely named disposable test database. Seed it only with test fixtures; do not use the project's configured database or real transaction data.
+- Require the local PostgreSQL server and client tools to be available, and use a role with permission to create and drop its test database. Pass only the disposable database connection through `TEST_DATABASE_URL` and unset inherited `DATABASE_URL` before running tests.
+- Drop the disposable database after the test run, including when tests fail or are interrupted. Keep test setup and teardown repeatable so the database can be recreated on demand; Docker is not required for PostgreSQL-backed tests.
 
 ## File Access
 

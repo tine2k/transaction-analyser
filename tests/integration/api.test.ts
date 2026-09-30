@@ -79,7 +79,7 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
 describe('API integration', () => {
   beforeAll(async () => {
     if (testDatabaseUrl === undefined || testDatabaseUrl === '') {
-      throw new Error('Run this suite through tests/run-with-test-database.sh to set TEST_DATABASE_URL.');
+      throw new Error('Run this suite with npm run test:integration; the local PostgreSQL test launcher creates a disposable database and sets TEST_DATABASE_URL.');
     }
 
     database = new pg.Pool({ connectionString: testDatabaseUrl });

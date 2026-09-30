@@ -1,91 +1,78 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  // Rules are matched in order and the last match wins, so the broad "ask"
-  // rule must stay first and the hard denies must stay last.
-  "permissions": [
-    { "action": "shell", "resource": "*", "effect": "ask" },
+  // V1 groups permission rules by tool. Keep broad rules first and exceptions last.
+  "permission": {
+    "bash": {
+      "*": "ask",
 
-    // Read-only git inspection
-    { "action": "shell", "resource": "git status *", "effect": "allow" },
-    { "action": "shell", "resource": "git diff *", "effect": "allow" },
+      // Read-only git inspection
+      "git status *": "allow",
+      "git diff *": "allow",
 
-    // Filesystem inspection
-    { "action": "shell", "resource": "pwd *", "effect": "allow" },
-    { "action": "shell", "resource": "ls *", "effect": "allow" },
-    { "action": "shell", "resource": "cat *", "effect": "allow" },
-    { "action": "shell", "resource": "head *", "effect": "allow" },
-    { "action": "shell", "resource": "tail *", "effect": "allow" },
-    { "action": "shell", "resource": "od *", "effect": "allow" },
-    { "action": "shell", "resource": "grep *", "effect": "allow" },
-    { "action": "shell", "resource": "tar *", "effect": "allow" },
-    { "action": "shell", "resource": "cut *", "effect": "allow" },
-    { "action": "shell", "resource": "sed *", "effect": "allow" },
-    { "action": "shell", "resource": "rg *", "effect": "allow" },
-    { "action": "shell", "resource": "wc *", "effect": "allow" },
-    { "action": "shell", "resource": "find *", "effect": "allow" },
-    { "action": "shell", "resource": "pgrep *", "effect": "allow" },
-    { "action": "shell", "resource": "pkill *", "effect": "allow" },
-    { "action": "shell", "resource": "lsof *", "effect": "allow" },
-    { "action": "shell", "resource": "xargs *", "effect": "allow" },
-    { "action": "shell", "resource": "ipconfig *", "effect": "allow" },
-    { "action": "shell", "resource": "sleep *", "effect": "allow" },
+      // Filesystem inspection
+      "pwd *": "allow",
+      "ls *": "allow",
+      "cat *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "od *": "allow",
+      "grep *": "allow",
+      "tar *": "allow",
+      "cut *": "allow",
+      "sed *": "allow",
+      "rg *": "allow",
+      "wc *": "allow",
+      "find *": "allow",
+      "pgrep *": "allow",
+      "pkill *": "allow",
+      "lsof *": "allow",
+      "xargs *": "allow",
+      "ipconfig *": "allow",
+      "sleep *": "allow",
 
-    // Directory creation
-    { "action": "shell", "resource": "mkdir *", "effect": "allow" },
+      // Directory creation
+      "mkdir *": "allow",
 
-    // Toolchain and environment lookup
-    { "action": "shell", "resource": "which *", "effect": "allow" },
-    { "action": "shell", "resource": "npm *", "effect": "allow" },
-    { "action": "shell", "resource": "npx playwright *", "effect": "allow" },
-    { "action": "shell", "resource": "brew list *", "effect": "allow" },
-    { "action": "shell", "resource": "openspec *", "effect": "allow" },
+      // Toolchain and environment lookup
+      "which *": "allow",
+      "npm *": "allow",
+      "npx playwright *": "allow",
+      "brew list *": "allow",
+      "openspec *": "allow",
 
-    // Output and scripting
-    { "action": "shell", "resource": "echo *", "effect": "allow" },
-    { "action": "shell", "resource": "printf *", "effect": "allow" },
-    { "action": "shell", "resource": "show *", "effect": "allow" },
-    { "action": "shell", "resource": "j *", "effect": "allow" },
-    { "action": "shell", "resource": "command *", "effect": "allow" },
-    { "action": "shell", "resource": "set *", "effect": "allow" },
-    { "action": "shell", "resource": "trap *", "effect": "allow" },
-    { "action": "shell", "resource": "break *", "effect": "allow" },
-    { "action": "shell", "resource": "true *", "effect": "allow" },
-    { "action": "shell", "resource": "test *", "effect": "allow" },
-    { "action": "shell", "resource": "tee *", "effect": "allow" },
-    { "action": "shell", "resource": "node *", "effect": "allow" },
-    { "action": "shell", "resource": "python3 *", "effect": "allow" },
-    { "action": "shell", "resource": "whoami *", "effect": "allow" },
-    { "action": "shell", "resource": "exit *", "effect": "allow" },
+      // Output and scripting
+      "echo *": "allow",
+      "printf *": "allow",
+      "show *": "allow",
+      "j *": "allow",
+      "command *": "allow",
+      "set *": "allow",
+      "trap *": "allow",
+      "break *": "allow",
+      "true *": "allow",
+      "test *": "allow",
+      "tee *": "allow",
+      "node *": "allow",
+      "python3 *": "allow",
+      "whoami *": "allow",
+      "exit *": "allow",
 
-    // Network
-    { "action": "shell", "resource": "curl *", "effect": "allow" },
+      // Network
+      "curl *": "allow",
 
-    // Database
-    { "action": "shell", "resource": "psql *", "effect": "allow" },
-    { "action": "shell", "resource": "postgres *", "effect": "allow" },
-    { "action": "shell", "resource": "pg_isready *", "effect": "allow" },
-    { "action": "shell", "resource": "createdb *", "effect": "allow" },
-    { "action": "shell", "resource": "dropdb *", "effect": "allow" },
+      // Database
+      "psql *": "allow",
+      "postgres *": "allow",
+      "pg_isready *": "allow",
+      "createdb *": "allow",
+      "dropdb *": "allow",
 
-    // Docker
-    { "action": "shell", "resource": "docker *", "effect": "allow" },
-    { "action": "shell", "resource": "docker-compose *", "effect": "allow" },
+      // Docker
+      "docker *": "allow",
+      "docker-compose *": "allow",
 
-    // Hard denies
-    { "action": "shell", "resource": "git push *", "effect": "deny" },
-    {
-      "action": "external_directory",
-      "resource": "*",
-      "effect": "deny"
+      // Hard deny
+      "git push *": "deny"
     }
-  ],
-  "experimental": {
-    "policies": [
-      {
-        "action": "permission",
-        "resource": "external_directory:*",
-        "effect": "deny"
-      }
-    ]
   }
 }

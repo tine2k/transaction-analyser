@@ -88,4 +88,6 @@ PGHOST=127.0.0.1 bash tests/run-with-test-database.sh bash -c '
 
 Run the wrapped command a second time to exercise the same image with another newly created disposable database URL. `--network host` is specific to Linux Docker; on other runtimes, configure a network route from the container to the local test PostgreSQL server instead. The wrapper removes the disposable database after each run, including when the command fails or is interrupted.
 
-GitHub Actions workflows are not part of this setup; a later workflow can invoke the same `docker build` command.
+## Publish to GitHub Container Registry
+
+The `Publish container image` GitHub Actions workflow builds this Dockerfile on pull requests targeting `main`, without publishing. Pushes to `main` publish `ghcr.io/<owner>/<repository>:main`, `:latest`, and a commit-SHA tag. Pushing a `v*` tag publishes the matching version tag and commit-SHA tag. The workflow uses the repository's `GITHUB_TOKEN` with package write permission; no personal access token is required.

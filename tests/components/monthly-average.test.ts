@@ -79,6 +79,39 @@ describe('monthly category average page', () => {
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('sorts averages by amount or category in either direction with stable ties', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: currentMonth.startDate, amount: '-240.00', category: { id: '3', name: 'Zebra', hidden: false } },
+      { bookingDate: currentMonth.startDate, amount: '-24.00', category: { id: '4', name: 'Alpha', hidden: false } },
+      { bookingDate: currentMonth.startDate, amount: '-24.00', category: { id: '2', name: 'alpha', hidden: false } },
+      { bookingDate: currentMonth.startDate, amount: '-36.00', category: null },
+    ]));
+
+    const wrapper = await mountSuspended(MonthlyAverage);
+    const keys = () => wrapper.findAll('[data-testid="category-average"]')
+      .map((item) => item.attributes('data-category-key'));
+    const amountSort = wrapper.get('[data-testid="monthly-average-sort-column"]');
+    const directionSort = wrapper.get('[data-testid="monthly-average-sort-direction"]');
+
+    expect((amountSort.element as HTMLSelectElement).value).toBe('amount');
+    expect((directionSort.element as HTMLSelectElement).value).toBe('desc');
+    expect(keys()).toEqual(['category:3', 'uncategorised', 'category:2', 'category:4']);
+
+    await directionSort.setValue('asc');
+    expect(keys()).toEqual(['category:2', 'category:4', 'uncategorised', 'category:3']);
+
+    await directionSort.setValue('desc');
+    expect(keys()).toEqual(['category:3', 'uncategorised', 'category:2', 'category:4']);
+
+    await amountSort.setValue('category');
+    await directionSort.setValue('asc');
+    expect(keys()).toEqual(['category:2', 'category:4', 'category:3', 'uncategorised']);
+
+    await directionSort.setValue('desc');
+    expect(keys()).toEqual(['category:3', 'category:2', 'category:4', 'uncategorised']);
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the last valid window when the control is emptied or given an invalid value', async () => {
     mocks.useFetch.mockReturnValue(response(sampleTransactions()));
 

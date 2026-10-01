@@ -81,7 +81,7 @@ function powerOfTen(exponent: number): bigint {
   return 10n ** BigInt(exponent);
 }
 
-function compareDecimalStrings(left: string, right: string): number {
+export function compareDecimalStrings(left: string, right: string): number {
   const leftDecimal = parseDecimal(left);
   const rightDecimal = parseDecimal(right);
   const commonScale = Math.max(leftDecimal.scale, rightDecimal.scale);

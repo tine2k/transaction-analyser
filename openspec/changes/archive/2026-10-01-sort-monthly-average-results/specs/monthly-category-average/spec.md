@@ -1,10 +1,6 @@
-# Monthly Category Average Specification
+# Spec Delta
 
-## Purpose
-
-Provides a read-only summary of each category's average monthly absolute spend over a configurable recent window, so categories can be compared at a glance without reading month by month.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: The monthly average route presents each category's average monthly spend
 

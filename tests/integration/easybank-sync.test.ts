@@ -107,6 +107,7 @@ describe('easybank sync against PostgreSQL and a fake bank', () => {
     expect(stored.rows[1]).toMatchObject({
       counterparty_name: 'Mag. Hanna Maier',
       counterparty_account: 'AT611904300234573201',
+      purpose: 'Netflix BG/0002\nBAWAATWWXXX AT611904300234573201 Mag. Hanna Maier',
     });
   });
 

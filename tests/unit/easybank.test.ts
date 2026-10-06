@@ -6,12 +6,12 @@ import type { ImportRow } from '../../shared/transactions-import';
 import { startFakeBank, type FakeBank } from '../helpers/fake-bank';
 
 describe('booking text mapping', () => {
-  it('maps an IBAN line to the account, the name after it, and the purpose before it', () => {
+  it('maps an IBAN line to the account, the name after it, and the whole text as the purpose', () => {
     expect(
       mapBookingText(['Abbuchung Dauerauftrag', 'AT611904300234573201 Schmid Immobilien Management']),
     ).toEqual({
       name: 'Schmid Immobilien Management',
-      purpose: 'Abbuchung Dauerauftrag',
+      purpose: 'Abbuchung Dauerauftrag\nAT611904300234573201 Schmid Immobilien Management',
       account: 'AT611904300234573201',
     });
   });
@@ -21,16 +21,16 @@ describe('booking text mapping', () => {
       mapBookingText(['Netflix BG/123', 'BAWAATWWXXX AT611904300234573201 Mag. Hanna Maier']),
     ).toEqual({
       name: 'Mag. Hanna Maier',
-      purpose: 'Netflix BG/123',
+      purpose: 'Netflix BG/123\nBAWAATWWXXX AT611904300234573201 Mag. Hanna Maier',
       account: 'AT611904300234573201',
     });
   });
 
-  it('appends the later lines to the name after an IBAN', () => {
+  it('appends the later lines to the name after an IBAN and keeps them in the purpose', () => {
     const mapped = mapBookingText(['Purpose', 'AT611904300234573201 First', 'Second line']);
 
     expect(mapped.name).toBe('First Second line');
-    expect(mapped.purpose).toBe('Purpose');
+    expect(mapped.purpose).toBe('Purpose\nAT611904300234573201 First\nSecond line');
     expect(mapped.account).toBe('AT611904300234573201');
   });
 
@@ -57,11 +57,11 @@ describe('booking text mapping', () => {
     expect(mapped.purpose).toBe('AT611904300234573201 Name\nlater');
   });
 
-  it('falls back to the whole text when nothing follows the IBAN', () => {
+  it('falls back to the whole text for name and purpose when nothing follows the IBAN', () => {
     const mapped = mapBookingText(['Purpose', 'AT611904300234573201']);
 
     expect(mapped.name).toBe('Purpose\nAT611904300234573201');
-    expect(mapped.purpose).toBe('Purpose');
+    expect(mapped.purpose).toBe('Purpose\nAT611904300234573201');
     expect(mapped.account).toBe('AT611904300234573201');
   });
 });
@@ -139,7 +139,7 @@ describe('easybank client', () => {
         bookingDate: '2026-10-04',
         valueDate: '2026-10-04',
         amount: '-9.99',
-        purpose: 'Netflix BG/0002',
+        purpose: 'Netflix BG/0002\nBAWAATWWXXX AT611904300234573201 Mag. Hanna Maier',
         counterpartyName: 'Mag. Hanna Maier',
         counterpartyAccount: 'AT611904300234573201',
       },

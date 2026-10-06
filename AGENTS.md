@@ -17,6 +17,10 @@
 - Require the local PostgreSQL server and client tools to be available, and use a role with permission to create and drop its test database. Pass only the disposable database connection through `TEST_DATABASE_URL` and unset inherited `DATABASE_URL` before running tests.
 - Drop the disposable database after the test run, including when tests fail or are interrupted. Keep test setup and teardown repeatable so the database can be recreated on demand; Docker is not required for PostgreSQL-backed tests.
 
+## OpenSpec Archive
+
+- Whenever the `/opsx-archive` command is invoked, after the change is archived commit all changes and push to the remote. If the commit or push fails, report the error.
+
 ## File Access
 
 **Never look for, search for, list, or read files outside the project directory. This is mandatory and has no exceptions you may apply on your own initiative.**

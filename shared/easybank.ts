@@ -7,8 +7,9 @@
 //
 // The list has no separate counterparty columns, so each row's booking text is
 // mapped to a counterparty and a purpose. A line holding an IBAN yields the
-// counterparty account and the name after it; without an IBAN the first line is
-// the name and the later lines the purpose. Both are always non-empty.
+// counterparty account and the name after it, and the whole text becomes the
+// purpose; without an IBAN the first line is the name and the later lines the
+// purpose. Both are always non-empty.
 //
 // See openspec/changes/add-easybank-sync/specs/easybank-sync/spec.md
 import * as cheerio from 'cheerio';
@@ -132,10 +133,10 @@ function giroAccountId($: CheerioAPI): string | null {
   return match === null ? null : match[1]!;
 }
 
-// Maps a booking text's lines to the counterparty and the purpose. The rules are
-// the hybrid the bank's own export follows: an IBAN names the counterparty and the
-// text before it is the purpose; without an IBAN the first line is the name and
-// the rest the purpose. Both results are always non-empty.
+// Maps a booking text's lines to the counterparty and the purpose. An IBAN names
+// the counterparty account, the text after it names the counterparty, and the
+// whole booking text is the purpose; without an IBAN the first line is the name
+// and the rest the purpose. Both results are always non-empty.
 export function mapBookingText(lines: string[]): { name: string; purpose: string; account: string | null } {
   const whole = lines.join('\n').trim();
   const ibanIndex = lines.findIndex((line) => IBAN.test(line));
@@ -146,10 +147,9 @@ export function mapBookingText(lines: string[]): { name: string; purpose: string
     const account = match[0];
     const after = line.slice(match.index + account.length).trim();
     const name = [after, ...lines.slice(ibanIndex + 1)].filter((part) => part !== '').join(' ').trim();
-    const before = lines.slice(0, ibanIndex).join('\n').trim();
     return {
       name: name !== '' ? name : whole,
-      purpose: before !== '' ? before : whole,
+      purpose: whole,
       account,
     };
   }

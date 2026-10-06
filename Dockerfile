@@ -23,6 +23,7 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 COPY --from=build --chown=node:node /app/.output ./.output
+RUN rm -rf .output/server/node_modules
 COPY --from=runtime-dependencies --chown=node:node /app/.output/server/node_modules ./.output/server/node_modules
 
 USER node

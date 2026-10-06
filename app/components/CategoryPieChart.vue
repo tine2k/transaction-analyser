@@ -16,7 +16,7 @@ const emit = defineEmits<{ click: [parameter: unknown] }>();
 </script>
 
 <template>
-  <div class="h-96 w-full">
-    <VChart class="w-full" :option="option" autoresize @click="emit('click', $event)" />
+  <div class="h-96 w-full min-w-0">
+    <VChart class="h-full w-full min-w-0" :option="option" autoresize @click="emit('click', $event)" />
   </div>
 </template>

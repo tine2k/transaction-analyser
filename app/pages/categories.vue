@@ -286,37 +286,37 @@ async function remove(category: Category): Promise<void> {
       inclusive.
     </p>
 
-    <form class="mt-6 max-w-2xl rounded-lg border border-slate-200 bg-white p-4" @submit.prevent="submit">
+    <form class="mt-6 w-full min-w-0 max-w-2xl rounded-lg border border-slate-200 bg-white p-4" @submit.prevent="submit">
       <h2 class="text-sm font-semibold text-slate-700">
         {{ editingId === null ? 'Add a category' : 'Edit category' }}
       </h2>
 
-      <label class="mt-3 flex flex-col text-sm text-slate-700">
+      <label class="mt-3 flex min-w-0 flex-col text-sm text-slate-700">
         Name
         <input
           v-model="name"
           type="text"
-          class="mt-1 rounded-md border border-slate-300 px-3 py-2 text-slate-900"
+          class="mt-1 min-h-11 w-full min-w-0 rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
         />
       </label>
 
-      <fieldset class="mt-3">
+      <fieldset class="mt-3 min-w-0">
         <legend class="text-sm text-slate-700">Regular expressions</legend>
         <div
           v-for="(_, index) in patterns"
           :key="index"
-          class="mt-2 flex items-center gap-2"
+          class="mt-2 flex min-w-0 items-center gap-2"
         >
           <input
             v-model="patterns[index]"
             type="text"
             data-testid="pattern-input"
-            class="flex-1 rounded-md border border-slate-300 px-3 py-2 font-mono text-slate-900"
+            class="min-h-11 min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 font-mono text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
           />
           <button
             type="button"
             :disabled="patterns.length === 1"
-            class="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 disabled:opacity-50"
+            class="min-h-11 shrink-0 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700 disabled:opacity-50"
             @click="removePattern(index)"
           >
             Remove
@@ -324,14 +324,14 @@ async function remove(category: Category): Promise<void> {
         </div>
         <button
           type="button"
-          class="mt-2 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
+          class="mt-2 min-h-11 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700"
           @click="addPattern"
         >
           Add expression
         </button>
       </fieldset>
 
-      <fieldset class="mt-3">
+      <fieldset class="mt-3 min-w-0">
         <legend class="text-sm text-slate-700">Date windows</legend>
         <p class="mt-1 text-xs text-slate-500">
           A transaction whose booking date falls on or between the two dates is assigned to this
@@ -340,30 +340,30 @@ async function remove(category: Category): Promise<void> {
         <div
           v-for="(_, index) in windows"
           :key="index"
-          class="mt-2 flex items-center gap-2"
+          class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
         >
-          <label class="flex items-center gap-1 text-xs text-slate-600">
+          <label class="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             From
             <input
               v-model="windows[index].from"
               type="date"
               data-testid="window-from"
-              class="rounded-md border border-slate-300 px-2 py-1 text-slate-900"
+              class="min-h-11 w-full min-w-0 rounded-md border border-slate-300 px-2 py-1 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
             >
           </label>
-          <label class="flex items-center gap-1 text-xs text-slate-600">
+          <label class="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             To
             <input
               v-model="windows[index].to"
               type="date"
               data-testid="window-to"
-              class="rounded-md border border-slate-300 px-2 py-1 text-slate-900"
+              class="min-h-11 w-full min-w-0 rounded-md border border-slate-300 px-2 py-1 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
             >
           </label>
           <button
             type="button"
             data-testid="remove-window"
-            class="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
+            class="min-h-11 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700"
             @click="removeWindow(index)"
           >
             Remove
@@ -372,19 +372,19 @@ async function remove(category: Category): Promise<void> {
         <button
           type="button"
           data-testid="add-window"
-          class="mt-2 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
+          class="mt-2 min-h-11 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700"
           @click="addWindow"
         >
           Add window
         </button>
       </fieldset>
 
-      <label class="mt-3 flex items-center gap-2 text-sm text-slate-700">
+      <label class="mt-3 flex min-h-11 items-center gap-3 py-2 text-sm text-slate-700">
         <input
           v-model="hidden"
           type="checkbox"
           data-testid="hidden-input"
-          class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+          class="size-5 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
         >
         Hidden from the analysis
       </label>
@@ -421,18 +421,18 @@ async function remove(category: Category): Promise<void> {
 
       <p v-if="formError" class="mt-3 text-sm text-red-700">{{ formError }}</p>
 
-      <div class="mt-3 flex gap-2">
+      <div class="mt-3 flex flex-wrap gap-2">
         <button
           type="submit"
           :disabled="saving"
-          class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          class="min-h-11 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {{ editingId === null ? 'Add category' : 'Save changes' }}
         </button>
         <button
           v-if="editingId !== null"
           type="button"
-          class="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
+          class="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
           @click="cancelEdit"
         >
           Cancel
@@ -452,7 +452,18 @@ async function remove(category: Category): Promise<void> {
 
     <div v-else class="mt-6">
       <p v-if="listError" class="mb-3 text-sm text-red-700">{{ listError }}</p>
-      <table class="w-full border-collapse text-left text-sm">
+      <p id="categories-scroll-help" class="mb-2 text-xs text-slate-500 sm:hidden">
+        Scroll horizontally to view all category columns and actions.
+      </p>
+      <div
+        role="region"
+        aria-label="Category table"
+        aria-describedby="categories-scroll-help"
+        tabindex="0"
+        data-testid="categories-scroll"
+        class="max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+      >
+      <table class="w-max min-w-full border-collapse text-left text-sm">
         <thead>
           <tr class="border-b border-slate-200">
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Name</th>
@@ -476,14 +487,14 @@ async function remove(category: Category): Promise<void> {
               <div class="flex gap-2">
                 <button
                   type="button"
-                  class="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
+                  class="min-h-11 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
                   @click="startEdit(category)"
                 >
                   Edit
                 </button>
                 <button
                   type="button"
-                  class="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700"
+                  class="min-h-11 rounded-md border border-red-300 px-3 text-xs font-medium text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
                   @click="remove(category)"
                 >
                   Delete
@@ -493,6 +504,7 @@ async function remove(category: Category): Promise<void> {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 </template>

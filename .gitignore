@@ -18,3 +18,7 @@ node_modules/
 
 # Database backups contain private transaction data.
 backups/
+
+# Playwright browser-test output.
+test-results/
+playwright-report/

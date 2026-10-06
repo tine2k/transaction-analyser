@@ -158,13 +158,13 @@ const visibleTotal = computed(() =>
     <p v-else-if="pending" class="mt-4 text-slate-600">Loading transactions…</p>
 
     <template v-else-if="transactions">
-      <div class="mt-6 flex flex-wrap gap-4">
-        <label class="grid gap-1 text-sm font-medium text-slate-700">
+      <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+        <label class="grid w-full gap-1 text-sm font-medium text-slate-700 sm:w-auto">
           Category
           <select
             v-model="categoryFilter"
             data-testid="category-filter"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2"
+            class="min-h-11 w-full max-w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:w-auto"
           >
             <option value="all">All categories ({{ transactions.length }})</option>
             <option value="uncategorised">Uncategorised ({{ uncategorisedTransactions.length }})</option>
@@ -173,12 +173,12 @@ const visibleTotal = computed(() =>
             </option>
           </select>
         </label>
-        <label class="grid gap-1 text-sm font-medium text-slate-700">
+        <label class="grid w-full gap-1 text-sm font-medium text-slate-700 sm:w-auto">
           Month
           <select
             v-model="monthFilter"
             data-testid="month-filter"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2"
+            class="min-h-11 w-full max-w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:w-auto"
           >
             <option value="all">All months</option>
             <option v-for="month in months" :key="month.key" :value="month.key">
@@ -200,8 +200,19 @@ const visibleTotal = computed(() =>
         There are no transactions matching the selected filters.
       </p>
 
-      <div v-else class="mt-4 overflow-x-auto">
-        <table class="w-full border-collapse text-left text-sm">
+      <div v-else class="mt-4">
+        <p id="transactions-scroll-help" class="mb-2 text-xs text-slate-500 sm:hidden">
+          Scroll horizontally to view all transaction columns.
+        </p>
+        <div
+          role="region"
+          aria-label="Transactions table"
+          aria-describedby="transactions-scroll-help"
+          tabindex="0"
+          data-testid="transactions-scroll"
+          class="max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+        >
+        <table class="w-max min-w-full border-collapse text-left text-sm">
           <thead>
             <tr class="border-b border-slate-200">
               <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Booking date</th>
@@ -250,6 +261,7 @@ const visibleTotal = computed(() =>
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </template>
   </div>

@@ -77,6 +77,32 @@ describe('category management page', () => {
       .toEqual(['0', '0', '1']);
   });
 
+  it('reflows category fields and provides touch-sized form controls', async () => {
+    const wrapper = await mountSuspended(Categories);
+
+    expect(wrapper.get('form').classes()).toContain('w-full');
+    expect(wrapper.get('form label input').classes()).toContain('min-h-11');
+    expect(wrapper.get('[data-testid="pattern-input"]').classes()).toContain('min-w-0');
+    expect(wrapper.get('[data-testid="add-window"]').classes()).toContain('min-h-11');
+    await wrapper.get('[data-testid="add-window"]').trigger('click');
+    expect(wrapper.get('[data-testid="window-from"]').element.parentElement?.parentElement?.classList.contains('grid'))
+      .toBe(true);
+    expect(wrapper.get('[data-testid="hidden-input"]').classes()).toContain('size-5');
+  });
+
+  it('labels the category table scroll region and sizes row actions for touch', async () => {
+    const wrapper = await mountSuspended(Categories);
+    const region = wrapper.get('[data-testid="categories-scroll"]');
+
+    expect(region.attributes('role')).toBe('region');
+    expect(region.attributes('aria-label')).toBe('Category table');
+    expect(region.attributes('tabindex')).toBe('0');
+    expect(region.classes()).toContain('overflow-x-auto');
+    expect(region.get('table').classes()).toContain('w-max');
+    expect(wrapper.findAll('tbody button').every((button) => button.classes().includes('min-h-11')))
+      .toBe(true);
+  });
+
   it('pre-populates the hidden state when editing a hidden category', async () => {
     const wrapper = await mountSuspended(Categories);
     const rows = wrapper.findAll('tbody tr');

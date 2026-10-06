@@ -62,6 +62,24 @@ describe('monthly category average page', () => {
     ]);
   });
 
+  it('uses touch-sized controls and allows long category names to wrap on phones', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      {
+        bookingDate: currentMonth.startDate,
+        amount: '-12.00',
+        category: { id: '1', name: 'A category name that needs room to wrap on a narrow screen', hidden: false },
+      },
+    ]));
+
+    const wrapper = await mountSuspended(MonthlyAverage);
+
+    expect(wrapper.get('[data-testid="month-count-input"]').classes()).toContain('min-h-11');
+    expect(wrapper.get('[data-testid="monthly-average-sort-column"]').classes()).toContain('min-h-11');
+    expect(wrapper.get('[data-testid="monthly-average-sort-direction"]').classes()).toContain('min-h-11');
+    expect(wrapper.get('[data-testid="category-average"]').classes()).toContain('flex-col');
+    expect(wrapper.get('[data-category-key="category:1"] span').classes()).toContain('break-words');
+  });
+
   it('recomputes the averages from the fetched data when the window changes', async () => {
     mocks.useFetch.mockReturnValue(response(sampleTransactions()));
 

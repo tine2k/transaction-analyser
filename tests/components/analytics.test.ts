@@ -47,6 +47,9 @@ describe('category spending page', () => {
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
     expect(mocks.useFetch.mock.calls[0]?.[0]).toBe('/api/transactions');
     expect(wrapper.findAll('[data-testid="month-panel"]')).toHaveLength(12);
+    expect(wrapper.get('[data-testid="monthly-charts"]').classes()).toContain('grid-cols-1');
+    expect(wrapper.get('[data-testid="month-panel"]').classes()).toContain('min-w-0');
+    expect(wrapper.get('[data-testid="hide-uncategorised"]').classes()).toContain('size-5');
 
     const today = getLocalDateString(new Date());
     const monthLink = wrapper.find('[data-testid="month-link"]');
@@ -65,6 +68,8 @@ describe('category spending page', () => {
 
     const wrapper = await mountSuspended(Analytics);
     const links = wrapper.findAll('[data-testid="category-transaction-link"]');
+    expect(links[0]?.classes()).toContain('min-h-11');
+    expect(links[0]?.classes()).toContain('min-w-0');
     const targets = links.map((link) => new URL(link.attributes('href'), 'http://localhost'));
     expect(targets.map((target) => [target.searchParams.get('month'), target.searchParams.get('category')]))
       .toEqual([[today.slice(0, 7), '7'], [today.slice(0, 7), 'uncategorised']]);

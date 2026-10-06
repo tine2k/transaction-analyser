@@ -23,6 +23,10 @@ describe('category pie chart adapter', () => {
     expect(wrapper.get('[data-testid="echarts-chart"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="echarts-chart"]').element.parentElement?.className)
       .toContain('h-96');
+    expect(wrapper.get('[data-testid="echarts-chart"]').element.parentElement?.className)
+      .toContain('min-w-0');
+    expect(wrapper.findComponent({ name: 'VChart' }).classes()).toContain('h-full');
+    expect(wrapper.findComponent({ name: 'VChart' }).classes()).toContain('min-w-0');
     expect(wrapper.findComponent({ name: 'VChart' }).props('option')).toEqual(option);
   });
 

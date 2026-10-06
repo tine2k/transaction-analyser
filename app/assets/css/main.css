@@ -4,3 +4,7 @@
 @import 'tailwindcss';
 /* Gives Vue ECharts' custom element and its internal host explicit dimensions. */
 @import 'vue-echarts/style.css';
+/* Intentional wide-table overflow is handled by each table's own scroll region. */
+body {
+  overflow-x: hidden;
+}

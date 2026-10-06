@@ -79,7 +79,7 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
     </p>
     <p v-else-if="pending" class="mt-4 text-slate-600">Loading monthly category averages…</p>
     <template v-else-if="transactions">
-      <label class="mt-4 inline-flex items-center gap-2 text-sm text-slate-700">
+      <label class="mt-4 inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-slate-700">
         Months to average
         <input
           :value="monthCount"
@@ -87,7 +87,7 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
           min="1"
           step="1"
           data-testid="month-count-input"
-          class="w-20 rounded border border-slate-300 px-2 py-1 text-slate-900 focus:border-slate-500 focus:outline-none"
+          class="min-h-11 w-24 rounded border border-slate-300 px-2 py-1 text-slate-900 focus:border-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
           @input="onMonthCountInput"
         >
       </label>
@@ -96,24 +96,24 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
         Averaging over the last {{ appliedMonthCount }} months.
       </p>
 
-      <div class="mt-4 flex flex-wrap gap-4">
-        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+      <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+        <label class="inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-slate-700">
           Sort by
           <select
             v-model="sortColumn"
             data-testid="monthly-average-sort-column"
-            class="rounded border border-slate-300 px-2 py-1 text-slate-900 focus:border-slate-500 focus:outline-none"
+            class="min-h-11 max-w-full rounded border border-slate-300 px-2 py-1 text-slate-900 focus:border-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
           >
             <option value="amount">Average amount</option>
             <option value="category">Category</option>
           </select>
         </label>
-        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+        <label class="inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-slate-700">
           Order
           <select
             v-model="sortDirection"
             data-testid="monthly-average-sort-direction"
-            class="rounded border border-slate-300 px-2 py-1 text-slate-900 focus:border-slate-500 focus:outline-none"
+            class="min-h-11 max-w-full rounded border border-slate-300 px-2 py-1 text-slate-900 focus:border-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
           >
             <option value="asc">Ascending</option>
             <option value="desc">Descending</option>
@@ -130,12 +130,12 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
         <li
           v-for="average in sortedAverages"
           :key="average.key"
-          class="flex items-center justify-between gap-4 px-4 py-2 text-sm"
+          class="flex flex-col items-start gap-1 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           data-testid="category-average"
           :data-category-key="average.key"
         >
-          <span class="text-slate-700">{{ average.name }}</span>
-          <span class="tabular-nums font-medium text-slate-900" data-testid="category-average-amount">
+          <span class="min-w-0 max-w-full break-words text-slate-700">{{ average.name }}</span>
+          <span class="max-w-full break-words tabular-nums font-medium text-slate-900 sm:shrink-0" data-testid="category-average-amount">
             {{ formatEuroAmount(average.amount) }}
           </span>
         </li>

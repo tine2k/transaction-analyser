@@ -24,7 +24,7 @@ const detail = computed(() =>
       <p class="mt-2 text-slate-600">{{ detail }}</p>
       <button
         type="button"
-        class="mt-6 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+        class="mt-6 min-h-11 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
         @click="clearError({ redirect: '/' })"
       >
         Back to the start

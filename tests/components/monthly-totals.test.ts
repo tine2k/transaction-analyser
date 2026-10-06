@@ -74,6 +74,13 @@ describe('monthly category totals page', () => {
       .toEqual([formatEuroAmount('5.00'), '', '', '', '']);
     expect(rows.every((row) => row.findAll('[data-testid="category-total-cell"]').length === 5))
       .toBe(true);
+
+    const region = wrapper.get('[data-testid="monthly-totals-scroll"]');
+    expect(region.attributes('role')).toBe('region');
+    expect(region.attributes('aria-label')).toBe('Monthly category totals table');
+    expect(region.attributes('tabindex')).toBe('0');
+    expect(region.classes()).toContain('overflow-x-auto');
+    expect(wrapper.get('[data-testid="monthly-totals-table"]').classes()).toContain('w-max');
   });
 
   it('links populated cells to their month and category and leaves blank cells inert', async () => {

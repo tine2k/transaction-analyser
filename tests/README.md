@@ -12,6 +12,24 @@ npm test
 
 `npm run test:unit` runs server/domain tests. `npm run test:components` mounts selected Vue components in Nuxt's simulated DOM. Neither command needs PostgreSQL, Docker, or a production build.
 
+Run the viewport and interaction checks in headless Chromium. GitHub Actions runs them on `ubuntu-latest`; API calls are intercepted with test fixtures, so no Docker daemon or PostgreSQL server is needed. For a glibc Linux host, install the lockfile-matched browser and dependencies with:
+
+```sh
+npm run build
+npm run test:browser:install
+npm run test:browser
+```
+
+For an Alpine-derived `ghcr.io/anomalyco/opencode` image, install its musl-native Chromium and select it explicitly:
+
+```dockerfile
+USER root
+RUN apk add --no-cache chromium
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+```
+
+Then run `npm ci`, `npm run build`, and `npm run test:browser` in that image. Do not run `npm run test:browser:install` there; that downloads Playwright's glibc browser. The production `.output` remains browser-free because Playwright is a development dependency and Chromium is installed only for testing.
+
 Run API/database integration tests with:
 
 ```sh
@@ -22,4 +40,4 @@ This builds the Nuxt server and uses the locally installed PostgreSQL 18.6 serve
 
 The launcher creates a uniquely named disposable database, applies the repository migrations, and loads only `tests/fixtures/integration.sql`. It passes that database as `TEST_DATABASE_URL`, removes any inherited `DATABASE_URL`, and drops the disposable database on success, failure, or handled interruption. Docker is not required. Do not invoke `test:integration:run` directly; it is the inner Vitest command and expects the disposable test database and built server to be ready.
 
-Run the entire local suite with `npm test`; it runs the fast suites followed by the integration suite. CI configuration is not part of this setup.
+Run the entire local suite with `npm test`; it runs the fast suites followed by the integration suite. The separate responsive-browser workflow runs the headless Chromium checks on GitHub Actions.

@@ -17,6 +17,8 @@
     "test": "npm run test:unit && npm run test:components && npm run test:integration",
     "test:unit": "vitest run tests/unit",
     "test:components": "vitest run tests/components",
+    "test:browser:install": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install --with-deps chromium",
+    "test:browser": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
     "test:integration": "npm run build && bash tests/run-with-test-database.sh npm run test:integration:run",
     "test:integration:run": "vitest run tests/integration --hookTimeout=30000 --testTimeout=10000"
   },
@@ -29,6 +31,7 @@
   },
   "devDependencies": {
     "@nuxt/test-utils": "^4.3.2",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vue/test-utils": "^2.5.1",
     "happy-dom": "^20.14.5",

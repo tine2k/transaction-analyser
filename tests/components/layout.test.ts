@@ -38,4 +38,20 @@ describe('default layout navigation', () => {
     expect(monthlyAverage.findAll('nav a')[4]?.text()).toBe('Monthly average');
     expect(monthlyAverage.findAll('nav a')[4]?.attributes('aria-current')).toBe('page');
   });
+
+  it('exposes and toggles the mobile navigation and closes it after choosing a destination', async () => {
+    route.path = '/';
+    const wrapper = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
+    const toggle = wrapper.get('[data-testid="mobile-navigation-toggle"]');
+
+    expect(toggle.attributes('aria-controls')).toBe('screen-navigation');
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.findAll('#screen-navigation a')).toHaveLength(5);
+
+    await toggle.trigger('click');
+    expect(toggle.attributes('aria-expanded')).toBe('true');
+
+    await wrapper.get('#screen-navigation a[href="/categories"]').trigger('click');
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+  });
 });

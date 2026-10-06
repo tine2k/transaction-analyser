@@ -13,6 +13,7 @@ useHead({
 });
 
 const route = useRoute();
+const mobileNavOpen = ref(false);
 
 const screens = [
   { to: '/', label: 'Transactions' },
@@ -25,27 +26,50 @@ const screens = [
 function isCurrent(to: string): boolean {
   return route.path === to;
 }
+
+watch(() => route.path, () => {
+  mobileNavOpen.value = false;
+});
 </script>
 
 <template>
   <div class="min-h-screen bg-slate-50 text-slate-900">
     <header class="border-b border-slate-200 bg-white">
-      <div class="w-full px-4 py-6">
-        <p class="text-xs font-semibold tracking-widest text-slate-500 uppercase">
-          Transaction Analyser
-        </p>
-        <nav aria-label="Screens" class="mt-3 flex gap-4 text-sm">
+      <div class="w-full px-4 py-4 sm:py-6">
+        <div class="flex items-center justify-between gap-4">
+          <p class="text-xs font-semibold tracking-widest text-slate-500 uppercase">
+            Transaction Analyser
+          </p>
+          <button
+            type="button"
+            class="inline-flex size-11 items-center justify-center rounded-md border border-slate-300 text-sm font-medium text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:hidden"
+            data-testid="mobile-navigation-toggle"
+            aria-controls="screen-navigation"
+            :aria-expanded="mobileNavOpen"
+            :aria-label="mobileNavOpen ? 'Close screen navigation' : 'Open screen navigation'"
+            @click="mobileNavOpen = !mobileNavOpen"
+          >
+            <span aria-hidden="true">{{ mobileNavOpen ? 'Close' : 'Menu' }}</span>
+          </button>
+        </div>
+        <nav
+          id="screen-navigation"
+          aria-label="Screens"
+          class="mt-3 flex-col gap-1 text-sm sm:flex sm:flex-row sm:flex-wrap sm:gap-4"
+          :class="mobileNavOpen ? 'flex' : 'hidden sm:flex'"
+        >
           <NuxtLink
             v-for="screen in screens"
             :key="screen.to"
             :to="screen.to"
             :aria-current="isCurrent(screen.to) ? 'page' : undefined"
-            class="font-medium"
+            class="inline-flex min-h-11 items-center rounded py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:min-h-0"
             :class="
               isCurrent(screen.to)
                 ? 'text-slate-900 underline underline-offset-4'
                 : 'text-slate-500 hover:text-slate-700'
             "
+            @click="mobileNavOpen = false"
           >
             {{ screen.label }}
           </NuxtLink>
@@ -53,7 +77,7 @@ function isCurrent(to: string): boolean {
       </div>
     </header>
 
-    <main class="w-full px-4 py-10">
+    <main class="w-full min-w-0 px-4 py-6 sm:py-10">
       <slot />
     </main>
   </div>

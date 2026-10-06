@@ -45,8 +45,18 @@ function transactionLocation(month: string, categoryKey: string) {
     </p>
     <p v-else-if="pending" class="mt-4 text-slate-600">Loading monthly category totals…</p>
     <template v-else-if="transactions">
-      <div class="mt-6 overflow-x-auto" data-testid="monthly-totals-scroll">
-        <table class="min-w-full border-collapse text-left text-sm" data-testid="monthly-totals-table">
+      <p id="monthly-totals-scroll-help" class="mb-2 mt-6 text-xs text-slate-500 sm:hidden">
+        Scroll horizontally to view all category columns.
+      </p>
+      <div
+        role="region"
+        aria-label="Monthly category totals table"
+        aria-describedby="monthly-totals-scroll-help"
+        tabindex="0"
+        class="max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+        data-testid="monthly-totals-scroll"
+      >
+        <table class="w-max min-w-full border-collapse text-left text-sm" data-testid="monthly-totals-table">
           <caption class="sr-only">
             Absolute transaction totals by category for every calendar month with transaction data
           </caption>
@@ -88,7 +98,7 @@ function transactionLocation(month: string, categoryKey: string) {
                 <NuxtLink
                   v-if="hasAmount(month.totals.get(category.key))"
                   :to="transactionLocation(month.key, category.key)"
-                  class="block px-3 py-2 transition-colors hover:bg-slate-200"
+                  class="block px-3 py-2 transition-colors hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-700"
                   data-testid="category-total-link"
                 >
                   {{ displayTotal(month.totals.get(category.key)) }}

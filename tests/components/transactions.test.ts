@@ -74,6 +74,28 @@ describe('transaction list filters', () => {
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('gives both filters a full-width mobile layout and touch-sized control height', async () => {
+    const wrapper = await mountSuspended(Transactions);
+
+    for (const selector of ['[data-testid="category-filter"]', '[data-testid="month-filter"]']) {
+      const filter = wrapper.get(selector);
+      expect(filter.classes()).toContain('min-h-11');
+      expect(filter.classes()).toContain('w-full');
+      expect(filter.classes()).toContain('sm:w-auto');
+    }
+  });
+
+  it('labels the transaction table scroll region and makes it keyboard reachable', async () => {
+    const wrapper = await mountSuspended(Transactions);
+    const region = wrapper.get('[data-testid="transactions-scroll"]');
+
+    expect(region.attributes('role')).toBe('region');
+    expect(region.attributes('aria-label')).toBe('Transactions table');
+    expect(region.attributes('tabindex')).toBe('0');
+    expect(region.classes()).toContain('overflow-x-auto');
+    expect(region.get('table').classes()).toContain('w-max');
+  });
+
   it('keeps a hidden category and its transactions visible in the list and filter', async () => {
     const wrapper = await mountSuspended(Transactions);
     const categoryFilter = wrapper.get('[data-testid="category-filter"]');

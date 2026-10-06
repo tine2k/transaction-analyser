@@ -239,7 +239,7 @@ The system SHALL read and validate the whole file before it writes any row, and 
 
 ### Requirement: The whole import is a single unit that either lands or does not
 
-The system SHALL write the rows of one import as a single indivisible unit, so that a failure part-way through leaves no row of that import behind and no partially written file remains in the table. The system SHALL report the run as successful only when every row of the file has been written. The system SHALL NOT write a row in a state the schema forbids, and SHALL NOT require the caller to repair a partially imported file. The system SHALL NOT merge an import with earlier rows: a row written by this import is added to whatever the table already holds, and the import SHALL NOT delete, update, or overwrite any row that was not written by the same import.
+The system SHALL write the rows of one import as a single indivisible unit, so that a failure part-way through leaves no row of that import behind and no partially written file remains in the table. The system SHALL report the run as successful only when every row of the file has been accounted for — written, or reported as already stored — and SHALL NOT report success when a row was neither. The system SHALL NOT write a row in a state the schema forbids, and SHALL NOT require the caller to repair a partially imported file. The system SHALL NOT merge an import with earlier rows: a row written by this import is added to whatever the table already holds, and the import SHALL NOT delete, update, or overwrite any row that was not written by the same import.
 
 #### Scenario: A failure during the write leaves no rows
 
@@ -249,7 +249,12 @@ The system SHALL write the rows of one import as a single indivisible unit, so t
 #### Scenario: The run reports what it did
 
 - **WHEN** an import completes successfully
-- **THEN** the run reports the number of rows read from the file, the number written, and that every imported transaction is uncategorised
+- **THEN** the run reports the number of rows read from the file, the number already stored, the number written, and that every imported transaction is uncategorised
+
+#### Scenario: A file whose rows are all stored is a success that writes nothing
+
+- **WHEN** every row of the file is already stored
+- **THEN** the run reports success, writes no row, and reports every row as already stored
 
 #### Scenario: Earlier rows are left alone
 
@@ -263,17 +268,22 @@ The system SHALL write the rows of one import as a single indivisible unit, so t
 
 ### Requirement: The import can be run without writing, and holds no credentials of its own
 
-The system SHALL offer a mode in which it reads and validates the file, reports what it found and what it would write, and writes nothing and connects to no database. The system SHALL take the address of the database to import into as a parameter or from the environment, and SHALL NOT store a database address, user name, or password in the repository, in a committed file, or in the output it prints. The system SHALL NOT print any credential it was given. The system SHALL report a connection failure, naming the reason, as an error rather than as a successful import of nothing.
+The system SHALL offer a mode in which it reads and validates the file, reports every row it would write and every row already stored, and writes nothing. That mode SHALL read the database to classify the rows, and SHALL leave every stored transaction unchanged. The system SHALL take the address of the database to import into as a parameter or from the environment, and SHALL NOT store a database address, user name, or password in the repository, in a committed file, or in the output it prints. The system SHALL NOT print any credential it was given. The system SHALL report a connection failure, naming the reason, as an error rather than as a successful import of nothing.
 
 #### Scenario: A dry run reports without writing
 
 - **WHEN** the import is run in its non-writing mode on a valid file
-- **THEN** the rows that would be written are reported, and the table is unchanged and no connection to a database is opened
+- **THEN** the rows that would be written and the rows already stored are reported, and the table is unchanged
 
 #### Scenario: A dry run still reports invalid rows
 
 - **WHEN** the import is run in its non-writing mode on a file holding an invalid row
 - **THEN** the invalid row is reported, and nothing is written
+
+#### Scenario: A dry run classifies rows against the database
+
+- **WHEN** the import is run in its non-writing mode against a table that already holds some of the file's rows
+- **THEN** the run reports which rows are new and which are already stored, and writes nothing
 
 #### Scenario: The database address is not committed
 
@@ -290,22 +300,37 @@ The system SHALL offer a mode in which it reads and validates the file, reports 
 - **WHEN** the database cannot be reached
 - **THEN** the run reports the reason and exits with a failure status, and writes no row
 
-### Requirement: What the file states is what is stored, rows included
+### Requirement: Only rows that are not already stored are imported
 
-The system SHALL import the file's rows as they are given, and SHALL NOT merge two rows that describe the same transaction, SHALL NOT collapse rows that share a date and an amount, and SHALL NOT discard a row as a duplicate. A statement that legitimately contains the same transaction twice SHALL therefore produce two rows, and the import SHALL report the number of rows it wrote so that the count can be checked against the file. The system SHALL NOT detect that the file has already been imported, and SHALL NOT refuse a run because the table already holds rows.
+The system SHALL import a row only when the table does not already hold a transaction with the same booking date, value date, amount, purpose, counterparty name, and counterparty account. When a file holds a row more often than the table does, the import SHALL write only the surplus of the file's count over the stored count, so that a statement that legitimately holds the same transaction twice still produces two rows, and a repeated import of an already stored file writes none. The system SHALL report the number of data rows read, the number already stored, and the number written. The system SHALL NOT update or delete a stored transaction, and SHALL NOT refuse a run because the table already holds rows.
 
-#### Scenario: Two identical rows are both written
+#### Scenario: A first import writes every row
 
-- **WHEN** a file holds two rows with the same date, amount, purpose, and counterparty
-- **THEN** two transactions are written, because the table holds no key that would make them one transaction
+- **WHEN** the file's rows are all absent from the table
+- **THEN** every row of the file is written, and the run reports every row as written
 
-#### Scenario: A second run adds the statement again
+#### Scenario: Two identical rows in one file are both written
+
+- **WHEN** a file holds two rows with the same date, amount, purpose, and counterparty and the table holds neither
+- **THEN** two transactions are written, because the file states the transaction twice
+
+#### Scenario: A second run of the same file writes nothing
 
 - **WHEN** the import is run a second time on the same file
-- **THEN** a second copy of every row is added, and the run reports the count it wrote rather than refusing
+- **THEN** every row is reported as already stored, no transaction is written, and the run does not refuse
 
-#### Scenario: The written count matches the file
+#### Scenario: A genuine duplicate is preserved when one copy is stored
+
+- **WHEN** a file holds two identical rows and the table already holds one of them
+- **THEN** exactly one new transaction is written, so that the table holds two
+
+#### Scenario: A stored transaction is not changed
+
+- **WHEN** an import runs against a table that already holds transactions
+- **THEN** every stored transaction keeps the values it had, and the import deletes and updates none of them
+
+#### Scenario: The counts match the file
 
 - **WHEN** an import completes successfully
-- **THEN** the number of rows reported as written equals the number of data rows the file held
+- **THEN** the number of rows reported as read equals the number of data rows the file held, and the rows reported as written plus the rows reported as already stored equal that read count
 

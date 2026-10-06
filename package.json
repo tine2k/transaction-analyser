@@ -12,6 +12,7 @@
     "dev": "nuxt dev",
     "dev:docker": "DATABASE_URL=postgres://analyser:analyser@localhost:5433/transaction_analyser nuxt dev --port 4000",
     "import": "node tools/import-transactions.ts",
+    "sync": "node tools/easybank-sync.ts",
     "postinstall": "nuxt prepare",
     "preview": "nuxt preview",
     "test": "npm run test:unit && npm run test:components && npm run test:integration",
@@ -20,9 +21,10 @@
     "test:browser:install": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install --with-deps chromium",
     "test:browser": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
     "test:integration": "npm run build && bash tests/run-with-test-database.sh npm run test:integration:run",
-    "test:integration:run": "vitest run tests/integration --hookTimeout=30000 --testTimeout=10000"
+    "test:integration:run": "vitest run tests/integration --no-file-parallelism --hookTimeout=30000 --testTimeout=10000"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "csv-parse": "^7.0.3",
     "echarts": "^6.1.0",
     "ocx": "^2.0.15",

@@ -32,12 +32,28 @@ const transactions = [
   },
 ];
 
+const importRuns = [
+  {
+    id: '1',
+    startedAt: '2026-10-06T03:00:00Z',
+    finishedAt: '2026-10-06T03:00:05Z',
+    source: 'scheduled',
+    nonWriting: true,
+    outcome: 'success',
+    rowsRead: 12,
+    rowsAlreadyStored: 12,
+    rowsWritten: 0,
+    error: null,
+  },
+];
+
 const routes = [
   { path: '/', heading: 'Transactions' },
   { path: '/categories', heading: 'Categories' },
   { path: '/analytics', heading: 'Category spending' },
   { path: '/monthly-totals', heading: 'Monthly totals' },
   { path: '/monthly-average', heading: 'Monthly average' },
+  { path: '/imports', heading: 'Imports' },
   { path: '/route-that-does-not-exist', heading: 'This page does not exist' },
 ];
 
@@ -54,6 +70,11 @@ async function interceptApi(page: Page): Promise<void> {
 
     if (pathname === '/api/transactions') {
       await route.fulfill({ json: transactions });
+      return;
+    }
+
+    if (pathname === '/api/imports') {
+      await route.fulfill({ json: importRuns });
       return;
     }
 
@@ -148,6 +169,12 @@ for (const viewport of viewports) {
             await expect(page.getByTestId('monthly-charts')).toHaveCSS('grid-template-columns', /\d+px$/);
           }
         }
+
+        if (route.path === '/imports') {
+          await expect(page.getByTestId('import-run')).toHaveCount(1);
+          await expect(page.getByTestId('import-run-mode')).toHaveText('Non-writing');
+          await expect(page.getByTestId('import-run-outcome')).toHaveText('Success');
+        }
       });
     }
 
@@ -160,7 +187,7 @@ for (const viewport of viewports) {
         await expect(toggle).toHaveAttribute('aria-expanded', 'false');
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        await expect(page.locator('#screen-navigation a')).toHaveCount(5);
+        await expect(page.locator('#screen-navigation a')).toHaveCount(6);
         await expectPhoneControlsToBeTouchSized(page);
         await page.getByRole('link', { name: 'Categories' }).click();
         await expect(page).toHaveURL(/\/categories$/);
@@ -173,7 +200,7 @@ for (const viewport of viewports) {
         await interceptApi(page);
         await page.goto('/');
         const links = page.locator('#screen-navigation a');
-        await expect(links).toHaveCount(5);
+        await expect(links).toHaveCount(6);
         await expect(links.first()).toBeVisible();
         await expect(links.last()).toBeVisible();
       });

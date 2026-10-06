@@ -19,6 +19,7 @@ describe('default layout navigation', () => {
       ['Analytics', '/analytics'],
       ['Monthly totals', '/monthly-totals'],
       ['Monthly average', '/monthly-average'],
+      ['Imports', '/imports'],
     ]);
     expect(links[0]?.attributes('aria-current')).toBe('page');
     await transactions.unmount();
@@ -37,6 +38,12 @@ describe('default layout navigation', () => {
     const monthlyAverage = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
     expect(monthlyAverage.findAll('nav a')[4]?.text()).toBe('Monthly average');
     expect(monthlyAverage.findAll('nav a')[4]?.attributes('aria-current')).toBe('page');
+    await monthlyAverage.unmount();
+
+    route.path = '/imports';
+    const imports = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
+    expect(imports.findAll('nav a')[5]?.text()).toBe('Imports');
+    expect(imports.findAll('nav a')[5]?.attributes('aria-current')).toBe('page');
   });
 
   it('exposes and toggles the mobile navigation and closes it after choosing a destination', async () => {
@@ -46,7 +53,7 @@ describe('default layout navigation', () => {
 
     expect(toggle.attributes('aria-controls')).toBe('screen-navigation');
     expect(toggle.attributes('aria-expanded')).toBe('false');
-    expect(wrapper.findAll('#screen-navigation a')).toHaveLength(5);
+    expect(wrapper.findAll('#screen-navigation a')).toHaveLength(6);
 
     await toggle.trigger('click');
     expect(toggle.attributes('aria-expanded')).toBe('true');

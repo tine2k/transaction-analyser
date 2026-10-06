@@ -56,7 +56,7 @@ async function resetFixtures(): Promise<void> {
   if (database === undefined) {
     throw new Error('test database is not initialized');
   }
-  await database.query('TRUNCATE TABLE transactions, categories RESTART IDENTITY CASCADE');
+  await database.query('TRUNCATE TABLE transactions, categories, import_runs RESTART IDENTITY CASCADE');
   await database.query(fixtures);
 }
 
@@ -586,5 +586,76 @@ describe('API integration', () => {
     }
 
     assert.deepEqual(await storedRows(), before);
+  });
+
+  it('returns an empty import log when no run exists', async () => {
+    const response = await request('/api/imports');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([]);
+  });
+
+  it('returns the fifty most recent runs, newest first', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+    await database.query(`
+      INSERT INTO import_runs (started_at, finished_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written, error)
+      SELECT '2026-01-01T00:00:00Z'::timestamptz + (number || ' minutes')::interval,
+             NULL, 'manual', false, 'success', number, 0, 0, NULL
+      FROM generate_series(1, 55) AS number
+    `);
+
+    const response = await request('/api/imports');
+
+    expect(response.status).toBe(200);
+    const runs = await response.json() as Array<{ rowsRead: number; startedAt: string }>;
+    expect(runs).toHaveLength(50);
+    expect(runs[0]?.rowsRead).toBe(55);
+    expect(runs[49]?.rowsRead).toBe(6);
+    expect(runs[0]?.startedAt).toBe('2026-01-01T00:55:00Z');
+  });
+
+  it('reports an unfinished run as in progress with no finish time', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+    await database.query(`
+      INSERT INTO import_runs (started_at, finished_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written, error)
+      VALUES ('2026-01-02T03:00:00Z', NULL, 'scheduled', true, 'in_progress', 7, 5, 0, NULL)
+    `);
+
+    const response = await request('/api/imports');
+
+    expect(await response.json()).toEqual([
+      {
+        id: '1',
+        startedAt: '2026-01-02T03:00:00Z',
+        finishedAt: null,
+        source: 'scheduled',
+        nonWriting: true,
+        outcome: 'in_progress',
+        rowsRead: 7,
+        rowsAlreadyStored: 5,
+        rowsWritten: 0,
+        error: null,
+      },
+    ]);
+  });
+
+  it('alters no run when a request uses another method', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+    await database.query(`
+      INSERT INTO import_runs (started_at, finished_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written, error)
+      VALUES (now(), now(), 'manual', false, 'success', 1, 0, 1, NULL)
+    `);
+    const before = await database.query('SELECT * FROM import_runs ORDER BY id');
+
+    await request('/api/imports', { method: 'POST' });
+
+    const after = await database.query('SELECT * FROM import_runs ORDER BY id');
+    expect(after.rows).toEqual(before.rows);
   });
 });

@@ -28,4 +28,16 @@ export default defineNuxtConfig({
   vite: {
     plugins: [tailwindcss()],
   },
+
+  // The nightly Easybank sync is a Nitro task, scheduled in-process at 03:00 in
+  // the container's time zone (TZ=Europe/Vienna). A night the server was not
+  // running is recovered by the next run's window.
+  //
+  // See openspec/changes/add-easybank-sync/specs/easybank-sync/spec.md
+  nitro: {
+    experimental: { tasks: true },
+    scheduledTasks: {
+      '0 3 * * *': ['easybank:sync'],
+    },
+  },
 });

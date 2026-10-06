@@ -42,6 +42,8 @@ describe('category management page', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('sorts category rows and loads the selected category into the edit form', async () => {
@@ -99,8 +101,40 @@ describe('category management page', () => {
     expect(region.attributes('tabindex')).toBe('0');
     expect(region.classes()).toContain('overflow-x-auto');
     expect(region.get('table').classes()).toContain('w-max');
+    expect(region.get('table').classes()).not.toContain('min-w-full');
     expect(wrapper.findAll('tbody button').every((button) => button.classes().includes('min-h-11')))
       .toBe(true);
+  });
+
+  it('sizes the category table to its content and stripes its rows', async () => {
+    const wrapper = await mountSuspended(Categories);
+
+    expect(wrapper.get('table').classes()).toContain('w-max');
+    expect(wrapper.get('table').classes()).not.toContain('min-w-full');
+    expect(wrapper.findAll('tbody tr').every((row) =>
+      row.classes().includes('odd:bg-white') && row.classes().includes('even:bg-slate-50'),
+    )).toBe(true);
+  });
+
+  it('scrolls the edit form into view when an edit starts', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.findAll('tbody tr')[0]?.find('button').trigger('click');
+    await flushPromises();
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+  });
+
+  it('brings the edit form into view without animation when reduced motion is requested', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.findAll('tbody tr')[0]?.find('button').trigger('click');
+    await flushPromises();
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
   });
 
   it('pre-populates the hidden state when editing a hidden category', async () => {

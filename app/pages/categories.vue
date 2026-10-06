@@ -40,6 +40,7 @@ const sortedCategories = computed(() =>
   }),
 );
 
+const formElement = ref<HTMLFormElement | null>(null);
 const name = ref('');
 const patterns = ref<string[]>(['']);
 const windows = ref<CategoryWindow[]>([]);
@@ -69,6 +70,13 @@ function startEdit(category: Category): void {
   windows.value = category.windows.map((window) => ({ ...window }));
   hidden.value = category.hidden;
   formError.value = null;
+  void nextTick(() => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    formElement.value?.scrollIntoView({
+      behavior: reducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  });
 }
 
 function cancelEdit(): void {
@@ -286,7 +294,11 @@ async function remove(category: Category): Promise<void> {
       inclusive.
     </p>
 
-    <form class="mt-6 w-full min-w-0 max-w-2xl rounded-lg border border-slate-200 bg-white p-4" @submit.prevent="submit">
+    <form
+      ref="formElement"
+      class="mt-6 w-full min-w-0 max-w-2xl rounded-lg border border-slate-200 bg-white p-4"
+      @submit.prevent="submit"
+    >
       <h2 class="text-sm font-semibold text-slate-700">
         {{ editingId === null ? 'Add a category' : 'Edit category' }}
       </h2>
@@ -463,7 +475,7 @@ async function remove(category: Category): Promise<void> {
         data-testid="categories-scroll"
         class="max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
       >
-      <table class="w-max min-w-full border-collapse text-left text-sm">
+      <table class="w-max border-collapse text-left text-sm">
         <thead>
           <tr class="border-b border-slate-200">
             <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Name</th>
@@ -474,7 +486,11 @@ async function remove(category: Category): Promise<void> {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="category in sortedCategories" :key="category.id" class="border-b border-slate-100">
+          <tr
+            v-for="category in sortedCategories"
+            :key="category.id"
+            class="border-b border-slate-100 odd:bg-white even:bg-slate-50"
+          >
             <td class="px-3 py-2 align-top text-slate-900">{{ category.name }}</td>
             <td class="px-3 py-2 align-top text-slate-900">{{ category.patterns.length }}</td>
             <td class="px-3 py-2 align-top text-slate-900" data-testid="category-window-count">

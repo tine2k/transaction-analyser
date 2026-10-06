@@ -5,9 +5,9 @@
     "bash": {
       "*": "ask",
 
-      // Read-only git inspection
-      "git status *": "allow",
-      "git diff *": "allow",
+      // Git and file moves
+      "git *": "allow",
+      "mv *": "allow",
 
       // Filesystem inspection
       "pwd *": "allow",
@@ -69,10 +69,7 @@
 
       // Docker
       "docker *": "allow",
-      "docker-compose *": "allow",
-
-      // Hard deny
-      "git push *": "deny"
+      "docker-compose *": "allow"
     }
   }
 }

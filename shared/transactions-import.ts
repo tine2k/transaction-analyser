@@ -42,7 +42,7 @@ const AMOUNT_SHAPE_HINT =
   'expected a number with a comma as the decimal separator and periods as thousands separators, such as -1.234,56';
 const ZERO_AMOUNT = /^0*(?:\.0*)?$/;
 
-export type ImportSourceKind = 'manual' | 'scheduled';
+export type ImportSourceKind = 'manual' | 'scheduled' | 'ui';
 export type ImportRunOutcome = 'in_progress' | 'success' | 'failed';
 
 export type ImportRow = {

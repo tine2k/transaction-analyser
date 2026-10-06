@@ -43,6 +43,12 @@ export function toIsoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// The source a run is recorded under, taken from the task payload. The schedule
+// passes no source, so its runs stay scheduled; the imports screen passes 'ui'.
+export function syncSourceFromPayload(payload: Record<string, unknown>): ImportSourceKind {
+  return payload['source'] === 'ui' ? 'ui' : 'scheduled';
+}
+
 // The default window reaches back to the start of the preceding calendar quarter,
 // the widest range the bank's own search offers, so a night the server did not run
 // is recovered by a later run.

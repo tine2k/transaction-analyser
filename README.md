@@ -72,7 +72,9 @@ EASYBANK_USER=...
 EASYBANK_PIN=...
 ```
 
-The nightly task runs at 03:00 Europe/Vienna while the server runs. Until `EASYBANK_SYNC_WRITE=true` is set, every run is non-writing: it records what it would import and changes no transaction. The result of every run appears on the Imports screen. Once the non-writing runs look right, set `EASYBANK_SYNC_WRITE=true` to let it write.
+The nightly task runs at 03:00 Europe/Vienna while the server runs. Until `EASYBANK_SYNC_WRITE=true` is set, every run is non-writing: it records what it would import and changes no transaction. The result of every run appears on the Imports screen, which also offers a control that starts the same sync on demand. Once the non-writing runs look right, set `EASYBANK_SYNC_WRITE=true` to let it write.
+
+To point the sync at a test bank instead of the real Easybank site, set `EASYBANK_BASE_URL` to that server's address; leave it unset to use the real bank.
 
 To run the same sync by hand — the way to check the login, the retrieval, and the counts before trusting the night:
 

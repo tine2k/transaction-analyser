@@ -17,6 +17,7 @@ export type FakeBank = {
   baseUrl: string;
   requests: FakeBankRequest[];
   mode: FakeBankMode;
+  delayMs: number;
   close: () => Promise<void>;
 };
 
@@ -103,7 +104,7 @@ export const DEFAULT_PAGES: string[] = [
 
 export async function startFakeBank(pages: string[] = DEFAULT_PAGES): Promise<FakeBank> {
   const requests: FakeBankRequest[] = [];
-  const state: { mode: FakeBankMode } = { mode: 'ok' };
+  const state: { mode: FakeBankMode; delayMs: number } = { mode: 'ok', delayMs: 0 };
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     let body = '';
@@ -111,50 +112,60 @@ export async function startFakeBank(pages: string[] = DEFAULT_PAGES): Promise<Fa
       body += chunk.toString();
     });
     request.on('end', () => {
-      const path = request.url ?? '';
-      requests.push({
-        method: request.method ?? '',
-        path,
-        body,
-        cookie: request.headers.cookie ?? null,
-      });
-      response.setHeader('content-type', 'text/html; charset=utf-8');
+      const respond = () => {
+        const path = request.url ?? '';
+        requests.push({
+          method: request.method ?? '',
+          path,
+          body,
+          cookie: request.headers.cookie ?? null,
+        });
+        response.setHeader('content-type', 'text/html; charset=utf-8');
 
-      if (request.method === 'GET' && path.includes('d=login')) {
-        response.end(LOGIN_PAGE);
-        return;
-      }
-      if (request.method === 'POST' && path === '/login-action') {
-        if (state.mode === 'rejected') {
-          response.end(REJECTED_PAGE);
+        if (request.method === 'GET' && path.includes('d=login')) {
+          response.end(LOGIN_PAGE);
           return;
         }
-        // The real bank answers the login with a 302 that carries the session
-        // cookies and points at the overview, which is why the client follows
-        // redirects by hand.
-        response.statusCode = 302;
-        response.setHeader('set-cookie', 'session=abc; Path=/');
-        response.setHeader('location', '/overview');
-        response.end('');
-        return;
-      }
-      if (request.method === 'GET' && path === '/overview') {
-        response.end(state.mode === 'no-account' ? NO_ACCOUNT_PAGE : OVERVIEW_PAGE);
-        return;
-      }
-      if (request.method === 'POST' && path === '/list-action') {
-        response.end(pages[0]);
-        return;
-      }
-      if (request.method === 'POST' && path === '/search-action') {
-        const match = /pagenumber=(\d+)/.exec(body);
-        const page = match === null ? 1 : Number(match[1]);
-        response.end(pages[Math.min(Math.max(page - 1, 0), pages.length - 1)]);
-        return;
-      }
+        if (request.method === 'POST' && path === '/login-action') {
+          if (state.mode === 'rejected') {
+            response.end(REJECTED_PAGE);
+            return;
+          }
+          // The real bank answers the login with a 302 that carries the session
+          // cookies and points at the overview, which is why the client follows
+          // redirects by hand.
+          response.statusCode = 302;
+          response.setHeader('set-cookie', 'session=abc; Path=/');
+          response.setHeader('location', '/overview');
+          response.end('');
+          return;
+        }
+        if (request.method === 'GET' && path === '/overview') {
+          response.end(state.mode === 'no-account' ? NO_ACCOUNT_PAGE : OVERVIEW_PAGE);
+          return;
+        }
+        if (request.method === 'POST' && path === '/list-action') {
+          response.end(pages[0]);
+          return;
+        }
+        if (request.method === 'POST' && path === '/search-action') {
+          const match = /pagenumber=(\d+)/.exec(body);
+          const page = match === null ? 1 : Number(match[1]);
+          response.end(pages[Math.min(Math.max(page - 1, 0), pages.length - 1)]);
+          return;
+        }
 
-      response.statusCode = 404;
-      response.end('not found');
+        response.statusCode = 404;
+        response.end('not found');
+      };
+
+      // A test can hold every answer to keep a sync run in flight while it makes
+      // a second request.
+      if (state.delayMs > 0) {
+        setTimeout(respond, state.delayMs);
+      } else {
+        respond();
+      }
     });
   });
 
@@ -172,6 +183,12 @@ export async function startFakeBank(pages: string[] = DEFAULT_PAGES): Promise<Fa
     },
     set mode(value: FakeBankMode) {
       state.mode = value;
+    },
+    get delayMs() {
+      return state.delayMs;
+    },
+    set delayMs(value: number) {
+      state.delayMs = value;
     },
     close: () => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))),
   };

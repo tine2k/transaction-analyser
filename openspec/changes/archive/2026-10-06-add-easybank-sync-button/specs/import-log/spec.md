@@ -1,10 +1,6 @@
-# import-log Specification
+# Spec Delta
 
-## Purpose
-
-Records what every transaction import did — scheduled or manual, non-writing or writing — and shows the recent runs, so an import can be checked without reading a server log.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Every import that starts leaves exactly one record
 
@@ -39,58 +35,6 @@ The system SHALL record one run for every import that starts — the scheduled s
 
 - **WHEN** an import fails
 - **THEN** one record exists for it, stating the failure and the reason
-
-### Requirement: The record distinguishes rows read, already stored, and written
-
-A record SHALL hold the number of data rows read, the number already stored, and the number written. The number written SHALL be zero for a run that wrote nothing, so a non-writing run still reports how many rows a writing run would add.
-
-#### Scenario: A writing run records its counts
-
-- **WHEN** a writing import reads ten rows of which four are already stored
-- **THEN** its record holds ten read, four already stored, and six written
-
-#### Scenario: A non-writing run still reports the new rows
-
-- **WHEN** a non-writing import reads ten rows of which four are already stored
-- **THEN** its record holds ten read, four already stored, and zero written
-
-#### Scenario: A repeated import records every row as already stored
-
-- **WHEN** an import runs again on a file whose rows are all stored
-- **THEN** its record holds every row as already stored and zero written
-
-### Requirement: A failed run records no written rows and leaves no partial import
-
-A run whose write fails part-way SHALL leave no row of that run behind and SHALL be recorded as failed, with a written count of zero and the reason. A run that fails before writing SHALL likewise record no written rows.
-
-#### Scenario: A failure during the write is recorded
-
-- **WHEN** an import fails after some rows have been sent
-- **THEN** no row of that run remains in the table, and its record states the failure and zero written rows
-
-#### Scenario: A failure before the write is recorded
-
-- **WHEN** an import fails before it writes anything
-- **THEN** its record states the failure and zero written rows
-
-### Requirement: The records are readable read-only, newest first, bounded
-
-The system SHALL expose the records at `GET /api/imports` as a JSON list ordered most recent first, limited to a bounded number of runs, and SHALL expose no request that creates, changes, or deletes a record.
-
-#### Scenario: The endpoint returns the recent runs
-
-- **WHEN** the endpoint is requested
-- **THEN** it answers with the most recent runs, most recent first, in a machine-readable form
-
-#### Scenario: The list is bounded
-
-- **WHEN** the endpoint is requested after many runs
-- **THEN** it answers with a bounded number of the most recent runs rather than every run ever recorded
-
-#### Scenario: No request changes a record
-
-- **WHEN** a request other than the read is made to the endpoint
-- **THEN** no record is created, changed, or deleted by it
 
 ### Requirement: The imports screen shows the recent runs
 

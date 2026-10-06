@@ -176,10 +176,13 @@ display, but SHALL NOT alter the returned data or evaluate any category's regula
 category spending chart, monthly category totals table, and monthly average page MAY group and
 aggregate the transactions returned by their single read request as their capabilities define. The
 imports screen MAY display the run records the import log returns, without deriving a transaction
-value from them. The browser SHALL NOT create, alter, or delete any stored data; the scheduled
-sync is the application's only writer, and no browser request can start it or change a run record.
-The shell's relationship to stored data SHALL be through same-origin read-only API requests and
-SHALL NOT run a statement against the database itself. The transaction table SHALL present
+value from them. The browser SHALL NOT create, alter, or delete any stored data itself, and SHALL
+NOT run a statement against the database. The browser MAY start the Easybank sync through the
+sync-start endpoint, as `easybank-sync` defines; a run that request starts writes through the
+server process and the shared import path, not through the browser, and the browser cannot change a
+recorded run. The shell's relationship to stored data SHALL be through same-origin API requests:
+stored data is read through read-only requests, and the sync-start request is the only request that
+can lead to stored data being written. The transaction table SHALL present
 transaction values exactly as the endpoint returned them. Apart from the two transaction filter
 counts, the selected view of returned transactions, the monthly aggregations defined by
 `category-spending-chart`, `monthly-category-totals-table`, and `monthly-category-average`, and
@@ -209,9 +212,14 @@ derive a value from transaction data for display.
 #### Scenario: No row is written
 
 - **WHEN** the browser uses the application
-- **THEN** no row is created, altered, or deleted by a browser request, because no endpoint alters stored data and none starts an import
+- **THEN** no row is created, altered, or deleted by the browser itself, because the only request that can lead to a write is the sync-start request and the server performs that write
+
+#### Scenario: The sync can be started from the imports screen
+
+- **WHEN** the sync control on the imports screen is used
+- **THEN** the browser makes a same-origin request to the sync-start endpoint, performs no retrieval and no write itself, and shows the outcome the endpoint returns
 
 #### Scenario: The scheduled sync is the writer
 
-- **WHEN** the nightly sync runs
-- **THEN** it writes through the server process, not through the browser, and the browser neither starts it nor changes what it writes
+- **WHEN** a sync run writes
+- **THEN** it writes through the server process, not through the browser, and the browser cannot change what it writes

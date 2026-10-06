@@ -5,7 +5,12 @@
 // reason when it failed. It derives nothing from transactions and invents no run;
 // it shows only what the endpoint returned.
 //
-// See openspec/changes/add-easybank-sync/specs/import-log/spec.md
+// Its Sync now control starts the same sync the nightly schedule runs through
+// POST /api/easybank/sync, waits for the answer, then refreshes the log so the
+// run it recorded appears.
+//
+// See openspec/changes/add-easybank-sync-button/specs/easybank-sync/spec.md
+// and openspec/changes/add-easybank-sync-button/specs/import-log/spec.md
 type ImportRun = {
   id: string;
   startedAt: string;
@@ -19,9 +24,39 @@ type ImportRun = {
   error: string | null;
 };
 
-const { data: runs, error, pending } = useFetch<ImportRun[]>('/api/imports', {
+const { data: runs, error, pending, refresh } = useFetch<ImportRun[]>('/api/imports', {
   default: () => [],
 });
+
+const syncing = ref(false);
+const syncMessage = ref<string | null>(null);
+
+// The server refuses overlapping runs and answers with the run's outcome; a
+// click while a request is in flight is ignored here as well.
+async function startSync(): Promise<void> {
+  if (syncing.value) {
+    return;
+  }
+  syncing.value = true;
+  syncMessage.value = null;
+  try {
+    const answer = await $fetch<{ status: string }>('/api/easybank/sync', { method: 'POST' });
+    if (answer.status === 'success') {
+      syncMessage.value = 'The sync finished. The newest run is below.';
+    } else if (answer.status === 'failed') {
+      syncMessage.value = 'The sync failed. The newest run below states the reason.';
+    } else if (answer.status === 'unconfigured') {
+      syncMessage.value = 'The sync is not configured on the server.';
+    } else {
+      syncMessage.value = 'The sync answered an unknown outcome.';
+    }
+  } catch {
+    syncMessage.value = 'The sync could not be started.';
+  } finally {
+    syncing.value = false;
+    await refresh();
+  }
+}
 
 // The endpoint writes UTC instants in a fixed form, so the screen renders them
 // without a locale-dependent Date parse.
@@ -38,6 +73,9 @@ function sourceLabel(source: string): string {
   }
   if (source === 'manual') {
     return 'Manual import';
+  }
+  if (source === 'ui') {
+    return 'Manual sync';
   }
   return source;
 }
@@ -62,6 +100,26 @@ function outcomeLabel(run: ImportRun): string {
     <p class="mt-2 text-sm text-slate-600">
       The most recent import runs, newest first, whether they wrote or only checked.
     </p>
+
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        class="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+        data-testid="sync-button"
+        :disabled="syncing"
+        @click="startSync"
+      >
+        {{ syncing ? 'Syncing…' : 'Sync now' }}
+      </button>
+      <p
+        v-if="syncMessage !== null"
+        class="text-sm text-slate-600"
+        data-testid="sync-status"
+        role="status"
+      >
+        {{ syncMessage }}
+      </p>
+    </div>
 
     <p v-if="error" class="mt-4 text-slate-600" data-testid="imports-error">
       The import log could not be loaded.

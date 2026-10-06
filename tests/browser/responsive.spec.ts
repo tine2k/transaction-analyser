@@ -43,6 +43,7 @@ const importRuns = [
     rowsRead: 12,
     rowsAlreadyStored: 12,
     rowsWritten: 0,
+    rowsCategorised: 0,
     error: null,
   },
 ];

@@ -88,6 +88,7 @@ export async function syncEasybank(
       rowsRead: plan.rowsRead,
       rowsAlreadyStored: plan.rowsAlreadyStored,
       rowsWritten: plan.rowsWritten,
+      rowsCategorised: plan.rowsCategorised,
       error: null,
     });
     return { status: 'success', runId, plan };
@@ -99,6 +100,7 @@ export async function syncEasybank(
       rowsRead,
       rowsAlreadyStored: 0,
       rowsWritten: 0,
+      rowsCategorised: 0,
       error: reason,
     }).catch(() => undefined);
     return { status: 'failed', runId, error: reason };

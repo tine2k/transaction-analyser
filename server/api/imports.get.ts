@@ -25,6 +25,7 @@ const SELECT_RECENT_RUNS = `
          rows_read,
          rows_already_stored,
          rows_written,
+         rows_categorised,
          error
   FROM import_runs
   ORDER BY started_at DESC, id DESC
@@ -43,6 +44,7 @@ type ImportRunRow = {
   rows_read: number;
   rows_already_stored: number;
   rows_written: number;
+  rows_categorised: number;
   error: string | null;
 };
 
@@ -83,6 +85,7 @@ export default defineEventHandler(async () => {
     rowsRead: row.rows_read,
     rowsAlreadyStored: row.rows_already_stored,
     rowsWritten: row.rows_written,
+    rowsCategorised: row.rows_categorised,
     error: row.error,
   }));
 });

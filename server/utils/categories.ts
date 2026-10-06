@@ -20,6 +20,7 @@
 // See openspec/changes/allow-multiple-category-expressions/specs/category-management-api/spec.md
 // and openspec/changes/allow-multiple-category-expressions/specs/category-assignment/spec.md
 import type { Pool, PoolClient } from 'pg';
+import { matchingCategorySql } from '../../shared/category-assignment';
 import { useDatabase } from './db';
 
 // A category's date window: two full calendar dates at day precision, both
@@ -106,40 +107,12 @@ const COUNT_CLAIMED_TRANSACTIONS = `
   )
 `;
 
-// The global recompute, in two tiers. A category matches when at least one of its
-// expressions matches the purpose line, so the first scalar subquery tests existence
-// across the category's expressions with `unnest`; `ORDER BY c.id LIMIT 1` makes the
-// smallest matching identity win. The second subquery does the same over the
-// category's date windows, testing the booking date inclusively with `BETWEEN`. The
-// two are joined by `COALESCE`, so a regular-expression match always wins and a
-// window is consulted only when no expression matches any category. It is run after
-// a create or an edit and is idempotent.
+// The global recompute: every stored transaction is assigned the category the
+// shared matching rule selects. It is run after a create or an edit and is
+// idempotent.
 const RECOMPUTE_ASSIGNMENTS = `
   UPDATE transactions AS t
-  SET category_id = COALESCE(
-    (
-      SELECT c.id
-      FROM categories AS c
-      WHERE EXISTS (
-        SELECT 1
-        FROM unnest(c.patterns) AS expression
-        WHERE t.purpose ~* expression
-      )
-      ORDER BY c.id
-      LIMIT 1
-    ),
-    (
-      SELECT c.id
-      FROM categories AS c
-      WHERE EXISTS (
-        SELECT 1
-        FROM jsonb_array_elements(c.windows) AS date_window
-        WHERE t.booking_date BETWEEN (date_window->>'from')::date AND (date_window->>'to')::date
-      )
-      ORDER BY c.id
-      LIMIT 1
-    )
-  )
+  SET category_id = ${matchingCategorySql()}
 `;
 
 // The reassignment that lets a category be deleted. The category being retired is
@@ -149,32 +122,9 @@ const RECOMPUTE_ASSIGNMENTS = `
 // matches. Once this has run, no transaction references the category, so the delete
 // no longer violates the foreign key.
 const REASSIGN_RETIRING_CATEGORY = `
-  UPDATE transactions
-  SET category_id = COALESCE(
-    (
-      SELECT c.id
-      FROM categories AS c
-      WHERE c.id <> $1 AND EXISTS (
-        SELECT 1
-        FROM unnest(c.patterns) AS expression
-        WHERE purpose ~* expression
-      )
-      ORDER BY c.id
-      LIMIT 1
-    ),
-    (
-      SELECT c.id
-      FROM categories AS c
-      WHERE c.id <> $1 AND EXISTS (
-        SELECT 1
-        FROM jsonb_array_elements(c.windows) AS date_window
-        WHERE booking_date BETWEEN (date_window->>'from')::date AND (date_window->>'to')::date
-      )
-      ORDER BY c.id
-      LIMIT 1
-    )
-  )
-  WHERE category_id = $1
+  UPDATE transactions AS t
+  SET category_id = ${matchingCategorySql({ excludeCategoryId: '$1' })}
+  WHERE t.category_id = $1
 `;
 
 // Rejects a candidate window set that overlaps a stored window. `$1` is the

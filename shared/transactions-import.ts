@@ -3,7 +3,10 @@
 // the header, validates every row, classifies each row against what the table
 // already holds, and writes only the surplus inside one transaction, so a repeated
 // import of the same rows changes nothing and a statement that legitimately holds
-// a transaction twice still produces two rows.
+// a transaction twice still produces two rows. Each newly written row is evaluated
+// against the stored categories in the same transaction, so it lands with the
+// category the matching rule selects rather than waiting for the next category
+// change.
 //
 // It is deliberately framework-free: it takes a `pg` client or pool and a source,
 // and imports nothing from Nuxt or the application. The command-line importer and
@@ -19,6 +22,7 @@
 import { readFile } from 'node:fs/promises';
 import { parse } from 'csv-parse';
 import type { Client, Pool, PoolClient } from 'pg';
+import { matchingCategorySql } from './category-assignment.ts';
 
 export const EXPECTED_HEADER = [
   'Date',
@@ -67,6 +71,7 @@ export type ImportPlan = {
   rowsRead: number;
   rowsAlreadyStored: number;
   rowsWritten: number;
+  rowsCategorised: number;
   newRows: ImportRow[];
 };
 
@@ -381,7 +386,25 @@ const STORED_COUNT_SQL = `
 
 const INSERT_SQL =
   'INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account) ' +
-  'VALUES ($1, $2, $3, $4, $5, $6)';
+  'VALUES ($1, $2, $3, $4, $5, $6) RETURNING id';
+
+// The write transaction takes a share lock on the categories table before it
+// inserts, so a category create, edit, or delete cannot interleave with the
+// assignment: either the category change commits first and the new rows are
+// evaluated against it, or the import commits first and the category change's
+// recompute sees the new rows. A category mutation takes a row-exclusive lock
+// when it writes categories, which conflicts with this one.
+const LOCK_CATEGORIES = 'LOCK TABLE categories IN SHARE MODE';
+
+// The scoped assignment: only the rows this import wrote are evaluated, by the
+// same matching rule the category mutations use. The update returns every row it
+// touched, so the count of non-null category references is the categorised count.
+const ASSIGN_IMPORTED_ROWS = `
+  UPDATE transactions AS t
+  SET category_id = ${matchingCategorySql()}
+  WHERE t.id = ANY($1::bigint[])
+  RETURNING t.category_id
+`;
 
 async function countStored(database: Database, row: ImportRow): Promise<number> {
   const result = await database.query(STORED_COUNT_SQL, [
@@ -466,9 +489,10 @@ async function classifyRows(
 }
 
 // Classifies already-validated rows against the table and, unless non-writing,
-// writes the surplus inside one transaction, so a failure leaves no row of the run
-// behind. The CSV import and the Easybank sync both go through here, which is what
-// keeps their dedupe and their run records identical.
+// writes the surplus and assigns the categories those new rows receive inside one
+// transaction, so a failure leaves no row of the run behind and no category
+// assigned by it. The CSV import and the Easybank sync both go through here, which
+// is what keeps their dedupe, their assignment, and their run records identical.
 export async function importRows(
   database: Database,
   rows: ImportRow[],
@@ -476,11 +500,14 @@ export async function importRows(
 ): Promise<ImportPlan> {
   const { newRows, alreadyStored } = await classifyRows(database, rows);
   const rowsWritten = options.dryRun ? 0 : newRows.length;
+  let rowsCategorised = 0;
 
   if (!options.dryRun && newRows.length > 0) {
     await withTransaction(database, async (client) => {
+      await client.query(LOCK_CATEGORIES);
+      const writtenIds: string[] = [];
       for (const row of newRows) {
-        await client.query(INSERT_SQL, [
+        const inserted = await client.query(INSERT_SQL, [
           row.bookingDate,
           row.valueDate,
           row.amount,
@@ -488,7 +515,12 @@ export async function importRows(
           row.counterpartyName,
           row.counterpartyAccount,
         ]);
+        writtenIds.push((inserted.rows[0] as { id: string }).id);
       }
+      const assigned = await client.query(ASSIGN_IMPORTED_ROWS, [writtenIds]);
+      rowsCategorised = assigned.rows.filter(
+        (assignedRow) => (assignedRow as { category_id: string | null }).category_id !== null,
+      ).length;
     });
   }
 
@@ -496,6 +528,7 @@ export async function importRows(
     rowsRead: rows.length,
     rowsAlreadyStored: alreadyStored,
     rowsWritten,
+    rowsCategorised,
     newRows,
   };
 }
@@ -533,8 +566,8 @@ export async function startImportRun(
   options: { source: ImportSourceKind; nonWriting: boolean },
 ): Promise<string> {
   const result = await database.query(
-    `INSERT INTO import_runs (started_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written)
-     VALUES (now(), $1, $2, 'in_progress', 0, 0, 0)
+    `INSERT INTO import_runs (started_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written, rows_categorised)
+     VALUES (now(), $1, $2, 'in_progress', 0, 0, 0, 0)
      RETURNING id`,
     [options.source, options.nonWriting],
   );
@@ -550,13 +583,23 @@ export async function finishImportRun(
     rowsRead: number;
     rowsAlreadyStored: number;
     rowsWritten: number;
+    rowsCategorised: number;
     error: string | null;
   },
 ): Promise<void> {
   await database.query(
     `UPDATE import_runs
-     SET finished_at = now(), outcome = $2, rows_read = $3, rows_already_stored = $4, rows_written = $5, error = $6
+     SET finished_at = now(), outcome = $2, rows_read = $3, rows_already_stored = $4,
+         rows_written = $5, rows_categorised = $6, error = $7
      WHERE id = $1`,
-    [id, result.outcome, result.rowsRead, result.rowsAlreadyStored, result.rowsWritten, result.error],
+    [
+      id,
+      result.outcome,
+      result.rowsRead,
+      result.rowsAlreadyStored,
+      result.rowsWritten,
+      result.rowsCategorised,
+      result.error,
+    ],
   );
 }

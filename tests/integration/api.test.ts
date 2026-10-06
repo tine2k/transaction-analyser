@@ -609,10 +609,11 @@ describe('API integration', () => {
     const response = await request('/api/imports');
 
     expect(response.status).toBe(200);
-    const runs = await response.json() as Array<{ rowsRead: number; startedAt: string }>;
+    const runs = await response.json() as Array<{ rowsRead: number; rowsCategorised: number; startedAt: string }>;
     expect(runs).toHaveLength(50);
     expect(runs[0]?.rowsRead).toBe(55);
     expect(runs[49]?.rowsRead).toBe(6);
+    expect(runs[0]?.rowsCategorised).toBe(0);
     expect(runs[0]?.startedAt).toBe('2026-01-01T00:55:00Z');
   });
 
@@ -621,8 +622,8 @@ describe('API integration', () => {
       throw new Error('test database is not initialized');
     }
     await database.query(`
-      INSERT INTO import_runs (started_at, finished_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written, error)
-      VALUES ('2026-01-02T03:00:00Z', NULL, 'scheduled', true, 'in_progress', 7, 5, 0, NULL)
+      INSERT INTO import_runs (started_at, finished_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written, rows_categorised, error)
+      VALUES ('2026-01-02T03:00:00Z', NULL, 'scheduled', true, 'in_progress', 7, 5, 0, 4, NULL)
     `);
 
     const response = await request('/api/imports');
@@ -638,6 +639,7 @@ describe('API integration', () => {
         rowsRead: 7,
         rowsAlreadyStored: 5,
         rowsWritten: 0,
+        rowsCategorised: 4,
         error: null,
       },
     ]);

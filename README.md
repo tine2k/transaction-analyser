@@ -28,7 +28,7 @@ Prerequisites: Docker, Git, and Node.js 24 with npm (Node is needed only for the
 
    Replace the example password. The volume is mounted at `/var/lib/postgresql`, the PostgreSQL 18 image's data volume; do not use the older `/var/lib/postgresql/data` path with this image.
 
-3. Create the schema by applying every migration in order (the latest, `0006_import_runs.sql`, adds the import log).
+3. Create the schema by applying every migration in order (the latest, `0007_import_runs_categorised.sql`, adds the categorised count to the import log).
 
    ```sh
    for migration in db/migrations/*.sql; do
@@ -59,7 +59,7 @@ npm run import -- /path/to/statement.csv --dsn postgres://analyser:change-me@loc
 
 The file must be UTF-8, semicolon-delimited, and carry exactly this header: `Date;Value date;Category;Name;Purpose;Account;Bank;Amount;Currency`.
 
-Dates are `DD.MM.YYYY`, amounts use a comma decimal separator (`-1.234,56`), the currency must be `EUR`, and zero amounts are rejected. A row already stored is skipped rather than imported again, so re-running an import of the same statement adds nothing; a statement that legitimately contains the same transaction twice still produces two rows. `--dry-run` validates the whole file, reads the database to report which rows are new and which are already stored, and writes nothing. Every run is recorded and shown on the Imports screen. Imported transactions start uncategorised; the stored transactions are re-evaluated whenever the category set changes. Without `--dsn` the importer uses `$DATABASE_URL`.
+Dates are `DD.MM.YYYY`, amounts use a comma decimal separator (`-1.234,56`), the currency must be `EUR`, and zero amounts are rejected. A row already stored is skipped rather than imported again, so re-running an import of the same statement adds nothing; a statement that legitimately contains the same transaction twice still produces two rows. `--dry-run` validates the whole file, reads the database to report which rows are new and which are already stored, and writes nothing. Every run is recorded and shown on the Imports screen. Each newly imported transaction is categorised by the categories stored at import time; the stored transactions are re-evaluated whenever the category set changes. Without `--dsn` the importer uses `$DATABASE_URL`.
 
 ## Keeping the account current
 

@@ -20,6 +20,7 @@ type Run = {
   rowsRead: number;
   rowsAlreadyStored: number;
   rowsWritten: number;
+  rowsCategorised: number;
   error: string | null;
 };
 
@@ -53,6 +54,7 @@ const runs: Run[] = [
     rowsRead: 12,
     rowsAlreadyStored: 9,
     rowsWritten: 3,
+    rowsCategorised: 2,
     error: null,
   },
   {
@@ -65,6 +67,7 @@ const runs: Run[] = [
     rowsRead: 5,
     rowsAlreadyStored: 5,
     rowsWritten: 0,
+    rowsCategorised: 0,
     error: null,
   },
   {
@@ -77,6 +80,7 @@ const runs: Run[] = [
     rowsRead: 0,
     rowsAlreadyStored: 0,
     rowsWritten: 0,
+    rowsCategorised: 0,
     error: 'the export could not be retrieved',
   },
 ];
@@ -91,6 +95,7 @@ const uiRun: Run = {
   rowsRead: 7,
   rowsAlreadyStored: 7,
   rowsWritten: 0,
+  rowsCategorised: 0,
   error: null,
 };
 
@@ -117,6 +122,8 @@ describe('imports page', () => {
       .toEqual(['9', '5', '0']);
     expect(rows.map((row) => row.find('[data-testid="import-run-written"]').text()))
       .toEqual(['3', '0', '0']);
+    expect(rows.map((row) => row.find('[data-testid="import-run-categorised"]').text()))
+      .toEqual(['2', '0', '0']);
     expect(rows[0]?.text()).toContain('2026-10-06 03:00:00 UTC');
     expect(rows[0]?.text()).toContain('Scheduled sync');
     expect(rows[1]?.text()).toContain('Manual import');

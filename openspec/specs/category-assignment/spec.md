@@ -9,17 +9,9 @@ reconciled when the category set changes. It settles the matching decisions the
 
 ## Requirements
 
-### Requirement: Assignment runs whenever the stored categories change
+### Requirement: A category change re-evaluates every stored transaction
 
-When the set of stored categories changes, by a create, an edit, or a delete, the system SHALL
-re-evaluate every stored transaction: the transaction's category SHALL be set to the category
-that wins the matching among the categories as they now stand, or the transaction SHALL be left
-uncategorised when no category matches. The evaluation SHALL be part of the same operation that
-changed the categories, so that once the operation has succeeded every stored reference agrees
-with the current expressions. The system SHALL NOT leave a transaction categorised by an
-expression that no longer matches it. A transaction stored after the last change to the category
-set SHALL stay uncategorised until the next such change, so an imported transaction is
-uncategorised until a category is created, edited, or deleted.
+When the set of stored categories changes, by a create, an edit, or a delete, the system SHALL re-evaluate every stored transaction and set its category to the category that wins the matching among the categories as they now stand, or leave it uncategorised when no category matches. The evaluation SHALL be part of the same operation that changed the categories, so no transaction is left categorised by an expression that no longer matches it.
 
 #### Scenario: Creating a category assigns it to matching transactions
 
@@ -36,10 +28,34 @@ uncategorised until a category is created, edited, or deleted.
 - **WHEN** a category is deleted
 - **THEN** no transaction holds it afterwards
 
-#### Scenario: A newly stored transaction waits for the next change
+### Requirement: An import assigns categories to the rows it writes
 
-- **WHEN** a transaction is imported while categories already exist, and no category is created, edited, or deleted afterwards
-- **THEN** the transaction stays uncategorised until the next change to the category set
+When an import writes transactions, the system SHALL evaluate each newly written transaction against the stored categories: a regular expression match is considered before a date window, and among matching categories the smallest identity wins. The transaction SHALL hold the winning category, or read as uncategorised when nothing matches. The evaluation SHALL cover only the rows the import wrote and SHALL be part of the write's single unit.
+
+#### Scenario: A new transaction matching an expression is categorised as it is imported
+
+- **WHEN** an import writes a transaction whose purpose line matches a stored category's expression
+- **THEN** the written transaction holds that category once the import has succeeded
+
+#### Scenario: A new transaction covered by a window is categorised as it is imported
+
+- **WHEN** an import writes a transaction that no stored expression matches but a stored category's date window covers by its booking date
+- **THEN** the written transaction holds that window's category
+
+#### Scenario: A new transaction that matches nothing is uncategorised
+
+- **WHEN** an import writes a transaction that no stored expression matches and no stored window covers
+- **THEN** the written transaction reads as uncategorised, and stays so until the next change to the category set
+
+#### Scenario: The import does not re-evaluate a transaction it did not write
+
+- **WHEN** the table already holds an uncategorised transaction from an earlier import and a later import writes other rows that match a stored category
+- **THEN** only the later import's rows are categorised, and the earlier transaction still reads as uncategorised
+
+#### Scenario: A failure leaves no assignment
+
+- **WHEN** an import fails while writing or evaluating its rows
+- **THEN** no transaction of that import exists and no stored transaction's category was changed
 
 ### Requirement: A category matches a purpose line as a case-insensitive substring
 

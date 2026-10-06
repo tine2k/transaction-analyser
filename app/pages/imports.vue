@@ -21,6 +21,7 @@ type ImportRun = {
   rowsRead: number;
   rowsAlreadyStored: number;
   rowsWritten: number;
+  rowsCategorised: number;
   error: string | null;
 };
 
@@ -151,6 +152,9 @@ function outcomeLabel(run: ImportRun): string {
               Already stored
             </th>
             <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-900">Written</th>
+            <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-900">
+              Categorised
+            </th>
             <th scope="col" class="px-3 py-2 font-semibold text-slate-900">Reason</th>
           </tr>
         </thead>
@@ -188,6 +192,12 @@ function outcomeLabel(run: ImportRun): string {
               data-testid="import-run-written"
             >
               {{ run.rowsWritten }}
+            </td>
+            <td
+              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900"
+              data-testid="import-run-categorised"
+            >
+              {{ run.rowsCategorised }}
             </td>
             <td class="px-3 py-2 text-slate-700" data-testid="import-run-error">{{ run.error ?? '' }}</td>
           </tr>

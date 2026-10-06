@@ -53,7 +53,7 @@ const USAGE = [
   EXPECTED_HEADER.join(DELIMITER),
   '',
   'A row already stored is skipped rather than imported again.',
-  'Every imported transaction is written with no category.',
+  'Each newly imported row is categorised by the categories stored at import time.',
 ].join('\n');
 
 function reportErrors(errors: RowError[]): void {
@@ -96,7 +96,7 @@ function reportPlan(plan: ImportPlan, file: string, dryRun: boolean): void {
     `Read ${plan.rowsRead} data row${plan.rowsRead === 1 ? '' : 's'} from "${file}", ` +
       `skipped ${plan.rowsAlreadyStored} already stored, and wrote ${plan.rowsWritten}.`,
   );
-  console.log('Every imported transaction is uncategorised.');
+  console.log(`${plan.rowsCategorised} of the written rows received a category.`);
 }
 
 async function main(): Promise<number> {
@@ -133,6 +133,7 @@ async function main(): Promise<number> {
         rowsRead,
         rowsAlreadyStored: 0,
         rowsWritten: 0,
+        rowsCategorised: 0,
         error: redact(reason),
       }).catch(() => undefined);
       throw error;
@@ -143,6 +144,7 @@ async function main(): Promise<number> {
       rowsRead: plan.rowsRead,
       rowsAlreadyStored: plan.rowsAlreadyStored,
       rowsWritten: plan.rowsWritten,
+      rowsCategorised: plan.rowsCategorised,
       error: null,
     });
 

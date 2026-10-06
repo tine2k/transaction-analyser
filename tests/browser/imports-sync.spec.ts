@@ -15,6 +15,7 @@ const scheduledRun = {
   rowsRead: 2,
   rowsAlreadyStored: 2,
   rowsWritten: 0,
+  rowsCategorised: 0,
   error: null,
 };
 
@@ -28,6 +29,7 @@ const uiRun = {
   rowsRead: 2,
   rowsAlreadyStored: 0,
   rowsWritten: 0,
+  rowsCategorised: 0,
   error: null,
 };
 

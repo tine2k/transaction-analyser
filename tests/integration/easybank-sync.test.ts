@@ -46,7 +46,7 @@ describe('easybank sync against PostgreSQL and a fake bank', () => {
 
   beforeEach(async () => {
     bank.mode = 'ok';
-    await connection().query('TRUNCATE transactions, import_runs RESTART IDENTITY CASCADE');
+    await connection().query('TRUNCATE transactions, categories, import_runs RESTART IDENTITY CASCADE');
   });
 
   afterAll(async () => {
@@ -108,6 +108,35 @@ describe('easybank sync against PostgreSQL and a fake bank', () => {
       counterparty_name: 'Mag. Hanna Maier',
       counterparty_account: 'AT611904300234573201',
     });
+  });
+
+  it('categorises a synced row that matches a stored category and records the count', async () => {
+    await connection().query("INSERT INTO categories (name, patterns) VALUES ('Streaming', ARRAY['netflix'])");
+
+    const result = await syncEasybank(connection(), options({ dryRun: false }));
+
+    expect(result.status).toBe('success');
+    if (result.status !== 'success') {
+      return;
+    }
+    expect(result.plan).toMatchObject({
+      rowsRead: 2,
+      rowsAlreadyStored: 0,
+      rowsWritten: 2,
+      rowsCategorised: 1,
+    });
+    const stored = await connection().query(
+      `SELECT t.counterparty_name, c.name AS category
+       FROM transactions AS t
+       LEFT JOIN categories AS c ON c.id = t.category_id
+       ORDER BY t.id`,
+    );
+    expect(stored.rows).toEqual([
+      { counterparty_name: 'Bezahlung Karte MC/0001', category: null },
+      { counterparty_name: 'Mag. Hanna Maier', category: 'Streaming' },
+    ]);
+    const runs = await connection().query('SELECT rows_written, rows_categorised FROM import_runs');
+    expect(runs.rows).toEqual([{ rows_written: 2, rows_categorised: 1 }]);
   });
 
   it('records a failed run when the bank refuses the login', async () => {

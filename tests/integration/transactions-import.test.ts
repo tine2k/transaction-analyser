@@ -63,6 +63,7 @@ async function runImport(text: string, dryRun = false): Promise<ImportPlan> {
       rowsRead: plan.rowsRead,
       rowsAlreadyStored: plan.rowsAlreadyStored,
       rowsWritten: plan.rowsWritten,
+      rowsCategorised: plan.rowsCategorised,
       error: null,
     });
     return plan;
@@ -73,6 +74,7 @@ async function runImport(text: string, dryRun = false): Promise<ImportPlan> {
       rowsRead,
       rowsAlreadyStored: 0,
       rowsWritten: 0,
+      rowsCategorised: 0,
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;
@@ -86,7 +88,7 @@ async function transactionCount(): Promise<number> {
 
 async function runs(): Promise<Array<Record<string, unknown>>> {
   const result = await connection().query(
-    'SELECT source, non_writing, outcome, rows_read, rows_already_stored, rows_written, error FROM import_runs ORDER BY id',
+    'SELECT source, non_writing, outcome, rows_read, rows_already_stored, rows_written, rows_categorised, error FROM import_runs ORDER BY id',
   );
   return result.rows as Array<Record<string, unknown>>;
 }
@@ -121,6 +123,7 @@ describe('transaction import against PostgreSQL', () => {
         rows_read: 2,
         rows_already_stored: 0,
         rows_written: 2,
+        rows_categorised: 0,
         error: null,
       },
     ]);
@@ -171,6 +174,112 @@ describe('transaction import against PostgreSQL', () => {
     expect(after.rows).toHaveLength(2);
   });
 
+  it('categorises a new row by expression and a new row by date window', async () => {
+    await connection().query("INSERT INTO categories (name, patterns) VALUES ('Groceries', ARRAY['shop'])");
+    await connection().query(
+      `INSERT INTO categories (name, patterns, windows)
+       VALUES ('Urlaub', ARRAY[]::text[], '[{"from":"2026-07-01","to":"2026-07-14"}]'::jsonb)`,
+    );
+
+    const plan = await runImport(
+      csv(
+        row({ purpose: 'Purchase at the shop' }),
+        row({ date: '05.07.2026', name: 'Souvenir', purpose: 'Holiday trinket' }),
+      ),
+    );
+
+    expect(plan).toMatchObject({ rowsRead: 2, rowsAlreadyStored: 0, rowsWritten: 2, rowsCategorised: 2 });
+    const stored = await connection().query(
+      `SELECT t.purpose, c.name AS category
+       FROM transactions AS t
+       LEFT JOIN categories AS c ON c.id = t.category_id
+       ORDER BY t.id`,
+    );
+    expect(stored.rows).toEqual([
+      { purpose: 'Purchase at the shop', category: 'Groceries' },
+      { purpose: 'Holiday trinket', category: 'Urlaub' },
+    ]);
+  });
+
+  it('leaves a new row uncategorised when no category matches', async () => {
+    await connection().query("INSERT INTO categories (name, patterns) VALUES ('Groceries', ARRAY['shop'])");
+
+    const plan = await runImport(csv(row({ name: 'Museum', purpose: 'Entry fee' })));
+
+    expect(plan).toMatchObject({ rowsWritten: 1, rowsCategorised: 0 });
+    const stored = await connection().query('SELECT category_id FROM transactions');
+    expect(stored.rows).toEqual([{ category_id: null }]);
+  });
+
+  it('does not re-evaluate a transaction it did not write', async () => {
+    await connection().query("INSERT INTO categories (name, patterns) VALUES ('Groceries', ARRAY['shop'])");
+    await connection().query(
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name)
+       VALUES ('2026-09-24', '2026-09-24', -1.00, 'Old shop purchase', 'Old Shop')`,
+    );
+
+    const plan = await runImport(csv(row({ purpose: 'A fresh shop purchase' })));
+
+    expect(plan).toMatchObject({ rowsWritten: 1, rowsCategorised: 1 });
+    const stored = await connection().query(
+      `SELECT t.purpose, c.name AS category
+       FROM transactions AS t
+       LEFT JOIN categories AS c ON c.id = t.category_id
+       ORDER BY t.id`,
+    );
+    expect(stored.rows).toEqual([
+      { purpose: 'Old shop purchase', category: null },
+      { purpose: 'A fresh shop purchase', category: 'Groceries' },
+    ]);
+  });
+
+  it('assigns no category in the non-writing mode', async () => {
+    await connection().query("INSERT INTO categories (name, patterns) VALUES ('Groceries', ARRAY['shop'])");
+    await connection().query(
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name)
+       VALUES ('2026-09-24', '2026-09-24', -1.00, 'Old shop purchase', 'Old Shop')`,
+    );
+
+    const plan = await runImport(csv(row({ purpose: 'A fresh shop purchase' })), true);
+
+    expect(plan).toMatchObject({ rowsRead: 1, rowsWritten: 0, rowsCategorised: 0 });
+    expect(await transactionCount()).toBe(1);
+    const stored = await connection().query('SELECT category_id FROM transactions');
+    expect(stored.rows).toEqual([{ category_id: null }]);
+  });
+
+  it('rolls back the rows and their categories when the assignment fails', async () => {
+    await connection().query("INSERT INTO categories (name, patterns) VALUES ('Groceries', ARRAY['purchase'])");
+    await connection().query(`
+      CREATE OR REPLACE FUNCTION test_fail_on_marked_assignment() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.purpose = 'MARKED' THEN
+          RAISE EXCEPTION 'forced assignment failure';
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    await connection().query(
+      'CREATE TRIGGER test_fail_on_marked_assignment BEFORE UPDATE ON transactions FOR EACH ROW EXECUTE FUNCTION test_fail_on_marked_assignment()',
+    );
+
+    try {
+      await expect(
+        runImport(csv(row(), row({ name: 'Doomed', purpose: 'MARKED' }))),
+      ).rejects.toThrow(/forced assignment failure/);
+      expect(await transactionCount()).toBe(0);
+      expect((await runs())[0]).toMatchObject({
+        outcome: 'failed',
+        rows_written: 0,
+        rows_categorised: 0,
+      });
+    } finally {
+      await connection().query('DROP TRIGGER test_fail_on_marked_assignment ON transactions');
+      await connection().query('DROP FUNCTION test_fail_on_marked_assignment()');
+    }
+  });
+
   it('refuses the whole file when one row is invalid and records the failure', async () => {
     await expect(
       runImport(csv(row(), row({ date: '31.02.2026' }))),
@@ -185,6 +294,7 @@ describe('transaction import against PostgreSQL', () => {
         rows_read: 2,
         rows_already_stored: 0,
         rows_written: 0,
+        rows_categorised: 0,
         error: '1 invalid row',
       },
     ]);
@@ -231,6 +341,7 @@ describe('transaction import against PostgreSQL', () => {
         rows_read: 2,
         rows_already_stored: 0,
         rows_written: 0,
+        rows_categorised: 0,
         error: null,
       },
     ]);

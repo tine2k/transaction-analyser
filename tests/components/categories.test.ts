@@ -116,6 +116,15 @@ describe('category management page', () => {
     )).toBe(true);
   });
 
+  it('centers every category table cell vertically', async () => {
+    const wrapper = await mountSuspended(Categories);
+    const cells = wrapper.findAll('th, td');
+
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells.every((cell) => cell.classes().includes('align-middle'))).toBe(true);
+    expect(cells.every((cell) => !cell.classes().includes('align-top'))).toBe(true);
+  });
+
   it('scrolls the edit form into view when an edit starts', async () => {
     const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
     const wrapper = await mountSuspended(Categories);

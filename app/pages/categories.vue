@@ -478,11 +478,11 @@ async function remove(category: Category): Promise<void> {
       <table class="w-max border-collapse text-left text-sm">
         <thead>
           <tr class="border-b border-slate-200">
-            <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Name</th>
-            <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Expression count</th>
-            <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Window count</th>
-            <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Analysis</th>
-            <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Actions</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Name</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Expression count</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Window count</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Analysis</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -491,15 +491,15 @@ async function remove(category: Category): Promise<void> {
             :key="category.id"
             class="border-b border-slate-100 odd:bg-white even:bg-slate-50"
           >
-            <td class="px-3 py-2 align-top text-slate-900">{{ category.name }}</td>
-            <td class="px-3 py-2 align-top text-slate-900">{{ category.patterns.length }}</td>
-            <td class="px-3 py-2 align-top text-slate-900" data-testid="category-window-count">
+            <td class="px-3 py-2 align-middle text-slate-900">{{ category.name }}</td>
+            <td class="px-3 py-2 align-middle text-slate-900">{{ category.patterns.length }}</td>
+            <td class="px-3 py-2 align-middle text-slate-900" data-testid="category-window-count">
               {{ category.windows.length }}
             </td>
-            <td class="px-3 py-2 align-top text-slate-900" data-testid="category-hidden-state">
+            <td class="px-3 py-2 align-middle text-slate-900" data-testid="category-hidden-state">
               {{ category.hidden ? 'Hidden' : 'Visible' }}
             </td>
-            <td class="px-3 py-2 align-top">
+            <td class="px-3 py-2 align-middle">
               <div class="flex gap-2">
                 <button
                   type="button"

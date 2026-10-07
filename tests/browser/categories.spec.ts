@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 // so the check exercises the screen rather than live category data.
 //
 // See openspec/changes/polish-categories-table/specs/category-management-screen/spec.md
+// and openspec/changes/center-categories-table-cells/specs/category-management-screen/spec.md
 
 const categories = Array.from({ length: 12 }, (_, index) => ({
   id: String(index + 1),
@@ -48,6 +49,27 @@ test('the category table takes only the space it needs and stripes its rows', as
   expect(colors[0]).not.toBe(colors[1]);
   expect(colors[1]).not.toBe(colors[2]);
   expect(colors[0]).toBe(colors[2]);
+});
+
+test('the category table centers cell values and row actions on one vertical axis', async ({ page }) => {
+  await interceptApi(page);
+  await page.goto('/categories', { waitUntil: 'networkidle' });
+
+  const row = page.locator('tbody tr').first();
+  const valueCenter = await row.locator('td').first().evaluate((cell) => {
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    const { top, height } = range.getBoundingClientRect();
+    return top + height / 2;
+  });
+
+  for (const name of ['Edit', 'Delete']) {
+    const controlCenter = await row.getByRole('button', { name }).evaluate((control) => {
+      const { top, height } = control.getBoundingClientRect();
+      return top + height / 2;
+    });
+    expect(Math.abs(valueCenter - controlCenter)).toBeLessThanOrEqual(1);
+  }
 });
 
 test('starting an edit scrolls the form into view with the category loaded', async ({ page }) => {

@@ -253,16 +253,26 @@ describe('transaction list filters', () => {
       .toEqual(['1']);
   });
 
-  it('lists only represented periods newest-first with each year before its year choice', async () => {
+  it('groups represented periods under Years and Months, newest first', async () => {
     const wrapper = await mountTransactions();
 
-    const options = wrapper.findAll('[data-testid="period-filter"] option');
-    expect(options.map((option) => [option.attributes('value'), option.text()])).toEqual([
+    const select = wrapper.get('[data-testid="period-filter"]');
+    expect(select.findAll('option').map((option) => [option.attributes('value'), option.text()])).toEqual([
       ['all', 'All periods'],
+      ['2026', '2026'],
       ['2026-03', 'March 2026'],
       ['2026-02', 'February 2026'],
-      ['2026', '2026 (year)'],
     ]);
+
+    const groups = select.findAll('optgroup');
+    expect(groups.map((group) => group.attributes('label'))).toEqual(['Years', 'Months']);
+    expect(groups[0]?.findAll('option').map((option) => [option.attributes('value'), option.text()]))
+      .toEqual([['2026', '2026']]);
+    expect(groups[1]?.findAll('option').map((option) => [option.attributes('value'), option.text()]))
+      .toEqual([
+        ['2026-03', 'March 2026'],
+        ['2026-02', 'February 2026'],
+      ]);
   });
 
   it('filters to a selected calendar year and excludes other years', async () => {
@@ -287,7 +297,7 @@ describe('transaction list filters', () => {
 
     expect(wrapper.findAll('[data-testid="period-filter"] option')
       .map((option) => option.attributes('value')))
-      .toEqual(['all', '2026-01', '2026', '2025-12', '2025']);
+      .toEqual(['all', '2026', '2025', '2026-01', '2025-12']);
 
     await wrapper.get('[data-testid="category-filter"]').setValue('all');
     await flushPromises();

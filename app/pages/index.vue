@@ -84,15 +84,16 @@ const categories = computed(() => {
 });
 
 type PeriodOption = { value: string; label: string };
+type PeriodGroups = { years: PeriodOption[]; months: PeriodOption[] };
 
 function isYearKey(value: string): boolean {
   return /^\d{4}$/.test(value);
 }
 
-// The period choices come from the returned transactions alone: each
-// represented year, newest first, lists that year's represented months before
-// the year's own whole-year choice.
-const periods = computed<PeriodOption[]>(() => {
+// The period choices come from the returned transactions alone: represented
+// calendar years newest first under a years group, and represented calendar
+// months newest first under a months group.
+const periods = computed<PeriodGroups>(() => {
   const monthsByYear = new Map<string, Set<string>>();
   for (const { bookingDate } of transactions.value ?? []) {
     const year = bookingDate.slice(0, 4);
@@ -108,13 +109,15 @@ const periods = computed<PeriodOption[]>(() => {
     months.add(month);
   }
 
-  const options: PeriodOption[] = [];
+  const years: PeriodOption[] = [];
+  const months: PeriodOption[] = [];
   for (const year of [...monthsByYear.keys()].sort((left, right) => right.localeCompare(left))) {
-    const months = [...(monthsByYear.get(year) ?? [])].sort((left, right) => right.localeCompare(left));
-    options.push(...months.map((key) => ({ value: key, label: monthLabel(key) })));
-    options.push({ value: year, label: `${year} (year)` });
+    years.push({ value: year, label: year });
+    for (const month of [...(monthsByYear.get(year) ?? [])].sort((left, right) => right.localeCompare(left))) {
+      months.push({ value: month, label: monthLabel(month) });
+    }
   }
-  return options;
+  return { years, months };
 });
 
 function categoryFromQuery(): string {
@@ -128,9 +131,10 @@ function categoryFromQuery(): string {
 }
 
 function periodFromQuery(): string {
+  const options = [...periods.value.years, ...periods.value.months];
   for (const key of ['month', 'year'] as const) {
     const requested = queryString(route.value.query[key]);
-    if (requested !== undefined && periods.value.some(({ value }) => value === requested)) {
+    if (requested !== undefined && options.some(({ value }) => value === requested)) {
       return requested;
     }
   }
@@ -550,9 +554,16 @@ onBeforeUnmount(() => {
             class="min-h-11 w-full max-w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:w-auto"
           >
             <option value="all">All periods</option>
-            <option v-for="period in periods" :key="period.value" :value="period.value">
-              {{ period.label }}
-            </option>
+            <optgroup v-if="periods.years.length > 0" label="Years">
+              <option v-for="period in periods.years" :key="period.value" :value="period.value">
+                {{ period.label }}
+              </option>
+            </optgroup>
+            <optgroup v-if="periods.months.length > 0" label="Months">
+              <option v-for="period in periods.months" :key="period.value" :value="period.value">
+                {{ period.label }}
+              </option>
+            </optgroup>
           </select>
         </label>
       </div>

@@ -94,7 +94,7 @@ The window defaults to the first day of the preceding calendar quarter through t
 
 ## What it does
 
-- **Transactions** - filterable by category and month, with the sum of displayed rows.
+- **Transactions** - filterable by category and month, with the sum of displayed rows; select text to add it as a pattern to a category without leaving the table.
 - **Categories** - regular expressions and inclusive date windows assign transactions, with match previews and a hidden flag.
 - **Analytics** - category spending pie charts for each of the last 12 months.
 - **Monthly totals** - a month-by-category matrix over every month with data.

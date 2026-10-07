@@ -11,8 +11,19 @@ import { formatEuroAmount, sumSignedAmountStrings } from '../utils/category-spen
 // runs on the client and the template's pending state shows while it is in
 // flight.
 //
-// See openspec/changes/add-transactions-table/specs/transaction-table/spec.md
-// and openspec/changes/disable-server-side-rendering/specs/frontend-shell/spec.md
+// The page also carries the transaction pattern shortcut. A selection of at
+// least three characters inside one table cell raises a fixed action bar that
+// names the captured text, previews the stored transactions the text matches,
+// and offers the stored categories. Choosing a category appends the text as a
+// literal pattern through the category management surface; the browser never
+// evaluates an expression and never assigns a category itself. Appends may
+// overlap: each affected row carries a marker until one coalesced background
+// read reflects the result, and the table's own loading state is never used for
+// a refresh.
+//
+// See openspec/changes/add-transactions-table/specs/transaction-table/spec.md,
+// openspec/changes/disable-server-side-rendering/specs/frontend-shell/spec.md,
+// and openspec/changes/add-transaction-pattern-shortcut/specs/transaction-pattern-shortcut/spec.md
 type Category = { id: string; name: string };
 
 type Transaction = {
@@ -26,7 +37,23 @@ type Transaction = {
   category: Category | null;
 };
 
+// A category as the management surface returns it. The shortcut only offers the
+// name and marks the hidden flag; the full shape is kept so an append response
+// can replace the entry in place without another read.
+type StoredCategory = {
+  id: string;
+  name: string;
+  patterns: string[];
+  hidden: boolean;
+  windows: Array<{ from: string; to: string }>;
+};
+
+type CapturedSelection = { text: string; transactionId: string };
+
 const { data: transactions, error, pending } = useFetch<Transaction[]>('/api/transactions');
+const { data: storedCategories } = useFetch<StoredCategory[]>('/api/categories', {
+  default: () => [],
+});
 const router = useRouter();
 const route = router.currentRoute;
 
@@ -145,10 +172,310 @@ const visibleTransactions = computed(() =>
 const visibleTotal = computed(() =>
   sumSignedAmountStrings(visibleTransactions.value.map(({ amount }) => amount)),
 );
+
+// The shortcut's own state. `captured` holds the current single-cell selection;
+// `markers` counts, per transaction row, the appends whose result is not yet
+// reflected; `inFlight` counts the appends that have not settled.
+const tableRegion = ref<HTMLElement | null>(null);
+const captured = ref<CapturedSelection | null>(null);
+const previewState = ref<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+const previewCount = ref<number | null>(null);
+const statusMessage = ref<string | null>(null);
+const statusKind = ref<'info' | 'error'>('info');
+const inFlight = ref(new Map<number, string>());
+const markers = ref(new Map<string, number>());
+let appendSequence = 0;
+
+const pickerCategories = computed(() =>
+  [...(storedCategories.value ?? [])].sort((left, right) =>
+    left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
+    || left.id.localeCompare(right.id, undefined, { numeric: true }),
+  ),
+);
+
+const inFlightCount = computed(() => inFlight.value.size);
+
+// A failure is never hidden behind the in-flight count; otherwise the count is
+// what the bar reports while writes run.
+const barStatus = computed(() => {
+  if (statusKind.value === 'error' && statusMessage.value !== null) {
+    return statusMessage.value;
+  }
+  if (inFlightCount.value > 0) {
+    return `${inFlightCount.value} update${inFlightCount.value === 1 ? '' : 's'} applying…`;
+  }
+  return statusMessage.value;
+});
+
+const shortcutVisible = computed(() => captured.value !== null || barStatus.value !== null);
+
+let previewGeneration = 0;
+let previewTimer: ReturnType<typeof setTimeout> | null = null;
+
+function resetPreview(): void {
+  previewGeneration += 1;
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer);
+    previewTimer = null;
+  }
+  previewState.value = 'idle';
+  previewCount.value = null;
+}
+
+// The preview is debounced like the category form's, and a superseded request
+// can never overwrite a newer one.
+function loadPreview(text: string): void {
+  const generation = ++previewGeneration;
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer);
+  }
+  previewState.value = 'loading';
+  previewCount.value = null;
+  previewTimer = setTimeout(() => {
+    previewTimer = null;
+    void fetchPreview(generation, text);
+  }, 250);
+}
+
+async function fetchPreview(generation: number, text: string): Promise<void> {
+  try {
+    const result = await $fetch<{ count: number }>('/api/categories/literal-match-count', {
+      method: 'POST',
+      body: { text },
+    });
+    if (generation !== previewGeneration) {
+      return;
+    }
+    if (!Number.isSafeInteger(result.count) || result.count < 0) {
+      previewState.value = 'unavailable';
+      return;
+    }
+    previewCount.value = result.count;
+    previewState.value = 'ready';
+  } catch {
+    if (generation === previewGeneration) {
+      previewCount.value = null;
+      previewState.value = 'unavailable';
+    }
+  }
+}
+
+function elementOf(node: Node): Element | null {
+  return node.nodeType === 1 ? node as Element : node.parentElement;
+}
+
+// A selection only counts when both of its ends sit in the same table cell, so
+// a drag across cells cannot produce a pattern.
+function selectedCell(selection: Selection): HTMLElement | null {
+  if (selection.rangeCount === 0) {
+    return null;
+  }
+  const range = selection.getRangeAt(0);
+  const startCell = elementOf(range.startContainer)?.closest('td') ?? null;
+  const endCell = elementOf(range.endContainer)?.closest('td') ?? null;
+  return startCell !== null && startCell === endCell ? startCell : null;
+}
+
+function focusWithinBar(): boolean {
+  return document.activeElement !== null
+    && document.activeElement.closest('[data-testid="pattern-shortcut-bar"]') !== null;
+}
+
+function clearCaptured(): void {
+  captured.value = null;
+  resetPreview();
+}
+
+function handleSelectionChange(): void {
+  const selection = window.getSelection();
+  const cell = selection === null ? null : selectedCell(selection);
+  const insideTable = cell !== null && tableRegion.value !== null && tableRegion.value.contains(cell);
+  const text = insideTable ? (selection?.toString() ?? '').trim() : '';
+  const transactionId = insideTable
+    ? cell?.closest('tr')?.getAttribute('data-transaction-id') ?? null
+    : null;
+
+  if (!insideTable || [...text].length < 3 || transactionId === null) {
+    // Focusing the bar's own control collapses the document selection, so the
+    // captured text must survive that.
+    if (!focusWithinBar()) {
+      clearCaptured();
+    }
+    return;
+  }
+
+  captured.value = { text, transactionId };
+  loadPreview(text);
+}
+
+function dismissShortcut(): void {
+  clearCaptured();
+}
+
+function handleKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && captured.value !== null) {
+    clearCaptured();
+  }
+}
+
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let refreshGeneration = 0;
+let statusTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearStatus(): void {
+  statusMessage.value = null;
+  statusKind.value = 'info';
+  if (statusTimer !== null) {
+    clearTimeout(statusTimer);
+    statusTimer = null;
+  }
+}
+
+function showStatus(message: string, kind: 'info' | 'error', transient: boolean): void {
+  clearStatus();
+  statusMessage.value = message;
+  statusKind.value = kind;
+  if (transient) {
+    statusTimer = setTimeout(() => {
+      statusTimer = null;
+      statusMessage.value = null;
+    }, 4000);
+  }
+}
+
+function messageOf(failure: unknown): string {
+  const message = (failure as { data?: { message?: unknown } }).data?.message;
+  return typeof message === 'string' && message !== '' ? message : 'The request could not be completed.';
+}
+
+function markRow(transactionId: string): void {
+  markers.value.set(transactionId, (markers.value.get(transactionId) ?? 0) + 1);
+}
+
+function unmarkRow(transactionId: string): void {
+  const count = markers.value.get(transactionId) ?? 0;
+  if (count <= 1) {
+    markers.value.delete(transactionId);
+  } else {
+    markers.value.set(transactionId, count - 1);
+  }
+}
+
+function updateStoredCategory(category: StoredCategory): void {
+  const list = storedCategories.value ?? [];
+  const index = list.findIndex((entry) => entry.id === category.id);
+  storedCategories.value = index === -1
+    ? [...list, category]
+    : [...list.slice(0, index), category, ...list.slice(index + 1)];
+}
+
+async function chooseCategory(categoryId: string): Promise<void> {
+  const selection = captured.value;
+  if (selection === null) {
+    return;
+  }
+  const chosen = pickerCategories.value.find((category) => category.id === categoryId);
+  const preview = { state: previewState.value, count: previewCount.value };
+  const requestId = ++appendSequence;
+
+  captured.value = null;
+  resetPreview();
+  clearStatus();
+  inFlight.value.set(requestId, selection.transactionId);
+  markRow(selection.transactionId);
+
+  try {
+    const result = await $fetch<{ category: StoredCategory; added: boolean }>(
+      `/api/categories/${categoryId}/patterns`,
+      { method: 'POST', body: { text: selection.text } },
+    );
+    updateStoredCategory(result.category);
+    showStatus(
+      result.added ? `Added to ${result.category.name}` : `Already in ${result.category.name}`,
+      'info',
+      true,
+    );
+  } catch (failure) {
+    showStatus(`Could not add to ${chosen?.name ?? 'the category'}: ${messageOf(failure)}`, 'error', false);
+    unmarkRow(selection.transactionId);
+    // The bar returns with the captured text unless a newer selection has
+    // already replaced it, so a retry needs no re-selection.
+    if (captured.value === null) {
+      captured.value = selection;
+      if (preview.state === 'ready') {
+        previewState.value = preview.state;
+        previewCount.value = preview.count;
+      } else {
+        loadPreview(selection.text);
+      }
+    }
+  } finally {
+    inFlight.value.delete(requestId);
+    if (inFlight.value.size === 0) {
+      scheduleRefresh();
+    }
+  }
+}
+
+// One read after the last append settles collapses a burst of appends into a
+// single background refresh. The response is assigned to the existing data ref,
+// so the table's own loading state is never raised.
+function scheduleRefresh(): void {
+  if (refreshTimer !== null) {
+    clearTimeout(refreshTimer);
+  }
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    void refreshTransactions();
+  }, 300);
+}
+
+async function refreshTransactions(): Promise<void> {
+  const generation = ++refreshGeneration;
+  try {
+    const fresh = await $fetch<Transaction[]>('/api/transactions');
+    if (generation !== refreshGeneration) {
+      return;
+    }
+    transactions.value = fresh;
+    const inFlightRows = new Set(inFlight.value.values());
+    for (const transactionId of [...markers.value.keys()]) {
+      if (!inFlightRows.has(transactionId)) {
+        markers.value.delete(transactionId);
+      }
+    }
+  } catch {
+    if (generation !== refreshGeneration) {
+      return;
+    }
+    showStatus('The transactions could not be refreshed.', 'error', false);
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('selectionchange', handleSelectionChange);
+  document.addEventListener('keydown', handleKeydown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('selectionchange', handleSelectionChange);
+  document.removeEventListener('keydown', handleKeydown);
+  previewGeneration += 1;
+  refreshGeneration += 1;
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer);
+  }
+  if (refreshTimer !== null) {
+    clearTimeout(refreshTimer);
+  }
+  if (statusTimer !== null) {
+    clearTimeout(statusTimer);
+  }
+});
 </script>
 
 <template>
-  <div>
+  <div :class="{ 'pb-28': shortcutVisible }">
     <h1 class="text-2xl font-bold text-slate-900">Transactions</h1>
 
     <p v-if="error" class="mt-4 text-slate-600">
@@ -205,6 +532,7 @@ const visibleTotal = computed(() =>
           Scroll horizontally to view all transaction columns.
         </p>
         <div
+          ref="tableRegion"
           role="region"
           aria-label="Transactions table"
           aria-describedby="transactions-scroll-help"
@@ -229,6 +557,7 @@ const visibleTotal = computed(() =>
               v-for="transaction in visibleTransactions"
               :key="transaction.id"
               :data-transaction-id="transaction.id"
+              :aria-busy="markers.has(transaction.id) ? 'true' : undefined"
               class="border-b border-slate-100"
             >
               <td class="px-3 py-2 whitespace-nowrap text-slate-900">
@@ -250,6 +579,12 @@ const visibleTotal = computed(() =>
                 </template>
               </td>
               <td class="px-3 py-2 text-slate-900">
+                <span
+                  v-if="markers.has(transaction.id)"
+                  aria-hidden="true"
+                  data-testid="row-updating"
+                  class="mr-1 inline-block size-2 rounded-full bg-slate-400 align-middle"
+                ></span>
                 <template v-if="transaction.category !== null">
                   {{ transaction.category.name }}
                 </template>
@@ -257,6 +592,7 @@ const visibleTotal = computed(() =>
                   <span aria-hidden="true" class="text-slate-400">—</span>
                   <span class="sr-only">Uncategorised</span>
                 </template>
+                <span v-if="markers.has(transaction.id)" class="sr-only">Updating category</span>
               </td>
             </tr>
           </tbody>
@@ -264,5 +600,16 @@ const visibleTotal = computed(() =>
         </div>
       </div>
     </template>
+
+    <PatternShortcutBar
+      :text="captured?.text ?? null"
+      :categories="pickerCategories"
+      :preview-state="previewState"
+      :preview-count="previewCount"
+      :status="barStatus"
+      :status-kind="statusKind"
+      @choose="chooseCategory"
+      @dismiss="dismissShortcut"
+    />
   </div>
 </template>

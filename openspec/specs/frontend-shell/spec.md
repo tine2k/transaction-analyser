@@ -181,8 +181,9 @@ NOT run a statement against the database. The browser MAY start the Easybank syn
 sync-start endpoint, as `easybank-sync` defines; a run that request starts writes through the
 server process and the shared import path, not through the browser, and the browser cannot change a
 recorded run. The shell's relationship to stored data SHALL be through same-origin API requests:
-stored data is read through read-only requests, and the sync-start request is the only request that
-can lead to stored data being written. The transaction table SHALL present
+stored data is read through read-only requests, and a write is requested through the category
+management surface or the sync-start endpoint and is performed by the server, never by the browser
+itself. The transaction table SHALL present
 transaction values exactly as the endpoint returned them. Apart from the two transaction filter
 counts, the selected view of returned transactions, the monthly aggregations defined by
 `category-spending-chart`, `monthly-category-totals-table`, and `monthly-category-average`, and
@@ -192,7 +193,7 @@ derive a value from transaction data for display.
 #### Scenario: No category pattern is evaluated
 
 - **WHEN** the application runs
-- **THEN** no category's regular expression is evaluated anywhere, and no transaction is assigned a category
+- **THEN** no category's regular expression is evaluated by the browser, and no transaction is assigned a category by the browser
 
 #### Scenario: Only the filter counts are derived from transactions
 
@@ -212,7 +213,12 @@ derive a value from transaction data for display.
 #### Scenario: No row is written
 
 - **WHEN** the browser uses the application
-- **THEN** no row is created, altered, or deleted by the browser itself, because the only request that can lead to a write is the sync-start request and the server performs that write
+- **THEN** no row is created, altered, or deleted by the browser itself, because a write is requested through the category management surface or the sync-start endpoint and the server performs it
+
+#### Scenario: The category write is the server's
+
+- **WHEN** a pattern is appended through the transaction shortcut
+- **THEN** the browser sends the captured text in a same-origin request to the category management surface, evaluates no expression, and the server stores the pattern and applies the assignment
 
 #### Scenario: The sync can be started from the imports screen
 

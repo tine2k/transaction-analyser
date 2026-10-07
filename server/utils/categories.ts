@@ -17,10 +17,22 @@
 // connection taken from the shared pool, so stored references are never observed
 // half-changed.
 //
+// A category can also gain one literal pattern at a time: the transaction
+// shortcut sends text a user selected, and `appendPattern` escapes it so the
+// stored expression matches that text literally. The append is one conditional
+// UPDATE, so a stale client cannot overwrite another tab's patterns, windows,
+// or hidden flag.
+//
+// Every mutation takes a transaction-scoped advisory lock before it touches
+// data. The re-evaluation reads the whole category set, so two concurrent
+// mutations could otherwise interleave their re-evaluations and leave the final
+// assignments reflecting only one of them.
+//
 // See openspec/changes/allow-multiple-category-expressions/specs/category-management-api/spec.md
 // and openspec/changes/allow-multiple-category-expressions/specs/category-assignment/spec.md
 import type { Pool, PoolClient } from 'pg';
 import { matchingCategorySql } from '../../shared/category-assignment';
+import { escapeLiteralPattern } from '../../shared/literal-pattern';
 import { useDatabase } from './db';
 
 // A category's date window: two full calendar dates at day precision, both
@@ -58,6 +70,18 @@ const SELECT_CATEGORIES = `
   ORDER BY id
 `;
 
+const SELECT_CATEGORY = `
+  SELECT id, name, patterns, hidden, windows
+  FROM categories
+  WHERE id = $1
+`;
+
+// One advisory-lock key shared by every category mutation. The value is
+// arbitrary but must not collide with another advisory lock in this
+// application. It is taken inside the write transaction and released when the
+// transaction ends.
+const CATEGORY_MUTATION_LOCK_KEY = 20261007;
+
 const INSERT_CATEGORY = `
   INSERT INTO categories (name, patterns, hidden, windows)
   VALUES ($1, $2, $3, $4::jsonb)
@@ -68,6 +92,17 @@ const UPDATE_CATEGORY = `
   UPDATE categories
   SET name = $2, patterns = $3, hidden = $4, windows = $5::jsonb
   WHERE id = $1
+  RETURNING id, name, patterns, hidden, windows
+`;
+
+// Appends one escaped literal to a category, but only when the category does
+// not already store it. The guard makes the append idempotent and atomic: the
+// row is extended in place rather than replaced from a client-side snapshot, so
+// a concurrent append to the same category cannot be lost.
+const APPEND_PATTERN = `
+  UPDATE categories
+  SET patterns = patterns || $2::text
+  WHERE id = $1 AND NOT patterns @> ARRAY[$2::text]
   RETURNING id, name, patterns, hidden, windows
 `;
 
@@ -183,6 +218,22 @@ export async function countCategoryMatches(input: unknown): Promise<number> {
   return count;
 }
 
+// Previews the transactions a literal text matches. The text is escaped by the
+// same function the append uses, so what is counted is what would be stored. It
+// reads only: no category is created or changed and no transaction is
+// re-evaluated.
+export async function countLiteralMatches(input: unknown): Promise<number> {
+  const pattern = escapeLiteralPattern(readLiteralText(input));
+  const database = useDatabase();
+
+  const result = await database.query(COUNT_MATCHING_TRANSACTIONS, [[pattern]]);
+  const count = Number(result.rows[0]?.count);
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error('the transaction match count is outside the supported range');
+  }
+  return count;
+}
+
 // Previews the transactions a candidate window set would claim. It reads only:
 // unlike create and edit, it stores nothing and triggers no reassignment. It
 // validates the windows exactly as a write does, but deliberately does not apply
@@ -212,6 +263,7 @@ export async function createCategory(input: unknown): Promise<Category> {
   await assertPatternsCompile(database, patterns);
 
   return inTransaction(database, async (client) => {
+    await lockCategoryMutations(client);
     await assertWindowsDoNotOverlap(client, windows, null);
     const inserted = await client.query(INSERT_CATEGORY, [
       name,
@@ -231,6 +283,7 @@ export async function editCategory(id: string, input: unknown): Promise<Category
   await assertPatternsCompile(database, patterns);
 
   return inTransaction(database, async (client) => {
+    await lockCategoryMutations(client);
     await assertWindowsDoNotOverlap(client, windows, id);
     const updated = await client.query(UPDATE_CATEGORY, [
       id,
@@ -247,11 +300,43 @@ export async function editCategory(id: string, input: unknown): Promise<Category
   });
 }
 
+// Appends one literal pattern to the category the identity names. The text is
+// escaped so the stored expression matches it literally, and the conditional
+// update makes the append atomic and idempotent. A real change re-evaluates the
+// stored transactions in the same transaction; an append that stores nothing
+// changes nothing and reports that.
+export async function appendPattern(
+  id: string,
+  input: unknown,
+): Promise<{ category: Category; added: boolean }> {
+  assertIdentity(id);
+  const pattern = escapeLiteralPattern(readLiteralText(input));
+  const database = useDatabase();
+
+  return inTransaction(database, async (client) => {
+    await lockCategoryMutations(client);
+    const updated = await client.query(APPEND_PATTERN, [id, pattern]);
+    if ((updated.rowCount ?? 0) > 0) {
+      await client.query(RECOMPUTE_ASSIGNMENTS);
+      return { category: updated.rows[0] as Category, added: true };
+    }
+
+    // The update matched no row: either the category does not exist, or it
+    // already stores the pattern. The select tells the two apart.
+    const existing = await client.query(SELECT_CATEGORY, [id]);
+    if ((existing.rowCount ?? 0) === 0) {
+      throw new CategoryError(404, 'no category carries that identity');
+    }
+    return { category: existing.rows[0] as Category, added: false };
+  });
+}
+
 export async function deleteCategory(id: string): Promise<void> {
   assertIdentity(id);
   const database = useDatabase();
 
   await inTransaction(database, async (client) => {
+    await lockCategoryMutations(client);
     await client.query(REASSIGN_RETIRING_CATEGORY, [id]);
     const deleted = await client.query(DELETE_CATEGORY, [id]);
     if (deleted.rowCount === 0) {
@@ -285,6 +370,14 @@ export function throwCategoryHttpError(error: unknown): never {
     statusMessage: 'Internal Server Error',
     message: 'the category request could not be completed',
   });
+}
+
+// Serializes every mutation that changes the category set, so the re-evaluation
+// one mutation triggers cannot read a category set another mutation is
+// concurrently changing. The lock is transaction-scoped: the commit or rollback
+// the caller performs releases it.
+async function lockCategoryMutations(client: PoolClient): Promise<void> {
+  await client.query('SELECT pg_advisory_xact_lock($1)', [CATEGORY_MUTATION_LOCK_KEY]);
 }
 
 async function inTransaction<T>(
@@ -433,6 +526,24 @@ function readHidden(input: unknown): boolean {
     throw new CategoryError(400, 'the hidden flag must be a boolean');
   }
   return hidden;
+}
+
+// The literal text of an append or a literal preview. It must be a string whose
+// trimmed form holds at least three characters; the trim means surrounding
+// whitespace neither counts toward the length nor reaches the stored pattern.
+function readLiteralText(input: unknown): string {
+  if (typeof input !== 'object' || input === null) {
+    throw new CategoryError(400, 'a literal pattern needs at least three characters of text');
+  }
+  const text = (input as { text?: unknown }).text;
+  if (typeof text !== 'string') {
+    throw new CategoryError(400, 'the pattern text must be a string');
+  }
+  const trimmed = text.trim();
+  if ([...trimmed].length < 3) {
+    throw new CategoryError(400, 'the pattern text must be at least three characters');
+  }
+  return trimmed;
 }
 
 function readPatterns(input: unknown): string[] {

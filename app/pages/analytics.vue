@@ -4,19 +4,23 @@ import {
   CATEGORY_COLOR_PALETTE,
   createCategoryColorMap,
   createMonthlyCategoryChartData,
+  createYearlyCategoryChartData,
   formatEuroAmount,
   getLocalDateString,
-  type CategoryPieDatum,
-  type CategorySpendingTransaction,
-  type MonthlyCategoryChartData,
   getMonthlyCategorySpendingTotals,
+  getYearlyCategorySpendingTotals,
+  groupTransactionsByAvailableYear,
   groupTransactionsByMonth,
+  type CategoryPieDatum,
+  type CategorySpendingTotal,
+  type CategorySpendingTransaction,
 } from '../utils/category-spending';
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
 const router = useRouter();
 const today = getLocalDateString(new Date());
 const hideUncategorised = ref(false);
+const view = ref<'months' | 'years'>('months');
 
 const monthlyCharts = computed(() =>
   createMonthlyCategoryChartData(
@@ -24,19 +28,39 @@ const monthlyCharts = computed(() =>
   ),
 );
 
-const categoryColorMap = computed(() => createCategoryColorMap(
-  monthlyCharts.value.flatMap(({ totals }) => totals.map(({ key }) => key)),
-));
+const yearlyCharts = computed(() =>
+  createYearlyCategoryChartData(
+    getYearlyCategorySpendingTotals(groupTransactionsByAvailableYear(transactions.value ?? [])),
+  ),
+);
 
-const displayedMonthlyCharts = computed(() => monthlyCharts.value.map((month) => ({
-  ...month,
-  totals: hideUncategorised.value
-    ? month.totals.filter(({ key }) => key !== 'uncategorised')
-    : month.totals,
-  pieData: hideUncategorised.value
-    ? month.pieData.filter(({ key }) => key !== 'uncategorised')
-    : month.pieData,
-})));
+// One map over both views keeps a category's color stable when the view
+// changes, in addition to keeping it stable within a view.
+const categoryColorMap = computed(() => createCategoryColorMap([
+  ...monthlyCharts.value.flatMap(({ totals }) => totals.map(({ key }) => key)),
+  ...yearlyCharts.value.flatMap(({ totals }) => totals.map(({ key }) => key)),
+]));
+
+type DisplayedChart = {
+  key: string;
+  label: string;
+  totals: CategorySpendingTotal[];
+  pieData: CategoryPieDatum[];
+};
+
+function withoutUncategorised<T extends DisplayedChart>(chart: T): T {
+  if (!hideUncategorised.value) {
+    return chart;
+  }
+  return {
+    ...chart,
+    totals: chart.totals.filter(({ key }) => key !== 'uncategorised'),
+    pieData: chart.pieData.filter(({ key }) => key !== 'uncategorised'),
+  };
+}
+
+const displayedMonthlyCharts = computed(() => monthlyCharts.value.map(withoutUncategorised));
+const displayedYearlyCharts = computed(() => yearlyCharts.value.map(withoutUncategorised));
 
 function categoryColor(key: string): string {
   return categoryColorMap.value.get(key) ?? CATEGORY_COLOR_PALETTE[0];
@@ -64,14 +88,14 @@ function categoryFilterValue(key: string): string {
   return key === 'uncategorised' ? 'uncategorised' : key.replace(/^category:/, '');
 }
 
-function transactionLocation(month: string, categoryKey: string) {
+function transactionLocation(periodKey: 'month' | 'year', period: string, categoryKey: string) {
   return {
     path: '/',
-    query: { month, category: categoryFilterValue(categoryKey) },
+    query: { [periodKey]: period, category: categoryFilterValue(categoryKey) },
   };
 }
 
-function onPieSliceClick(parameter: unknown, month: string): void {
+function onPieSliceClick(parameter: unknown, periodKey: 'month' | 'year', period: string): void {
   const item = parameter as { data?: { key?: unknown } } | undefined;
   if (typeof item?.data?.key !== 'string') {
     return;
@@ -80,10 +104,10 @@ function onPieSliceClick(parameter: unknown, month: string): void {
   if (key !== 'uncategorised' && !key.startsWith('category:')) {
     return;
   }
-  void router.push(transactionLocation(month, key));
+  void router.push(transactionLocation(periodKey, period, key));
 }
 
-function chartOption(month: MonthlyCategoryChartData): EChartsOption {
+function chartOption(chart: DisplayedChart): EChartsOption {
   return {
     tooltip: {
       trigger: 'item',
@@ -95,7 +119,7 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
       radius: '68%',
       minShowLabelAngle: 0,
       labelLayout: { hideOverlap: false },
-      data: month.pieData.map((datum) => {
+      data: chart.pieData.map((datum) => {
         const color = categoryColor(datum.key);
         return {
           ...datum,
@@ -113,7 +137,9 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
   <div>
     <h1 class="text-2xl font-bold text-slate-900">Category spending</h1>
     <p class="mt-2 text-sm text-slate-600">
-      Absolute transaction totals by category for each of the last 12 months.
+      {{ view === 'months'
+        ? 'Absolute transaction totals by category for each of the last 12 months.'
+        : 'Absolute transaction totals by category for every calendar year with transaction data.' }}
     </p>
 
     <p v-if="error" class="mt-4 text-slate-600">
@@ -121,7 +147,33 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
     </p>
     <p v-else-if="pending" class="mt-4 text-slate-600">Loading monthly category totals…</p>
     <template v-else-if="transactions">
-      <label class="mt-4 inline-flex min-h-11 items-center gap-3 py-2 text-sm text-slate-700">
+      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-700" data-testid="view-switch">
+        <legend class="sr-only">Category spending view</legend>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="view"
+            type="radio"
+            name="analytics-view"
+            value="months"
+            data-testid="view-months"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          Months
+        </label>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="view"
+            type="radio"
+            name="analytics-view"
+            value="years"
+            data-testid="view-years"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          Years
+        </label>
+      </fieldset>
+
+      <label class="mt-2 inline-flex min-h-11 items-center gap-3 py-2 text-sm text-slate-700">
         <input
           v-model="hideUncategorised"
           type="checkbox"
@@ -131,7 +183,11 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
         Hide uncategorised
       </label>
 
-      <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3" data-testid="monthly-charts">
+      <div
+        v-if="view === 'months'"
+        class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
+        data-testid="monthly-charts"
+      >
         <section
           v-for="month in displayedMonthlyCharts"
           :key="month.key"
@@ -152,7 +208,7 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
           <figure class="mt-3 min-w-0">
             <figcaption class="sr-only">Pie chart of absolute transaction totals for {{ month.label }}</figcaption>
             <ClientOnly>
-              <CategoryPieChart :option="chartOption(month)" @click="onPieSliceClick($event, month.key)" />
+              <CategoryPieChart :option="chartOption(month)" @click="onPieSliceClick($event, 'month', month.key)" />
             </ClientOnly>
           </figure>
 
@@ -167,7 +223,7 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
               data-testid="category-total"
             >
               <NuxtLink
-                :to="transactionLocation(month.key, total.key)"
+                :to="transactionLocation('month', month.key, total.key)"
                 :aria-label="`View ${total.name} transactions for ${month.label}`"
                 class="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
                 data-testid="category-transaction-link"
@@ -189,6 +245,77 @@ function chartOption(month: MonthlyCategoryChartData): EChartsOption {
           </ul>
         </section>
       </div>
+
+      <div
+        v-else
+        class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
+        data-testid="yearly-charts"
+      >
+        <section
+          v-for="year in displayedYearlyCharts"
+          :key="year.key"
+          class="min-w-0 rounded-md border border-slate-200 bg-white p-4"
+          data-testid="year-panel"
+          :data-year-key="year.key"
+        >
+          <h2 class="text-lg font-semibold text-slate-900">
+            <NuxtLink
+              :to="{ path: '/', query: { year: year.key, category: 'all' } }"
+              :aria-label="`View all transactions for ${year.label}`"
+              class="hover:underline"
+              data-testid="year-link"
+            >
+              {{ year.label }}
+            </NuxtLink>
+          </h2>
+          <figure class="mt-3 min-w-0">
+            <figcaption class="sr-only">Pie chart of absolute transaction totals for {{ year.label }}</figcaption>
+            <ClientOnly>
+              <CategoryPieChart :option="chartOption(year)" @click="onPieSliceClick($event, 'year', year.key)" />
+            </ClientOnly>
+          </figure>
+
+          <p v-if="year.totals.length === 0" class="mt-2 text-sm text-slate-600">
+            No category data for {{ year.label }}.
+          </p>
+          <ul v-else aria-label="Category totals" class="mt-2 grid min-w-0 gap-2 text-sm">
+            <li
+              v-for="total in year.totals"
+              :key="total.key"
+              class="min-w-0"
+              data-testid="category-total"
+            >
+              <NuxtLink
+                :to="transactionLocation('year', year.key, total.key)"
+                :aria-label="`View ${total.name} transactions for ${year.label}`"
+                class="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                data-testid="category-transaction-link"
+              >
+                <span class="flex min-w-0 flex-1 items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    class="h-3 w-3 shrink-0 rounded-full"
+                    data-testid="category-color"
+                    :style="{ backgroundColor: categoryColor(total.key) }"
+                  />
+                  <span class="min-w-0 break-words text-slate-700">{{ total.name }}</span>
+                </span>
+                <span class="max-w-[55%] shrink-0 break-words text-right tabular-nums font-medium text-slate-900">
+                  {{ formatEuroAmount(total.amount) }}
+                </span>
+              </NuxtLink>
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <p
+        v-if="view === 'years' && displayedYearlyCharts.length === 0"
+        class="mt-4 text-sm text-slate-600"
+        data-testid="no-year-data"
+      >
+        No category data for any year.
+      </p>
     </template>
   </div>
 </template>

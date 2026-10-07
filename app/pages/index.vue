@@ -2,7 +2,7 @@
 import { formatEuroAmount, sumSignedAmountStrings } from '../utils/category-spending';
 
 // The index route reads stored transactions from the read-only GET
-// /api/transactions endpoint. Category and booking-month filters are derived
+// /api/transactions endpoint. Category and booking-period filters are derived
 // from that response and represented in the route query. The values are
 // presented exactly as returned: amounts remain signed decimal strings, and
 // dates remain day-precise strings.
@@ -83,17 +83,38 @@ const categories = computed(() => {
   );
 });
 
-const months = computed(() => {
-  const keys = new Set((transactions.value ?? [])
-    .map(({ bookingDate }) => bookingDate.slice(0, 7))
-    .filter(isMonthKey));
-  const today = getLocalDateString(new Date());
-  for (const month of getLastTwelveCalendarMonths(today)) {
-    keys.add(month.key);
+type PeriodOption = { value: string; label: string };
+
+function isYearKey(value: string): boolean {
+  return /^\d{4}$/.test(value);
+}
+
+// The period choices come from the returned transactions alone: each
+// represented year, newest first, lists that year's represented months before
+// the year's own whole-year choice.
+const periods = computed<PeriodOption[]>(() => {
+  const monthsByYear = new Map<string, Set<string>>();
+  for (const { bookingDate } of transactions.value ?? []) {
+    const year = bookingDate.slice(0, 4);
+    const month = bookingDate.slice(0, 7);
+    if (!isYearKey(year) || !isMonthKey(month)) {
+      continue;
+    }
+    let months = monthsByYear.get(year);
+    if (months === undefined) {
+      months = new Set();
+      monthsByYear.set(year, months);
+    }
+    months.add(month);
   }
-  return [...keys]
-    .sort((left, right) => right.localeCompare(left))
-    .map((key) => ({ key, label: monthLabel(key) }));
+
+  const options: PeriodOption[] = [];
+  for (const year of [...monthsByYear.keys()].sort((left, right) => right.localeCompare(left))) {
+    const months = [...(monthsByYear.get(year) ?? [])].sort((left, right) => right.localeCompare(left));
+    options.push(...months.map((key) => ({ value: key, label: monthLabel(key) })));
+    options.push({ value: year, label: `${year} (year)` });
+  }
+  return options;
 });
 
 function categoryFromQuery(): string {
@@ -106,49 +127,63 @@ function categoryFromQuery(): string {
     : 'uncategorised';
 }
 
-function monthFromQuery(): string {
-  const requested = queryString(route.value.query.month);
-  return requested !== undefined
-    && isMonthKey(requested)
-    && months.value.some(({ key }) => key === requested)
-    ? requested
-    : 'all';
+function periodFromQuery(): string {
+  for (const key of ['month', 'year'] as const) {
+    const requested = queryString(route.value.query[key]);
+    if (requested !== undefined && periods.value.some(({ value }) => value === requested)) {
+      return requested;
+    }
+  }
+  return 'all';
 }
 
 const selectedCategory = ref('uncategorised');
-const selectedMonth = ref('all');
+const selectedPeriod = ref('all');
 
 const categoryFilter = computed({
   get: () => selectedCategory.value,
   set(value: string) {
     selectedCategory.value = value;
-    setFilterQuery('category', value);
+    setCategoryQuery(value);
   },
 });
 
-const monthFilter = computed({
-  get: () => selectedMonth.value,
+const periodFilter = computed({
+  get: () => selectedPeriod.value,
   set(value: string) {
-    selectedMonth.value = value;
-    setFilterQuery('month', value);
+    selectedPeriod.value = value;
+    setPeriodQuery(value);
   },
 });
 
-function setFilterQuery(key: 'category' | 'month', value: string): void {
+function setCategoryQuery(value: string): void {
+  const query = { ...route.value.query, category: value };
+  void router.replace({ path: '/', query });
+}
+
+function setPeriodQuery(value: string): void {
   const query = { ...route.value.query };
-  if (key === 'month' && value === 'all') {
-    delete query.month;
-  } else {
-    query[key] = value;
+  delete query.month;
+  delete query.year;
+  if (isYearKey(value)) {
+    query.year = value;
+  } else if (value !== 'all') {
+    query.month = value;
   }
   void router.replace({ path: '/', query });
 }
 
 watch(
-  () => [route.value.query.category, route.value.query.month, categories.value, months.value],
+  () => [
+    route.value.query.category,
+    route.value.query.month,
+    route.value.query.year,
+    categories.value,
+    periods.value,
+  ],
   () => {
     selectedCategory.value = categoryFromQuery();
-    selectedMonth.value = monthFromQuery();
+    selectedPeriod.value = periodFromQuery();
   },
   { immediate: true },
 );
@@ -157,15 +192,22 @@ const uncategorisedTransactions = computed(() =>
   (transactions.value ?? []).filter((transaction) => transaction.category === null),
 );
 
+function matchesPeriod(bookingDate: string, period: string): boolean {
+  if (period === 'all') {
+    return true;
+  }
+  return isYearKey(period)
+    ? bookingDate.slice(0, 4) === period
+    : bookingDate.slice(0, 7) === period;
+}
+
 const visibleTransactions = computed(() =>
   (transactions.value ?? []).filter((transaction) => {
     const categoryMatches = categoryFilter.value === 'all'
       || (categoryFilter.value === 'uncategorised'
         ? transaction.category === null
         : transaction.category?.id === categoryFilter.value);
-    const monthMatches = monthFilter.value === 'all'
-      || transaction.bookingDate.slice(0, 7) === monthFilter.value;
-    return categoryMatches && monthMatches;
+    return categoryMatches && matchesPeriod(transaction.bookingDate, periodFilter.value);
   }),
 );
 
@@ -501,15 +543,15 @@ onBeforeUnmount(() => {
           </select>
         </label>
         <label class="grid w-full gap-1 text-sm font-medium text-slate-700 sm:w-auto">
-          Month
+          Period
           <select
-            v-model="monthFilter"
-            data-testid="month-filter"
+            v-model="periodFilter"
+            data-testid="period-filter"
             class="min-h-11 w-full max-w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:w-auto"
           >
-            <option value="all">All months</option>
-            <option v-for="month in months" :key="month.key" :value="month.key">
-              {{ month.label }}
+            <option value="all">All periods</option>
+            <option v-for="period in periods" :key="period.value" :value="period.value">
+              {{ period.label }}
             </option>
           </select>
         </label>

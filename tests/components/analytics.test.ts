@@ -262,4 +262,163 @@ describe('category spending page', () => {
       .toHaveLength(12);
     expect(empty.findAll('[data-testid="category-total"]')).toHaveLength(0);
   });
+
+  it('defaults to the months view and switches to years without another request', async () => {
+    const year = new Date().getFullYear() - 2;
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: `${year}-05-01`, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false } },
+    ]));
+
+    const wrapper = await mountSuspended(Analytics);
+
+    expect((wrapper.get('[data-testid="view-months"]').element as HTMLInputElement).checked).toBe(true);
+    expect(wrapper.findAll('[data-testid="month-panel"]')).toHaveLength(12);
+    expect(wrapper.findAll('[data-testid="year-panel"]')).toHaveLength(0);
+
+    await wrapper.get('[data-testid="view-years"]').setValue(true);
+    expect(wrapper.findAll('[data-testid="month-panel"]')).toHaveLength(0);
+    const yearPanels = wrapper.findAll('[data-testid="year-panel"]');
+    expect(yearPanels).toHaveLength(1);
+    expect(yearPanels[0]?.attributes('data-year-key')).toBe(String(year));
+
+    await wrapper.get('[data-testid="view-months"]').setValue(true);
+    expect(wrapper.findAll('[data-testid="month-panel"]')).toHaveLength(12);
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('sums whole calendar years newest-first and excludes hidden categories', async () => {
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+    const oldestYear = currentYear - 2;
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: `${oldestYear}-03-01`, amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: `${oldestYear}-11-01`, amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: `${oldestYear}-05-01`, amount: '-3.25', category: null },
+      { bookingDate: `${currentYear}-01-01`, amount: '-99.00', category: { id: '9', name: 'Internal', hidden: true } },
+      { bookingDate: `${previousYear}-07-01`, amount: '-7.00', category: { id: '2', name: 'Travel', hidden: false } },
+      { bookingDate: `${currentYear}-02-01`, amount: '-1.00', category: { id: '2', name: 'Travel', hidden: false } },
+    ]));
+
+    const wrapper = await mountSuspended(Analytics);
+    await wrapper.get('[data-testid="view-years"]').setValue(true);
+
+    const panels = wrapper.findAll('[data-testid="year-panel"]');
+    expect(panels.map((panel) => panel.attributes('data-year-key')))
+      .toEqual([String(currentYear), String(previousYear), String(oldestYear)]);
+    expect(panels[0]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .toEqual([`Travel${formatEuroAmount('1.00')}`]);
+    expect(panels[1]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .toEqual([`Travel${formatEuroAmount('7.00')}`]);
+    expect(panels[2]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .toEqual([`Groceries${formatEuroAmount('16.50')}`, `Uncategorised${formatEuroAmount('3.25')}`]);
+    expect(wrapper.text()).not.toContain('Internal');
+
+    const charts = wrapper.findAllComponents({ name: 'VChart' });
+    expect(charts).toHaveLength(3);
+    expect(charts[2]?.props('option').series[0].data.map(({ name, amount }) => [name, amount]))
+      .toEqual([['Groceries', '16.50'], ['Uncategorised', '3.25']]);
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('links year headings and category totals to matching year transactions', async () => {
+    const year = new Date().getFullYear() - 2;
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: `${year}-05-01`, amount: '-10.00', category: { id: '7', name: 'Groceries', hidden: false } },
+      { bookingDate: `${year}-05-02`, amount: '-2.00', category: null },
+    ]));
+
+    const wrapper = await mountSuspended(Analytics);
+    await wrapper.get('[data-testid="view-years"]').setValue(true);
+
+    const yearLink = wrapper.get('[data-testid="year-link"]');
+    const yearTarget = new URL(yearLink.attributes('href'), 'http://localhost');
+    expect(yearTarget.pathname).toBe('/');
+    expect(yearTarget.searchParams.get('year')).toBe(String(year));
+    expect(yearTarget.searchParams.get('category')).toBe('all');
+
+    const links = wrapper.findAll('[data-testid="category-transaction-link"]');
+    const targets = links.map((link) => new URL(link.attributes('href'), 'http://localhost'));
+    expect(targets.map((target) => [target.searchParams.get('year'), target.searchParams.get('category')]))
+      .toEqual([[String(year), '7'], [String(year), 'uncategorised']]);
+
+    const chart = wrapper.findAllComponents({ name: 'VChart' })[0];
+    if (chart === undefined) {
+      throw new Error('expected current year pie chart');
+    }
+    const push = vi.spyOn(wrapper.vm.$router, 'push');
+    const emitSlice = async (key: string) => {
+      chart.vm.$emit('click', { data: { key } });
+      await flushPromises();
+    };
+
+    await emitSlice('category:7');
+    expect(push).toHaveBeenLastCalledWith({
+      path: '/',
+      query: { year: String(year), category: '7' },
+    });
+
+    await emitSlice('uncategorised');
+    expect(push).toHaveBeenLastCalledWith({
+      path: '/',
+      query: { year: String(year), category: 'uncategorised' },
+    });
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides uncategorised across year panels and keeps the setting when switching views', async () => {
+    const today = getLocalDateString(new Date());
+    const year = new Date().getFullYear() - 2;
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: `${year}-05-01`, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: `${year}-05-02`, amount: '-2.00', category: null },
+      { bookingDate: today, amount: '-5.00', category: null },
+    ]));
+
+    const wrapper = await mountSuspended(Analytics);
+    await wrapper.get('[data-testid="view-years"]').setValue(true);
+    await wrapper.get('[data-testid="hide-uncategorised"]').setValue(true);
+
+    const panels = wrapper.findAll('[data-testid="year-panel"]');
+    expect(panels.map((panel) => panel.attributes('data-year-key')))
+      .toEqual([String(new Date().getFullYear()), String(year)]);
+    expect(panels[0]?.findAll('[data-testid="category-total"]')).toHaveLength(0);
+    expect(panels[0]?.text()).toContain(`No category data for ${new Date().getFullYear()}`);
+    expect(panels[1]?.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .toEqual([`Groceries${formatEuroAmount('10.00')}`]);
+
+    await wrapper.get('[data-testid="view-months"]').setValue(true);
+    expect((wrapper.get('[data-testid="hide-uncategorised"]').element as HTMLInputElement).checked).toBe(true);
+    expect(wrapper.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .not.toContain(`Uncategorised${formatEuroAmount('5.00')}`);
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no year panels and an explanation when no year has eligible data', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: '2024-05-01', amount: '-9.00', category: { id: '9', name: 'Internal', hidden: true } },
+    ]));
+
+    const wrapper = await mountSuspended(Analytics);
+    await wrapper.get('[data-testid="view-years"]').setValue(true);
+
+    expect(wrapper.findAll('[data-testid="year-panel"]')).toHaveLength(0);
+    expect(wrapper.get('[data-testid="no-year-data"]').text()).toContain('No category data for any year');
+  });
+
+  it('keeps each category color when switching between views', async () => {
+    const today = getLocalDateString(new Date());
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false } },
+    ]));
+
+    const wrapper = await mountSuspended(Analytics);
+    const monthlyColor = wrapper.get('[data-testid="month-panel"] [data-testid="category-color"]')
+      .element.style.backgroundColor;
+
+    await wrapper.get('[data-testid="view-years"]').setValue(true);
+    const yearlyColor = wrapper.get('[data-testid="year-panel"] [data-testid="category-color"]')
+      .element.style.backgroundColor;
+
+    expect(yearlyColor).toBe(monthlyColor);
+  });
 });

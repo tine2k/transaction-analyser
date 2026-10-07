@@ -25,11 +25,26 @@ export type CalendarMonth = {
   endDate: string;
 };
 
+export type CalendarYear = {
+  key: string;
+  label: string;
+  startDate: string;
+  endDate: string;
+};
+
 export type MonthlyCategoryGroups = CalendarMonth & {
   groups: CategoryTransactionGroup[];
 };
 
 export type MonthlyCategoryTotals = CalendarMonth & {
+  totals: CategorySpendingTotal[];
+};
+
+export type YearlyCategoryGroups = CalendarYear & {
+  groups: CategoryTransactionGroup[];
+};
+
+export type YearlyCategoryTotals = CalendarYear & {
   totals: CategorySpendingTotal[];
 };
 
@@ -39,6 +54,10 @@ export type MonthlyCategoryMatrixData = {
 };
 
 export type MonthlyCategoryChartData = MonthlyCategoryTotals & {
+  pieData: CategoryPieDatum[];
+};
+
+export type YearlyCategoryChartData = YearlyCategoryTotals & {
   pieData: CategoryPieDatum[];
 };
 
@@ -171,6 +190,15 @@ export function getMonthlyCategorySpendingTotals(
   }));
 }
 
+export function getYearlyCategorySpendingTotals(
+  years: YearlyCategoryGroups[],
+): YearlyCategoryTotals[] {
+  return years.map(({ groups, ...year }) => ({
+    ...year,
+    totals: getCategorySpendingTotals(groups),
+  }));
+}
+
 function compareCategoryEntries(
   left: Pick<CategorySpendingTotal, 'key' | 'name'>,
   right: Pick<CategorySpendingTotal, 'key' | 'name'>,
@@ -252,6 +280,15 @@ export function createMonthlyCategoryChartData(
   return months.map((month) => ({
     ...month,
     pieData: createCategoryPieData(month.totals),
+  }));
+}
+
+export function createYearlyCategoryChartData(
+  years: YearlyCategoryTotals[],
+): YearlyCategoryChartData[] {
+  return years.map((year) => ({
+    ...year,
+    pieData: createCategoryPieData(year.totals),
   }));
 }
 
@@ -484,6 +521,51 @@ export function groupTransactionsByAvailableMonth(
     .sort((left, right) => right.month.key.localeCompare(left.month.key))
     .map(({ month, groupsByKey }) => ({
       ...month,
+      groups: [...groupsByKey.values()],
+    }));
+}
+
+export function groupTransactionsByAvailableYear(
+  transactions: CategorySpendingTransaction[],
+): YearlyCategoryGroups[] {
+  const yearsByKey = new Map<string, {
+    year: CalendarYear;
+    groupsByKey: Map<string, CategoryTransactionGroup>;
+  }>();
+
+  for (const transaction of excludeHiddenCategoryTransactions(transactions)) {
+    const key = transaction.bookingDate.slice(0, 4);
+    let year = yearsByKey.get(key);
+    if (year === undefined) {
+      year = {
+        year: {
+          key,
+          label: key,
+          startDate: `${key}-01-01`,
+          endDate: `${key}-12-31`,
+        },
+        groupsByKey: new Map(),
+      };
+      yearsByKey.set(key, year);
+    }
+
+    const categoryKey = transaction.category === null ? 'uncategorised' : `category:${transaction.category.id}`;
+    let group = year.groupsByKey.get(categoryKey);
+    if (group === undefined) {
+      group = {
+        key: categoryKey,
+        name: transaction.category?.name ?? 'Uncategorised',
+        transactions: [],
+      };
+      year.groupsByKey.set(categoryKey, group);
+    }
+    group.transactions.push(transaction);
+  }
+
+  return [...yearsByKey.values()]
+    .sort((left, right) => right.year.key.localeCompare(left.year.key))
+    .map(({ year, groupsByKey }) => ({
+      ...year,
       groups: [...groupsByKey.values()],
     }));
 }

@@ -141,7 +141,7 @@ describe('transaction list filters', () => {
 
     expect((wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
       .toBe('uncategorised');
-    expect((wrapper.get('[data-testid="month-filter"]').element as HTMLSelectElement).value)
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
       .toBe('all');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['1']);
@@ -154,7 +154,7 @@ describe('transaction list filters', () => {
   it('gives both filters a full-width mobile layout and touch-sized control height', async () => {
     const wrapper = await mountTransactions();
 
-    for (const selector of ['[data-testid="category-filter"]', '[data-testid="month-filter"]']) {
+    for (const selector of ['[data-testid="category-filter"]', '[data-testid="period-filter"]']) {
       const filter = wrapper.get(selector);
       expect(filter.classes()).toContain('min-h-11');
       expect(filter.classes()).toContain('w-full');
@@ -193,7 +193,7 @@ describe('transaction list filters', () => {
 
     expect((wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
       .toBe('1');
-    expect((wrapper.get('[data-testid="month-filter"]').element as HTMLSelectElement).value)
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
       .toBe('2026-02');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['2']);
@@ -205,16 +205,16 @@ describe('transaction list filters', () => {
   it('composes filter selections, preserves row order, and reflects them in the route query', async () => {
     const wrapper = await mountTransactions();
     const categoryFilter = wrapper.get('[data-testid="category-filter"]');
-    const monthFilter = wrapper.get('[data-testid="month-filter"]');
+    const periodFilter = wrapper.get('[data-testid="period-filter"]');
     const replace = vi.spyOn(wrapper.vm.$router, 'replace');
 
     await categoryFilter.setValue('all');
     await flushPromises();
     expect((categoryFilter.element as HTMLSelectElement).value).toBe('all');
     expect(replace).toHaveBeenCalledWith({ path: '/', query: { category: 'all' } });
-    await monthFilter.setValue('2026-02');
+    await periodFilter.setValue('2026-02');
     await flushPromises();
-    expect((monthFilter.element as HTMLSelectElement).value).toBe('2026-02');
+    expect((periodFilter.element as HTMLSelectElement).value).toBe('2026-02');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['3', '2', '5', '1']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-18.74'));
@@ -229,28 +229,96 @@ describe('transaction list filters', () => {
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['1']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-0.25'));
-    await monthFilter.setValue('all');
+    await periodFilter.setValue('all');
     await flushPromises();
-    expect((monthFilter.element as HTMLSelectElement).value).toBe('all');
+    expect((periodFilter.element as HTMLSelectElement).value).toBe('all');
     expect(mocks.useFetch).toHaveBeenCalledTimes(2);
 
     await categoryFilter.setValue('1');
     await flushPromises();
-    await monthFilter.setValue('2026-03');
+    await periodFilter.setValue('2026-03');
     await flushPromises();
     expect(wrapper.findAll('tbody tr')).toHaveLength(0);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('0'));
   });
 
   it('falls back safely for unknown query values', async () => {
-    const wrapper = await mountTransactions({ route: '/?category=missing&month=2026-13' });
+    const wrapper = await mountTransactions({ route: '/?category=missing&month=2026-13&year=1999' });
 
     expect((wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
       .toBe('uncategorised');
-    expect((wrapper.get('[data-testid="month-filter"]').element as HTMLSelectElement).value)
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
       .toBe('all');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['1']);
+  });
+
+  it('lists only represented periods newest-first with each year before its year choice', async () => {
+    const wrapper = await mountTransactions();
+
+    const options = wrapper.findAll('[data-testid="period-filter"] option');
+    expect(options.map((option) => [option.attributes('value'), option.text()])).toEqual([
+      ['all', 'All periods'],
+      ['2026-03', 'March 2026'],
+      ['2026-02', 'February 2026'],
+      ['2026', '2026 (year)'],
+    ]);
+  });
+
+  it('filters to a selected calendar year and excludes other years', async () => {
+    const mixed: TestTransaction[] = [
+      {
+        id: '9', bookingDate: '2025-12-31', valueDate: '2025-12-31', amount: '-1.00',
+        purpose: 'Old year', counterpartyName: 'Shop', counterpartyAccount: null,
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+      {
+        id: '8', bookingDate: '2026-01-02', valueDate: '2026-01-02', amount: '-2.00',
+        purpose: 'New year', counterpartyName: 'Shop', counterpartyAccount: null,
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+    ];
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(mixed) : categoriesResponse());
+
+    const wrapper = await mountTransactions();
+    const periodFilter = wrapper.get('[data-testid="period-filter"]');
+    const replace = vi.spyOn(wrapper.vm.$router, 'replace');
+
+    expect(wrapper.findAll('[data-testid="period-filter"] option')
+      .map((option) => option.attributes('value')))
+      .toEqual(['all', '2026-01', '2026', '2025-12', '2025']);
+
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+    await periodFilter.setValue('2025');
+    await flushPromises();
+
+    expect((periodFilter.element as HTMLSelectElement).value).toBe('2025');
+    const yearCall = replace.mock.calls.find(([location]) =>
+      (location as { query?: Record<string, string> }).query?.year === '2025');
+    expect(yearCall).toBeDefined();
+    expect((yearCall?.[0] as { query: Record<string, string> }).query.month).toBeUndefined();
+    expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['9']);
+  });
+
+  it('initializes the period filter from a year link', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=1&year=2026' });
+
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
+      .toBe('2026');
+    expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['2']);
+  });
+
+  it('prefers an offered month over a year when both are in the query', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=1&month=2026-02&year=2026' });
+
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
+      .toBe('2026-02');
+    expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['2']);
   });
 });
 

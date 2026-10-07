@@ -6,12 +6,15 @@ import {
   createCategoryColorMap,
   createMonthlyCategoryMatrixData,
   createMonthlyCategoryChartData,
+  createYearlyCategoryChartData,
   formatEuroAmount,
   getCategoryMonthlyAverages,
   getLastCalendarMonths,
   getLastTwelveCalendarMonths,
   getMonthlyCategorySpendingTotals,
+  getYearlyCategorySpendingTotals,
   groupTransactionsByAvailableMonth,
+  groupTransactionsByAvailableYear,
   groupTransactionsByMonth,
   isZeroAmountString,
   sumAbsoluteAmountStrings,
@@ -314,6 +317,74 @@ describe('calendar-month transaction buckets', () => {
     ]);
     expect(charts.slice(1).every(({ totals, pieData }) => totals.length === 0 && pieData.length === 0))
       .toBe(true);
+  });
+});
+
+describe('available-year transaction buckets', () => {
+  it('groups every represented booking year newest-first with calendar-year bounds and no empty years', () => {
+    const years = groupTransactionsByAvailableYear([
+      { bookingDate: '2020-01-31', amount: '-1.00', category: { id: '1', name: 'Old', hidden: false } },
+      { bookingDate: '2026-08-03', amount: '-2.00', category: { id: '2', name: 'Recent', hidden: false } },
+      { bookingDate: '2026-09-02', amount: '-4.00', category: null },
+    ]);
+
+    expect(years.map(({ key, label }) => [key, label])).toEqual([
+      ['2026', '2026'],
+      ['2020', '2020'],
+    ]);
+    expect(years[0]).toMatchObject({ startDate: '2026-01-01', endDate: '2026-12-31' });
+    expect(years[1]).toMatchObject({ startDate: '2020-01-01', endDate: '2020-12-31' });
+    expect(years[0]?.groups.map((group) => group.name)).toEqual(['Recent', 'Uncategorised']);
+    expect(years[1]?.groups.map((group) => group.name)).toEqual(['Old']);
+  });
+
+  it('drops hidden-category transactions and years represented only by them', () => {
+    const years = groupTransactionsByAvailableYear([
+      { bookingDate: '2023-05-01', amount: '-9.00', category: { id: '2', name: 'Internal', hidden: true } },
+      { bookingDate: '2026-09-01', amount: '-7.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-09-02', amount: '-9.00', category: { id: '2', name: 'Internal', hidden: true } },
+    ]);
+
+    expect(years.map(({ key }) => key)).toEqual(['2026']);
+    expect(years[0]?.groups).toEqual([
+      {
+        key: 'category:1',
+        name: 'Groceries',
+        transactions: [
+          { bookingDate: '2026-09-01', amount: '-7.00', category: { id: '1', name: 'Groceries', hidden: false } },
+        ],
+      },
+    ]);
+  });
+
+  it('returns no years for empty input or input whose categories are all hidden', () => {
+    expect(groupTransactionsByAvailableYear([])).toEqual([]);
+    expect(groupTransactionsByAvailableYear([
+      { bookingDate: '2024-01-01', amount: '-1.00', category: { id: '1', name: 'Internal', hidden: true } },
+    ])).toEqual([]);
+  });
+
+  it('sums absolute category totals across a whole year and builds year chart data', () => {
+    const years = getYearlyCategorySpendingTotals(groupTransactionsByAvailableYear([
+      { bookingDate: '2026-03-01', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-11-01', amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false } },
+      { bookingDate: '2026-03-02', amount: '-8.25', category: null },
+      { bookingDate: '2025-11-01', amount: '-8.00', category: { id: '1', name: 'Groceries', hidden: false } },
+    ]));
+    const charts = createYearlyCategoryChartData(years);
+
+    expect(charts.map(({ key }) => key)).toEqual(['2026', '2025']);
+    expect(charts[0]?.totals).toEqual([
+      { key: 'category:1', name: 'Groceries', amount: '16.50' },
+      { key: 'uncategorised', name: 'Uncategorised', amount: '8.25' },
+    ]);
+    expect(charts[0]?.pieData).toEqual([
+      { key: 'category:1', name: 'Groceries', amount: '16.50', value: 1 },
+      { key: 'uncategorised', name: 'Uncategorised', amount: '8.25', value: 0.5 },
+    ]);
+    expect(charts[1]?.totals).toEqual([
+      { key: 'category:1', name: 'Groceries', amount: '8.00' },
+    ]);
   });
 });
 

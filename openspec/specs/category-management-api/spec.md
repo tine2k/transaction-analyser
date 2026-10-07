@@ -139,7 +139,7 @@ every transaction's category unchanged.
 
 ### Requirement: The category management surface previews transaction match counts
 
-The category management surface SHALL provide a read-only operation that accepts a non-empty list of candidate regular expressions and returns the number of stored transactions whose purpose line matches at least one expression. Matching SHALL follow `category-assignment`: case-insensitive and against any part of the purpose line. A transaction SHALL be counted once regardless of how many candidate expressions match, and SHALL be counted even if another category currently wins assignment. The operation SHALL validate the expressions using the same rules as category creation and editing, returning a client error for a missing, empty, non-string, or uncompilable expression list. It SHALL NOT create or change a category, assign or reassign a transaction, or otherwise modify stored data. Its successful JSON response SHALL contain the count as an integer. Failures SHALL be reported as errors rather than as a fabricated count.
+The category management surface SHALL provide a read-only operation that accepts a non-empty list of candidate regular expressions and returns the number of stored transactions whose purpose line or counterparty name matches at least one expression. Matching SHALL follow `category-assignment`: case-insensitive and against any part of the purpose line or the counterparty name. A transaction SHALL be counted once regardless of how many candidate expressions match, and SHALL be counted even if another category currently wins assignment. The operation SHALL validate the expressions using the same rules as category creation and editing, returning a client error for a missing, empty, non-string, or uncompilable expression list. It SHALL NOT create or change a category, assign or reassign a transaction, or otherwise modify stored data. Its successful JSON response SHALL contain the count as an integer. Failures SHALL be reported as errors rather than as a fabricated count.
 
 #### Scenario: A preview returns the number of matching transactions
 
@@ -149,6 +149,11 @@ The category management surface SHALL provide a read-only operation that accepts
 #### Scenario: Matching follows category assignment semantics
 
 - **WHEN** a purpose line contains a match that differs in case or is only a substring match
+- **THEN** the transaction is included in the preview count
+
+#### Scenario: A counterparty-name match is included
+
+- **WHEN** a transaction's purpose line matches no candidate expression and its counterparty name matches one
 - **THEN** the transaction is included in the preview count
 
 #### Scenario: Each transaction contributes at most one
@@ -179,7 +184,7 @@ The category management surface SHALL provide a read-only operation that accepts
 ### Requirement: The category management surface previews the transactions a literal text matches
 
 The category management surface SHALL provide a read-only operation that accepts a `text` value and
-returns the number of stored transactions whose purpose line contains it, matched case-insensitively
+returns the number of stored transactions whose purpose line or counterparty name contains it, matched case-insensitively
 and literally. It SHALL validate the text as an append does, count each transaction once, change no
 category or transaction, and answer with the count as an integer. A failure SHALL be reported as an
 error rather than as a fabricated count.
@@ -194,10 +199,15 @@ error rather than as a fabricated count.
 - **WHEN** a purpose line contains the text with a different letter case
 - **THEN** the transaction is counted
 
+#### Scenario: A counterparty-name match is counted
+
+- **WHEN** a transaction's counterparty name contains the text and its purpose line does not
+- **THEN** the transaction is counted
+
 #### Scenario: A metacharacter in the text matches literally
 
 - **WHEN** the text contains a regular-expression metacharacter
-- **THEN** only transactions whose purpose line contains that literal character are counted
+- **THEN** only transactions whose purpose line or counterparty name contains that literal character are counted
 
 #### Scenario: Each transaction contributes at most one
 
@@ -503,9 +513,9 @@ The category management surface SHALL provide a read-only operation that accepts
 of candidate date windows and returns the number of stored transactions the windows would claim. A
 transaction SHALL be counted when its booking date falls on or between the `from` and `to` of at
 least one candidate window, inclusive of both endpoints, and no stored category's regular
-expression matches its purpose line. Window coverage SHALL follow `category-assignment`: the
+expression matches its purpose line or counterparty name. Window coverage SHALL follow `category-assignment`: the
 booking date alone is tested, and the value date is not consulted; expression matching SHALL be
-case-insensitive and against any part of the purpose line. A transaction SHALL be counted once
+case-insensitive and against any part of the purpose line or the counterparty name. A transaction SHALL be counted once
 regardless of how many candidate windows cover it, and a transaction claimed by a stored
 category's expression SHALL NOT be counted. The operation SHALL validate the windows using the
 same shape and date rules as category creation and editing — a list of objects holding exactly
@@ -524,7 +534,12 @@ count.
 
 #### Scenario: A transaction already claimed by a stored expression is not counted
 
-- **WHEN** a transaction's booking date falls in a candidate window and a stored category's regular expression matches its purpose line
+- **WHEN** a transaction's booking date falls in a candidate window and a stored category's regular expression matches its purpose line or counterparty name
+- **THEN** the transaction is excluded from the returned count, because the window would not claim it
+
+#### Scenario: A counterparty-name match excludes a window claim
+
+- **WHEN** a transaction's booking date falls in a candidate window and a stored category's regular expression matches its counterparty name
 - **THEN** the transaction is excluded from the returned count, because the window would not claim it
 
 #### Scenario: Both window endpoints are inclusive

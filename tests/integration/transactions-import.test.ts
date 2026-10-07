@@ -211,6 +211,23 @@ describe('transaction import against PostgreSQL', () => {
     expect(stored.rows).toEqual([{ category_id: null }]);
   });
 
+  it('categorises a new row whose counterparty name matches when its purpose does not', async () => {
+    await connection().query("INSERT INTO categories (name, patterns) VALUES ('Books', ARRAY['acme'])");
+
+    const plan = await runImport(csv(row({ name: 'ACME Books', purpose: 'Purchase' })));
+
+    expect(plan).toMatchObject({ rowsRead: 1, rowsAlreadyStored: 0, rowsWritten: 1, rowsCategorised: 1 });
+    const stored = await connection().query(
+      `SELECT t.purpose, t.counterparty_name, c.name AS category
+       FROM transactions AS t
+       LEFT JOIN categories AS c ON c.id = t.category_id
+       ORDER BY t.id`,
+    );
+    expect(stored.rows).toEqual([
+      { purpose: 'Purchase', counterparty_name: 'ACME Books', category: 'Books' },
+    ]);
+  });
+
   it('does not re-evaluate a transaction it did not write', async () => {
     await connection().query("INSERT INTO categories (name, patterns) VALUES ('Groceries', ARRAY['shop'])");
     await connection().query(

@@ -5,10 +5,11 @@
 // build their statements from the same rule and cannot drift apart.
 //
 // The rule is two-tier. A category matches when at least one of its expressions
-// matches the purpose line — using the database's case-insensitive match operator
-// `~*`, matching a part of the line rather than anchoring to the whole of it — so
-// the first scalar subquery tests existence across the category's expressions with
-// `unnest`. A category covers a booking date when one of its inclusive from/to
+// matches the purpose line or the counterparty name — using the database's
+// case-insensitive match operator `~*`, matching a part of the text rather than
+// anchoring to the whole of it — so the first scalar subquery tests existence
+// across the category's expressions with `unnest`. A category covers a booking
+// date when one of its inclusive from/to
 // windows contains it, tested by the second subquery. `COALESCE` joins the tiers,
 // so an expression match always wins and a window is consulted only when no
 // expression matches any category. `ORDER BY c.id LIMIT 1` makes the smallest
@@ -35,7 +36,7 @@ export function matchingCategorySql(options: MatchingCategoryOptions = {}): stri
         WHERE ${exclusion}EXISTS (
           SELECT 1
           FROM unnest(c.patterns) AS expression
-          WHERE t.purpose ~* expression
+          WHERE t.purpose ~* expression OR t.counterparty_name ~* expression
         )
         ORDER BY c.id
         LIMIT 1

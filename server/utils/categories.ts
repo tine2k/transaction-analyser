@@ -109,23 +109,24 @@ const APPEND_PATTERN = `
 const DELETE_CATEGORY = 'DELETE FROM categories WHERE id = $1';
 
 // The preview counts each transaction once, even if multiple candidate
-// expressions match its purpose. Stored categories and assignments are ignored.
+// expressions match its purpose line or counterparty name. Stored categories and
+// assignments are ignored.
 const COUNT_MATCHING_TRANSACTIONS = `
   SELECT count(*)::text AS count
   FROM transactions AS t
   WHERE EXISTS (
     SELECT 1
     FROM unnest($1::text[]) AS candidate(pattern)
-    WHERE t.purpose ~* candidate.pattern
+    WHERE t.purpose ~* candidate.pattern OR t.counterparty_name ~* candidate.pattern
   )
 `;
 
 // The window preview counts the transactions a candidate window set would claim:
 // its booking date falls inclusively in at least one window, and no stored
-// category's expression matches its purpose line. The exclusion mirrors the first
-// tier of the recompute, so a transaction an expression explains is never claimed
-// by a window; `count(*)` counts each transaction once even when several windows
-// cover it. It reads only.
+// category's expression matches its purpose line or counterparty name. The
+// exclusion mirrors the first tier of the recompute, so a transaction an
+// expression explains is never claimed by a window; `count(*)` counts each
+// transaction once even when several windows cover it. It reads only.
 const COUNT_CLAIMED_TRANSACTIONS = `
   SELECT count(*)::text AS count
   FROM transactions AS t
@@ -138,7 +139,7 @@ const COUNT_CLAIMED_TRANSACTIONS = `
     SELECT 1
     FROM categories AS c
     CROSS JOIN LATERAL unnest(c.patterns) AS expression(pattern)
-    WHERE t.purpose ~* expression.pattern
+    WHERE t.purpose ~* expression.pattern OR t.counterparty_name ~* expression.pattern
   )
 `;
 
@@ -148,6 +149,18 @@ const COUNT_CLAIMED_TRANSACTIONS = `
 const RECOMPUTE_ASSIGNMENTS = `
   UPDATE transactions AS t
   SET category_id = ${matchingCategorySql()}
+`;
+
+// The on-demand re-categorisation: every stored transaction is assigned the
+// category the shared matching rule selects, and only the rows whose reference
+// actually changes are updated and returned, so the driver's row count is the
+// number of changed transactions. It is idempotent: an immediate repeat changes
+// and reports nothing.
+const RECATEGORISE_TRANSACTIONS = `
+  UPDATE transactions AS t
+  SET category_id = ${matchingCategorySql()}
+  WHERE t.category_id IS DISTINCT FROM (${matchingCategorySql()})
+  RETURNING 1
 `;
 
 // The reassignment that lets a category be deleted. The category being retired is
@@ -342,6 +355,22 @@ export async function deleteCategory(id: string): Promise<void> {
     if (deleted.rowCount === 0) {
       throw new CategoryError(404, 'no category carries that identity');
     }
+  });
+}
+
+// Re-evaluates every stored transaction against the stored categories on demand
+// and answers with the number whose category changed. It takes the same
+// transaction-scoped lock every category mutation takes, so the category set it
+// reads cannot be changed underneath it, and it writes only category references:
+// no category, no run record, and no report is stored. An import may run
+// concurrently because it evaluates its own new rows with the same rule.
+export async function recategoriseTransactions(): Promise<number> {
+  const database = useDatabase();
+
+  return inTransaction(database, async (client) => {
+    await lockCategoryMutations(client);
+    const updated = await client.query(RECATEGORISE_TRANSACTIONS);
+    return updated.rowCount ?? 0;
   });
 }
 

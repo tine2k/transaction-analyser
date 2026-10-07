@@ -74,6 +74,8 @@ EASYBANK_PIN=...
 
 The nightly task runs at 03:00 Europe/Vienna while the server runs. Until `EASYBANK_SYNC_WRITE=true` is set, every run is non-writing: it records what it would import and changes no transaction. The result of every run appears on the Imports screen, which also offers a control that starts the same sync on demand. Once the non-writing runs look right, set `EASYBANK_SYNC_WRITE=true` to let it write.
 
+The Imports screen also offers a control that re-applies the stored categories to every stored transaction on demand and reports how many transactions changed. The report is transient: nothing is recorded, and reloading the screen clears it.
+
 To point the sync at a test bank instead of the real Easybank site, set `EASYBANK_BASE_URL` to that server's address; leave it unset to use the real bank.
 
 To run the same sync by hand — the way to check the login, the retrieval, and the counts before trusting the night:
@@ -95,7 +97,7 @@ The window defaults to the first day of the preceding calendar quarter through t
 ## What it does
 
 - **Transactions** - filterable by category and month, with the sum of displayed rows; select text to add it as a pattern to a category without leaving the table.
-- **Categories** - regular expressions and inclusive date windows assign transactions, with match previews and a hidden flag.
+- **Categories** - regular expressions matched against the purpose line or the counterparty name, and inclusive date windows, assign transactions, with match previews and a hidden flag.
 - **Analytics** - category spending pie charts for each of the last 12 months.
 - **Monthly totals** - a month-by-category matrix over every month with data.
 - **Monthly average** - average spend per category over a chosen number of months.

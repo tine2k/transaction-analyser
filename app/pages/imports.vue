@@ -9,8 +9,13 @@
 // POST /api/easybank/sync, waits for the answer, then refreshes the log so the
 // run it recorded appears.
 //
+// Its Re-categorise all control re-evaluates every stored transaction through
+// POST /api/categories/recategorise and shows the returned number of changed
+// transactions. The operation records no run, so the log is not refreshed, and
+// the count is a transient message rather than stored data.
+//
 // See openspec/changes/add-easybank-sync-button/specs/easybank-sync/spec.md
-// and openspec/changes/add-easybank-sync-button/specs/import-log/spec.md
+// and openspec/changes/match-counterparty-and-recategorise/specs/category-recategorisation/spec.md
 type ImportRun = {
   id: string;
   startedAt: string;
@@ -31,6 +36,8 @@ const { data: runs, error, pending, refresh } = useFetch<ImportRun[]>('/api/impo
 
 const syncing = ref(false);
 const syncMessage = ref<string | null>(null);
+const recategorising = ref(false);
+const recategoriseMessage = ref<string | null>(null);
 
 // The server refuses overlapping runs and answers with the run's outcome; a
 // click while a request is in flight is ignored here as well.
@@ -56,6 +63,27 @@ async function startSync(): Promise<void> {
   } finally {
     syncing.value = false;
     await refresh();
+  }
+}
+
+// The server re-evaluates every stored transaction and answers with the number
+// whose category changed. The operation records no run, so the log is not
+// refreshed; the count is a transient message and is never stored.
+async function recategorise(): Promise<void> {
+  if (recategorising.value) {
+    return;
+  }
+  recategorising.value = true;
+  recategoriseMessage.value = null;
+  try {
+    const answer = await $fetch<{ changed: number }>('/api/categories/recategorise', { method: 'POST' });
+    recategoriseMessage.value = answer.changed === 1
+      ? '1 transaction changed.'
+      : `${answer.changed} transactions changed.`;
+  } catch {
+    recategoriseMessage.value = 'The re-categorisation could not be completed.';
+  } finally {
+    recategorising.value = false;
   }
 }
 
@@ -119,6 +147,23 @@ function outcomeLabel(run: ImportRun): string {
         role="status"
       >
         {{ syncMessage }}
+      </p>
+      <button
+        type="button"
+        class="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+        data-testid="recategorise-button"
+        :disabled="recategorising"
+        @click="recategorise"
+      >
+        {{ recategorising ? 'Re-categorising…' : 'Re-categorise all' }}
+      </button>
+      <p
+        v-if="recategoriseMessage !== null"
+        class="text-sm text-slate-600"
+        data-testid="recategorise-status"
+        role="status"
+      >
+        {{ recategoriseMessage }}
       </p>
     </div>
 

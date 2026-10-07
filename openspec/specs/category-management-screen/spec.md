@@ -205,7 +205,7 @@ SHALL NOT submit a category that carries neither an expression nor a window.
 
 ### Requirement: The category form previews how many transactions its expressions match
 
-While a category is being created or edited, the screen SHALL show a label with the count of stored transactions whose purpose line matches at least one currently entered expression. The count SHALL use the same case-insensitive, substring matching semantics as category assignment, count each transaction once, and include matches even when another category wins assignment. It SHALL cover all stored transactions, not only uncategorised transactions. The browser SHALL obtain the count from the category management surface and SHALL NOT evaluate expressions itself. The preview SHALL update as the expressions change and SHALL reflect the latest entered values. When no non-empty expression has been entered, while a count is being loaded, or when a valid count cannot be obtained, the screen SHALL show an appropriate non-count state rather than a stale or invented number. The preview SHALL NOT submit or save the category, and inability to load the preview SHALL NOT prevent the normal save attempt.
+While a category is being created or edited, the screen SHALL show a label with the count of stored transactions whose purpose line or counterparty name matches at least one currently entered expression. The count SHALL use the same case-insensitive, substring matching semantics as category assignment, count each transaction once, and include matches even when another category wins assignment. It SHALL cover all stored transactions, not only uncategorised transactions. The browser SHALL obtain the count from the category management surface and SHALL NOT evaluate expressions itself. The preview SHALL update as the expressions change and SHALL reflect the latest entered values. When no non-empty expression has been entered, while a count is being loaded, or when a valid count cannot be obtained, the screen SHALL show an appropriate non-count state rather than a stale or invented number. The preview SHALL NOT submit or save the category, and inability to load the preview SHALL NOT prevent the normal save attempt.
 
 #### Scenario: A new category shows a matching transaction count before saving
 
@@ -221,6 +221,11 @@ While a category is being created or edited, the screen SHALL show a label with 
 
 - **WHEN** a stored transaction's purpose line matches more than one entered expression
 - **THEN** that transaction contributes one to the displayed count
+
+#### Scenario: A counterparty-name match is counted
+
+- **WHEN** a stored transaction's counterparty name matches an entered expression and its purpose line does not
+- **THEN** that transaction contributes to the displayed match count
 
 #### Scenario: Overlapping categories do not reduce the preview count
 
@@ -299,7 +304,7 @@ While a category is being created or edited, the screen SHALL show a label with 
 stored transactions the currently entered date windows would claim, in its own place, separate
 from the expression-match preview. The count SHALL use the same semantics as the category
 management surface: a transaction is counted when its booking date falls inclusively in at least
-one entered window and no stored category's regular expression matches its purpose line; each
+one entered window and no stored category's regular expression matches its purpose line or counterparty name; each
 transaction is counted once across all entered windows, and a transaction already claimed by an
 expression is excluded. The screen SHALL obtain the count from the category management surface
 and SHALL NOT test a date or evaluate an expression itself. The preview SHALL update as the
@@ -323,6 +328,11 @@ separately, and SHALL NOT fold one into the other.
 #### Scenario: A transaction claimed by an expression is not counted
 
 - **WHEN** a stored transaction's booking date falls in an entered window and a stored category's regular expression matches its purpose line
+- **THEN** the displayed window-claim count excludes that transaction
+
+#### Scenario: A counterparty-name match excludes a claimed transaction
+
+- **WHEN** a stored transaction's booking date falls in an entered window and a stored category's regular expression matches its counterparty name
 - **THEN** the displayed window-claim count excludes that transaction
 
 #### Scenario: A transaction in several entered windows is counted once

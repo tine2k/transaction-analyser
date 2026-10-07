@@ -99,14 +99,14 @@ async function categories(): Promise<Array<{ id: string; name: string; patterns:
   return request('/api/categories').then((result) => result.json());
 }
 
-async function insertTransaction(purpose: string): Promise<void> {
+async function insertTransaction(purpose: string, counterpartyName = 'Test'): Promise<void> {
   if (database === undefined) {
     throw new Error('test database is not initialized');
   }
   await database.query(
     `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account)
-     VALUES ('2026-03-01', '2026-03-01', -1.00, $1, 'Test', NULL)`,
-    [purpose],
+     VALUES ('2026-03-01', '2026-03-01', -1.00, $1, $2, NULL)`,
+    [purpose, counterpartyName],
   );
 }
 
@@ -298,5 +298,68 @@ describe('category pattern append API integration', () => {
     }
 
     assert.deepEqual(await storedRows(), before);
+  });
+
+  it('assigns a transaction whose counterparty name matches when its purpose does not', async () => {
+    await insertTransaction('Purchase', 'ACME Books');
+
+    const created = await post('/api/categories', { name: 'Reading', patterns: ['acme'] });
+    expect(created.status).toBe(201);
+
+    const transactions = await request('/api/transactions').then((result) => result.json()) as Array<{
+      purpose: string;
+      category: { name: string } | null;
+    }>;
+    expect(transactions.find((transaction) => transaction.purpose === 'Purchase')?.category)
+      .toMatchObject({ name: 'Reading' });
+  });
+
+  it('re-evaluates a transaction when an edited expression matches only its counterparty name', async () => {
+    await insertTransaction('Purchase', 'ACME Books');
+
+    const edited = await request('/api/categories/1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Groceries', patterns: ['rewe', 'market', 'acme'] }),
+    });
+    expect(edited.status).toBe(200);
+
+    const transactions = await request('/api/transactions').then((result) => result.json()) as Array<{
+      purpose: string;
+      category: { name: string } | null;
+    }>;
+    expect(transactions.find((transaction) => transaction.purpose === 'Purchase')?.category)
+      .toMatchObject({ name: 'Groceries' });
+  });
+
+  it('counts a counterparty-name match in the expression preview', async () => {
+    await insertTransaction('Purchase', 'ACME Books');
+
+    const response = await post('/api/categories/match-count', { patterns: ['acme'] });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ count: 1 });
+  });
+
+  it('counts a counterparty-name match in the literal preview', async () => {
+    await insertTransaction('Purchase', 'ACME Books');
+
+    const response = await post('/api/categories/literal-match-count', { text: 'acme' });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ count: 1 });
+  });
+
+  it('excludes a counterparty-name match from the window-claim preview', async () => {
+    await insertTransaction('Purchase', 'ACME Books');
+    const created = await post('/api/categories', { name: 'Acme', patterns: ['acme'] });
+    expect(created.status).toBe(201);
+
+    const response = await post('/api/categories/window-match-count', {
+      windows: [{ from: '2026-03-01', to: '2026-03-01' }],
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ count: 0 });
   });
 });

@@ -247,4 +247,73 @@ describe('imports page', () => {
 
     expect(wrapper.get('[data-testid="sync-status"]').text()).toContain('could not be started');
   });
+
+  it('posts to the re-categorise endpoint, waits for the answer, and shows the changed count', async () => {
+    const log = response(runs);
+    mocks.useFetch.mockReturnValue(log);
+    const answer = deferred<{ changed: number }>();
+    mocks.fetch.mockReturnValue(answer.promise);
+
+    const wrapper = await mountSuspended(Imports);
+    const button = wrapper.get('[data-testid="recategorise-button"]');
+    expect(button.text()).toBe('Re-categorise all');
+
+    await button.trigger('click');
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/categories/recategorise', { method: 'POST' });
+    expect(button.attributes('disabled')).toBeDefined();
+    expect(button.text()).toBe('Re-categorising…');
+    expect(wrapper.find('[data-testid="recategorise-status"]').exists()).toBe(false);
+
+    answer.resolve({ changed: 3 });
+    await flushPromises();
+
+    expect(button.attributes('disabled')).toBeUndefined();
+    expect(button.text()).toBe('Re-categorise all');
+    expect(wrapper.get('[data-testid="recategorise-status"]').text()).toContain('3 transactions changed');
+    expect(log.refresh).not.toHaveBeenCalled();
+  });
+
+  it('ignores a second re-categorisation click while a request is in flight', async () => {
+    mocks.useFetch.mockReturnValue(response(runs));
+    const answer = deferred<{ changed: number }>();
+    mocks.fetch.mockReturnValue(answer.promise);
+
+    const wrapper = await mountSuspended(Imports);
+    const button = wrapper.get('[data-testid="recategorise-button"]');
+
+    await button.trigger('click');
+    await button.trigger('click');
+
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+
+    answer.resolve({ changed: 1 });
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a count of zero changed transactions rather than a failure', async () => {
+    mocks.useFetch.mockReturnValue(response(runs));
+    mocks.fetch.mockResolvedValue({ changed: 0 });
+
+    const wrapper = await mountSuspended(Imports);
+    await wrapper.get('[data-testid="recategorise-button"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="recategorise-status"]').text()).toContain('0 transactions changed');
+  });
+
+  it('reports a failed re-categorisation rather than a zero count', async () => {
+    mocks.useFetch.mockReturnValue(response(runs));
+    mocks.fetch.mockRejectedValue(new Error('request failed'));
+
+    const wrapper = await mountSuspended(Imports);
+    await wrapper.get('[data-testid="recategorise-button"]').trigger('click');
+    await flushPromises();
+
+    const status = wrapper.get('[data-testid="recategorise-status"]');
+    expect(status.text()).toContain('could not be completed');
+    expect(status.text()).not.toContain('0 transactions changed');
+  });
 });

@@ -57,16 +57,16 @@ When an import writes transactions, the system SHALL evaluate each newly written
 - **WHEN** an import fails while writing or evaluating its rows
 - **THEN** no transaction of that import exists and no stored transaction's category was changed
 
-### Requirement: A category matches a purpose line as a case-insensitive substring
+### Requirement: A category matches the purpose line or the counterparty name as a case-insensitive substring
 
 Matching SHALL ignore case and SHALL succeed when at least one of the category's regular
-expressions matches any part of the purpose line. The system SHALL NOT require the whole purpose
-line to match. Matching SHALL NOT alter, reformat, or replace the purpose line, and SHALL NOT
-require the purpose line to conform to any shape. An expression that matches the empty string
-SHALL match every transaction. A category's expressions SHALL be alternatives: the category
-matches when any one of them matches, and the others need not match for the category to match.
-Consequently, a category carrying an expression that matches the empty string SHALL match every
-transaction.
+expressions matches any part of the transaction's purpose line or any part of its counterparty
+name. The system SHALL NOT require the whole purpose line or the whole counterparty name to match.
+Matching SHALL NOT alter, reformat, or replace either text, and SHALL NOT require either to
+conform to any shape. An expression that matches the empty string SHALL match every transaction. A
+category's expressions SHALL be alternatives: the category matches when any one of them matches
+either text, and the others need not match for the category to match. Consequently, a category
+carrying an expression that matches the empty string SHALL match every transaction.
 
 #### Scenario: A match inside the line is enough
 
@@ -93,12 +93,32 @@ transaction.
 - **WHEN** a category is matched against a purpose line and assigned
 - **THEN** the stored and reported purpose line is exactly the text it was before the match
 
+#### Scenario: A match inside the counterparty name is enough
+
+- **WHEN** a category's expression matches a part of a counterparty name but not the whole name
+- **THEN** the category matches that transaction
+
+#### Scenario: The purpose line need not match when the counterparty name does
+
+- **WHEN** a category's expression matches no part of a purpose line but matches a part of the counterparty name
+- **THEN** the category matches that transaction
+
+#### Scenario: Matching ignores case in the counterparty name
+
+- **WHEN** a category's expression is `rewe` and a counterparty name reads `REWE Markt`
+- **THEN** the category matches that transaction
+
+#### Scenario: Matching leaves the counterparty name unchanged
+
+- **WHEN** a category is matched against a counterparty name and assigned
+- **THEN** the stored and reported counterparty name is exactly the text it was before the match
+
 ### Requirement: Among matching categories the smallest identity wins
 
-When more than one category's expression matches a single purpose line, the system SHALL assign
-the matching category whose storage identity is smallest. The winning category SHALL be the same
-on every evaluation of the same stored data, so the outcome does not depend on the order in
-which categories are read.
+When more than one category's expression matches a single transaction's purpose line or
+counterparty name, the system SHALL assign the matching category whose storage identity is
+smallest. The winning category SHALL be the same on every evaluation of the same stored data, so
+the outcome does not depend on the order in which categories are read.
 
 #### Scenario: The smallest identity wins an overlap
 
@@ -109,6 +129,11 @@ which categories are read.
 
 - **WHEN** the same overlapping categories and purpose line are evaluated again
 - **THEN** the same category wins
+
+#### Scenario: The smallest identity wins when both match the counterparty name
+
+- **WHEN** two categories' expressions both match one counterparty name and one has a smaller identity
+- **THEN** the transaction holds the category with the smaller identity
 
 ### Requirement: A transaction holds at most one category and re-evaluation replaces it
 
@@ -169,13 +194,14 @@ transaction.
 ### Requirement: Date windows decide assignment only after every regular expression has failed
 
 The system SHALL consider regular expressions before date windows. When at least one category's
-regular expression matches a transaction's purpose line, the transaction's category SHALL be
-decided among the matching categories by the existing rules and no date window SHALL be applied,
-whatever the identities involved. Only when no category's regular expression matches the purpose
-line SHALL the system consider the categories whose date windows cover the transaction's booking
-date. A transaction matched by no expression and covered by no window SHALL be uncategorised. This
-ordering SHALL hold under re-evaluation, so a transaction that gains an expression match after a
-category change SHALL stop being held by a date window.
+regular expression matches a transaction's purpose line or counterparty name, the transaction's
+category SHALL be decided among the matching categories by the existing rules and no date window
+SHALL be applied, whatever the identities involved. Only when no category's regular expression
+matches the purpose line or the counterparty name SHALL the system consider the categories whose
+date windows cover the transaction's booking date. A transaction matched by no expression and
+covered by no window SHALL be uncategorised. This ordering SHALL hold under re-evaluation, so a
+transaction that gains an expression match after a category change SHALL stop being held by a date
+window.
 
 #### Scenario: An expression match beats a covering window
 
@@ -201,6 +227,11 @@ category change SHALL stop being held by a date window.
 
 - **WHEN** a transaction was held by a date window and, after a category change, a regular expression matches its purpose line
 - **THEN** re-evaluation replaces the window's category with the expression-winning category
+
+#### Scenario: A counterparty-name match beats a covering window
+
+- **WHEN** a transaction's counterparty name matches a category's expression and its booking date is covered by another category's window
+- **THEN** the transaction holds the category whose expression matched, and the window is not applied
 
 ### Requirement: Among covering windows the smallest identity wins
 

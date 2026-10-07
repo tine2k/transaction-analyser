@@ -72,3 +72,48 @@ test('the sync control reports a sync that is not configured', async ({ page }) 
   await expect(page.getByTestId('sync-status')).toContainText('not configured');
   await expect(page.getByTestId('import-run')).toHaveCount(1);
 });
+
+test('the re-categorise control disables while it runs and shows the changed count', async ({ page }) => {
+  let recategoriseMethod: string | null = null;
+  let releaseRecategorise!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    releaseRecategorise = resolve;
+  });
+
+  await page.route('**/api/imports', async (route) => {
+    await route.fulfill({ json: [scheduledRun] });
+  });
+  await page.route('**/api/categories/recategorise', async (route) => {
+    recategoriseMethod = route.request().method();
+    await pending;
+    await route.fulfill({ json: { changed: 2 } });
+  });
+
+  await page.goto('/imports');
+  const button = page.getByTestId('recategorise-button');
+  await button.click();
+
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveText('Re-categorising…');
+
+  releaseRecategorise();
+
+  await expect(page.getByTestId('recategorise-status')).toContainText('2 transactions changed');
+  await expect(button).toBeEnabled();
+  expect(recategoriseMethod).toBe('POST');
+});
+
+test('the re-categorise control reports a failure rather than a zero count', async ({ page }) => {
+  await page.route('**/api/imports', async (route) => {
+    await route.fulfill({ json: [scheduledRun] });
+  });
+  await page.route('**/api/categories/recategorise', async (route) => {
+    await route.fulfill({ status: 500, json: { message: 'the category request could not be completed' } });
+  });
+
+  await page.goto('/imports');
+  await page.getByTestId('recategorise-button').click();
+
+  await expect(page.getByTestId('recategorise-status')).toContainText('could not be completed');
+  await expect(page.getByTestId('recategorise-status')).not.toContainText('0 transactions changed');
+});

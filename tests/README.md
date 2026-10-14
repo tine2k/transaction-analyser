@@ -12,7 +12,7 @@ npm test
 
 `npm run test:unit` runs server/domain tests. `npm run test:components` mounts selected Vue components in Nuxt's simulated DOM. Neither command needs PostgreSQL, Docker, or a production build.
 
-Run the viewport and interaction checks in headless Chromium. GitHub Actions runs them on `ubuntu-latest`; API calls are intercepted with test fixtures, so no Docker daemon or PostgreSQL server is needed. For a glibc Linux host, install the lockfile-matched browser and dependencies with:
+Run the viewport and interaction checks in headless Chromium. API calls are intercepted with test fixtures, but the built server still needs a database to start: `npm run test:browser` runs inside the same disposable-database launcher as the integration suite, so the local PostgreSQL prerequisites below apply. For a glibc Linux host, install the lockfile-matched browser and dependencies with:
 
 ```sh
 npm run build
@@ -38,6 +38,6 @@ npm run test:integration
 
 This builds the Nuxt server and uses the locally installed PostgreSQL 18.6 server. Start PostgreSQL first and confirm `pg_isready --dbname=postgres` succeeds. The local PostgreSQL client tools (`pg_isready`, `createdb`, `dropdb`, and `psql`) must be on `PATH`; the configured local role must be able to create databases and own/drop the database it creates. If local password authentication is required, configure `PGPASSWORD` along with the local PostgreSQL connection settings.
 
-The launcher creates a uniquely named disposable database, applies the repository migrations, and loads only `tests/fixtures/integration.sql`. It passes that database as `TEST_DATABASE_URL`, removes any inherited `DATABASE_URL`, and drops the disposable database on success, failure, or handled interruption. Docker is not required. Do not invoke `test:integration:run` directly; it is the inner Vitest command and expects the disposable test database and built server to be ready.
+The launcher creates a uniquely named disposable database, applies the repository migrations with the migration runner (`node-pg-migrate`), which records each applied file in the database's `pgmigrations` table, and loads only `tests/fixtures/integration.sql`. It passes that database as `TEST_DATABASE_URL`, removes any inherited `DATABASE_URL`, and drops the disposable database on success, failure, or handled interruption. Docker is not required. Do not invoke `test:integration:run` directly; it is the inner Vitest command and expects the disposable test database and built server to be ready.
 
 Run the entire local suite with `npm test`; it runs the fast suites followed by the integration suite. The separate responsive-browser workflow runs the headless Chromium checks on GitHub Actions.

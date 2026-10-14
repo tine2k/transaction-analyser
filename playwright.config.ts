@@ -23,7 +23,10 @@ export default defineConfig({
     env: {
       HOST: '127.0.0.1',
       PORT: '3000',
-      DATABASE_URL: '',
+      // The launcher supplies a disposable migrated database; the server applies
+      // pending migrations before it serves and fails without an address.
+      // See openspec/changes/add-startup-database-migrations/design.md D10.
+      DATABASE_URL: process.env['TEST_DATABASE_URL'] ?? '',
     },
   },
 });

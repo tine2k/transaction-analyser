@@ -19,7 +19,8 @@
     "test:unit": "vitest run tests/unit",
     "test:components": "vitest run tests/components",
     "test:browser:install": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install --with-deps chromium",
-    "test:browser": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
+    "test:browser": "bash tests/run-with-test-database.sh npm run test:browser:run",
+    "test:browser:run": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
     "test:integration": "npm run build && bash tests/run-with-test-database.sh npm run test:integration:run",
     "test:integration:run": "vitest run tests/integration --no-file-parallelism --hookTimeout=30000 --testTimeout=10000"
   },
@@ -27,6 +28,7 @@
     "cheerio": "^1.2.0",
     "csv-parse": "^7.0.3",
     "echarts": "^6.1.0",
+    "node-pg-migrate": "^9.0.0",
     "ocx": "^2.0.15",
     "pg": "^8.23.0",
     "vue-echarts": "^8.3.1"

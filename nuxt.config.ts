@@ -39,5 +39,13 @@ export default defineNuxtConfig({
     scheduledTasks: {
       '0 3 * * *': ['easybank:sync'],
     },
+
+    // The startup migration plugin awaits its run at module scope, so the server
+    // does not listen before migrations have been applied. Nitro's default esbuild
+    // target refuses top-level await, and the fallback in design.md D6 would bind
+    // the port before a failed start; instead the server code is built for the
+    // Node version the project requires.
+    // See openspec/changes/add-startup-database-migrations/design.md D6.
+    esbuild: { options: { target: 'esnext' } },
   },
 });

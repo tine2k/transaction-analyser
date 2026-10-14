@@ -8,7 +8,6 @@ node_modules
 .output
 coverage
 backups
-db
 tests
 tools
 docs

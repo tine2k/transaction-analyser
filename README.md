@@ -6,7 +6,7 @@ Self-hosted web application that imports transactions from a bank export CSV int
 
 Prerequisites: Docker, Git, and Node.js 24 with npm (Node is needed only for the CSV importer).
 
-1. Get the repository; the migrations and importer live here, not in the image.
+1. Get the repository; the CSV importer lives here, not in the image, which carries the migrations it applies.
 
    ```sh
    git clone https://github.com/tine2k/transaction-analyser.git
@@ -28,22 +28,14 @@ Prerequisites: Docker, Git, and Node.js 24 with npm (Node is needed only for the
 
    Replace the example password. The volume is mounted at `/var/lib/postgresql`, the PostgreSQL 18 image's data volume; do not use the older `/var/lib/postgresql/data` path with this image.
 
-3. Create the schema by applying every migration in order (the latest, `0008_category_expense_type.sql`, adds the optional expense type to categories).
-
-   ```sh
-   for migration in db/migrations/*.sql; do
-     docker exec --interactive transaction-analyser-postgres \
-       psql --username analyser --dbname transaction_analyser --set ON_ERROR_STOP=1 < "$migration"
-   done
-   ```
-
-4. Start the application and verify it is up, then open http://localhost:3000.
+3. Start the application. The image applies the pending migrations while it starts, so there is no schema step to run; open http://localhost:3000 once the health endpoint answers. A database whose schema was applied by hand before the migration history existed is adopted once with `MIGRATE_BASELINE` (see Upgrading).
 
    ```sh
    docker run --detach --name transaction-analyser --network transaction-analyser \
      --publish 3000:3000 \
      --env DATABASE_URL=postgres://analyser:change-me@transaction-analyser-postgres:5432/transaction_analyser \
      ghcr.io/tine2k/transaction-analyser:latest
+   until curl --fail --silent http://localhost:3000/api/health > /dev/null; do sleep 1; done
    curl --fail http://localhost:3000/api/health   # {"status":"ok"}
    ```
 
@@ -99,8 +91,8 @@ The window defaults to the first day of the preceding calendar quarter through t
 ## Upgrading and backups
 
 - Pin `vX.Y.Z` or `sha-<commit>`; the `latest` and `main` tags move with the default branch.
-- To upgrade, pull the new image and recreate the application container with the same `DATABASE_URL`.
-- After pulling new source, apply only the migration files you have not applied yet, in filename order. There is no migration tracking table, so do not re-run migrations that have already been applied.
+- To upgrade, pull the new image and recreate the application container with the same `DATABASE_URL`; the pending migrations are applied while it starts, and every applied migration is recorded in the database's `pgmigrations` table, so no migration is ever applied twice.
+- A database whose schema was applied by hand before the migration history existed is adopted once by starting with `MIGRATE_BASELINE` set to the highest applied version (for example `0008`); the variable is ignored once the database records migrations. Migrations are forward-only: correct a bad migration with a new file or by restoring a backup.
 - Back up the database with `tools/backup-postgres.sh [directory]`; it requires the quick-start container name `transaction-analyser-postgres` and writes a timestamped `.sql.gz`, by default under `backups/`.
 
 ## What it does
@@ -113,4 +105,4 @@ The window defaults to the first day of the preceding calendar quarter through t
 
 ## Development
 
-`npm install` then `npm run dev` serves the app on http://127.0.0.1:3000. `npm test` runs the unit, component, and integration suites; see [tests/README.md](tests/README.md) for prerequisites. The full container reference is in [docs/container-image.md](docs/container-image.md).
+`npm install` then `npm run dev` serves the app on http://127.0.0.1:3000. The server requires a reachable database: set `DATABASE_URL` in the environment or a gitignored `.env` file, and the pending migrations are applied at startup. `npm test` runs the unit, component, and integration suites; see [tests/README.md](tests/README.md) for prerequisites. The full container reference is in [docs/container-image.md](docs/container-image.md).

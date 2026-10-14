@@ -226,20 +226,27 @@ describe('category re-categorisation API integration', () => {
     expect(await categoryName('Purchase')).toBe('Acme');
   });
 
-  it('answers a database failure as an error rather than a count', async () => {
-    const broken = await startServer('postgres://test:secret@127.0.0.1:1/unreachable');
+  it('refuses to start against an unreachable database without disclosing it', async () => {
+    const port = await availablePort();
+    let output = '';
+    const child = spawn(process.execPath, ['.output/server/index.mjs'], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        DATABASE_URL: 'postgres://test:secret@127.0.0.1:1/unreachable',
+        HOST: '127.0.0.1',
+        PORT: String(port),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    child.stdout?.on('data', (chunk: Buffer) => { output += chunk.toString(); });
+    child.stderr?.on('data', (chunk: Buffer) => { output += chunk.toString(); });
 
-    try {
-      const response = await fetch(`${broken.url}/api/categories/recategorise`, { method: 'POST' });
-      expect(response.status).toBe(500);
-      const body = await response.text();
-      expect(body).not.toContain('secret');
-      expect(body).not.toContain('127.0.0.1:1');
-    } finally {
-      const exited = once(broken.child, 'exit');
-      broken.child.kill('SIGTERM');
-      await exited;
-    }
+    const [exitCode] = await once(child, 'exit');
+    expect(exitCode).toBe(1);
+    expect(output).toContain('DATABASE_URL');
+    expect(output).not.toContain('secret');
+    expect(output).not.toContain('127.0.0.1:1');
   });
 
   it('serializes with a concurrent category change and leaves a consistent assignment', async () => {

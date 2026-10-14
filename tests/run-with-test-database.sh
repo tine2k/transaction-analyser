@@ -35,6 +35,11 @@ for command_name in pg_isready createdb dropdb psql node; do
   fi
 done
 
+if [[ ! -x node_modules/.bin/node-pg-migrate ]]; then
+  echo "node-pg-migrate is not installed. Run npm install, then retry." >&2
+  exit 127
+fi
+
 if ! pg_isready --dbname=postgres >/dev/null 2>&1; then
   echo "Local PostgreSQL is not ready. Start the local PostgreSQL server and confirm 'pg_isready --dbname=postgres' succeeds, then retry." >&2
   exit 1
@@ -56,12 +61,24 @@ if ! createdb --maintenance-db=postgres --encoding=UTF8 "$database_name"; then
 fi
 database_created=true
 
-for migration in db/migrations/*.sql; do
-  psql --no-psqlrc \
-    --set ON_ERROR_STOP=1 \
-    --dbname="$database_name" \
-    --file="$migration"
-done
+test_database_url=$(TEST_DATABASE_NAME="$database_name" \
+  TEST_DATABASE_HOST="$database_host" \
+  TEST_DATABASE_PORT="$database_port" \
+  TEST_DATABASE_USER="$database_user" \
+  TEST_DATABASE_PASSWORD="${PGPASSWORD-}" \
+  node --input-type=commonjs --eval='
+    const url = new URL("postgresql:///");
+    url.pathname = `/${process.env.TEST_DATABASE_NAME}`;
+    url.searchParams.set("host", process.env.TEST_DATABASE_HOST);
+    url.searchParams.set("port", process.env.TEST_DATABASE_PORT);
+    url.searchParams.set("user", process.env.TEST_DATABASE_USER);
+    if (process.env.TEST_DATABASE_PASSWORD !== "") {
+      url.searchParams.set("password", process.env.TEST_DATABASE_PASSWORD);
+    }
+    process.stdout.write(url.toString());
+  ')
+
+DATABASE_URL="$test_database_url" node_modules/.bin/node-pg-migrate up --migrations-dir db/migrations
 
 psql --no-psqlrc \
   --set ON_ERROR_STOP=1 \
@@ -88,23 +105,6 @@ if [[ "$database_is_ready" != "t" ]]; then
   echo "Disposable PostgreSQL database '$database_name' is missing the migrated schema or integration fixture rows." >&2
   exit 1
 fi
-
-test_database_url=$(TEST_DATABASE_NAME="$database_name" \
-  TEST_DATABASE_HOST="$database_host" \
-  TEST_DATABASE_PORT="$database_port" \
-  TEST_DATABASE_USER="$database_user" \
-  TEST_DATABASE_PASSWORD="${PGPASSWORD-}" \
-  node --input-type=commonjs --eval='
-    const url = new URL("postgresql:///");
-    url.pathname = `/${process.env.TEST_DATABASE_NAME}`;
-    url.searchParams.set("host", process.env.TEST_DATABASE_HOST);
-    url.searchParams.set("port", process.env.TEST_DATABASE_PORT);
-    url.searchParams.set("user", process.env.TEST_DATABASE_USER);
-    if (process.env.TEST_DATABASE_PASSWORD !== "") {
-      url.searchParams.set("password", process.env.TEST_DATABASE_PASSWORD);
-    }
-    process.stdout.write(url.toString());
-  ')
 
 # Never allow application-configured credentials to leak into a test process.
 unset DATABASE_URL

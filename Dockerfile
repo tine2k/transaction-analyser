@@ -26,6 +26,11 @@ COPY --from=build --chown=node:node /app/.output ./.output
 RUN rm -rf .output/server/node_modules
 COPY --from=runtime-dependencies --chown=node:node /app/.output/server/node_modules ./.output/server/node_modules
 
+# The server applies pending migrations when it starts, so the migration files it
+# applies are part of the image.
+# See openspec/changes/add-startup-database-migrations/specs/container-image/spec.md
+COPY --chown=node:node db/migrations ./db/migrations
+
 USER node
 EXPOSE 3000
 CMD ["node", ".output/server/index.mjs"]

@@ -108,43 +108,19 @@ or write a row in the database, and SHALL NOT be reported as a missing resource.
 - **WHEN** the health endpoint is requested while the database is unreachable
 - **THEN** the response is the same as when the database is reachable, because the endpoint reports on the server alone
 
-### Requirement: The database address and its credentials come from the environment and are never disclosed
-
-The system SHALL read the database address from the process environment at run time, and SHALL NOT require a configuration file in the repository to hold it. The system SHALL NOT ship a default address, and SHALL NOT resolve the address while the application is built, so that one build can be pointed at any database by changing only the environment. No file committed to the repository SHALL hold a real database address, a user name, or a password; an example file MAY name the variables the application expects with no value for any of them. The system SHALL NOT include the address, a user name, a password, or any part of a connection string in a response body, in an error message shown to a browser, or in a log line.
-
-#### Scenario: The address comes from the environment
-
-- **WHEN** the server is started with the address present in the environment
-- **THEN** the server reads that address and holds it for later use
-
-#### Scenario: The address is not needed to start
-
-- **WHEN** the server is started with no address in the environment
-- **THEN** it starts and serves the health endpoint, and the missing address is reported only when something asks the database for data
-
-#### Scenario: The address is resolved at run time rather than at build time
-
-- **WHEN** one build of the application is run twice against two different addresses
-- **THEN** each run reaches the database its own environment names, with no rebuild in between
-
-#### Scenario: No credential is committed
-
-- **WHEN** the repository is inspected
-- **THEN** no file in it holds a real database address, user name, or password, and the example file holds variable names with empty values
-
-#### Scenario: The address is never disclosed
-
-- **WHEN** any response is returned or any log line is written
-- **THEN** neither the response nor the log line contains the address, a user name, a password, or any part of a connection string
-
 ### Requirement: One shared connection pool serves every consumer, opened only when it is used
 
-The system SHALL hold one shared database connection pool per server process, built from the configured address, and every consumer of the database SHALL obtain that same pool rather than opening a connection of its own. The system SHALL NOT open a connection while the server starts, while a page is rendered, or while a request is answered; a connection SHALL be established only when a statement is run through the pool. The system SHALL release the pool's connections when the server shuts down. The pages and the health endpoint SHALL run no statement, so the pool is opened only when a statement is run through it, which the transactions read endpoint, the category management surface, the import log endpoint, and the scheduled sync task do.
+The system SHALL hold one shared database connection pool per server process, built from the configured address, and every consumer of the database SHALL obtain that same pool rather than opening a connection of its own. The system SHALL NOT open a connection while the server starts, while a page is rendered, or while a request is answered; a connection SHALL be established only when a statement is run through the pool. The system SHALL release the pool's connections when the server shuts down. The pages and the health endpoint SHALL run no statement, so the pool is opened only when a statement is run through it, which the transactions read endpoint, the category management surface, the import log endpoint, and the scheduled sync task do. The startup migration run SHALL use its own connection, established and released for that run, and SHALL NOT obtain it from the shared pool.
 
 #### Scenario: Starting opens no connection
 
-- **WHEN** the server starts with no database reachable
-- **THEN** it starts, opens no connection, and reports no database failure
+- **WHEN** the server starts with the address configured
+- **THEN** no connection is opened through the shared pool while starting, and the startup migration run uses a connection of its own for the run's duration
+
+#### Scenario: The migration connection is released
+
+- **WHEN** the startup migration run finishes
+- **THEN** its connection is closed, and no connection opened for the run is held afterward
 
 #### Scenario: Serving opens no connection
 
@@ -202,7 +178,7 @@ The system SHALL serve every request it receives without asking for a credential
 
 ### Requirement: The command-line importer, the sync command, and the scheduled sync share one import path
 
-The system SHALL keep the command-line import tool runnable as a command, taking the path to the statement as its argument, taking the database address from its arguments or the environment, and offering its non-writing mode, and SHALL keep it in the manifest. The tool SHALL share its parsing, validation, deduplication, and write path with the scheduled sync, the sync command, and the sync started from the imports screen, so that all four import the same way, as `transaction-csv-import` defines. The system SHALL offer a sync command that runs the same sync by hand, as `easybank-sync` defines. The application SHALL offer the sync from the imports screen through the sync-start endpoint, as `easybank-sync` defines, and SHALL offer no other way to start an import from the browser. The system SHALL leave the database migrations as plain SQL files applied by the person running them, SHALL NOT edit a migration that has already been applied, and SHALL NOT apply, generate, or require any migration when the application starts or serves a request; a new table SHALL arrive as a new migration file applied the same way.
+The system SHALL keep the command-line import tool runnable as a command, taking the path to the statement as its argument, taking the database address from its arguments or the environment, and offering its non-writing mode, and SHALL keep it in the manifest. The tool SHALL share its parsing, validation, deduplication, and write path with the scheduled sync, the sync command, and the sync started from the imports screen, so that all four import the same way, as `transaction-csv-import` defines. The system SHALL offer a sync command that runs the same sync by hand, as `easybank-sync` defines. The application SHALL offer the sync from the imports screen through the sync-start endpoint, as `easybank-sync` defines, and SHALL offer no other way to start an import from the browser. The system SHALL keep the database migrations as plain SQL files in the repository and SHALL apply every pending migration automatically while the application starts, before it serves any request, as the `database-migrations` capability defines; the system SHALL NOT edit a migration that has already been applied, and a new table SHALL arrive as a new migration file applied at the next start.
 
 #### Scenario: The import command keeps its interface
 
@@ -227,36 +203,97 @@ The system SHALL keep the command-line import tool runnable as a command, taking
 #### Scenario: The migrations stay plain SQL files
 
 - **WHEN** a database is prepared for use
-- **THEN** it is prepared by applying the SQL files with a database client, and the application performs no schema step of its own
+- **THEN** its schema comes from the plain SQL files in the repository, applied automatically while the application starts, and the application generates or edits no migration file of its own
+
+#### Scenario: The migrations are applied at startup
+
+- **WHEN** the application starts against a database with pending migration files in the repository
+- **THEN** they are applied before any request is served, and no person applies them by hand
+
+#### Scenario: A recorded migration is not re-run
+
+- **WHEN** the application restarts against a database whose history records a migration
+- **THEN** that migration's SQL is not executed again
 
 #### Scenario: Starting the application changes no schema and no data
 
-- **WHEN** the server starts and serves requests against a database holding the migrated schema and its rows
+- **WHEN** the server starts and serves requests against a database whose migrations are all recorded
 - **THEN** no table, column, or row is created, altered, or removed by starting it
 
-### Requirement: The application is installed, started, built, and served with no other service
+### Requirement: Starting requires a configured, reachable database
 
-The system SHALL be installed, started, built, and served by commands declared in the project's package manifest, and SHALL NOT require a container runtime, a separate process, or an external tool beyond a Node package installation. Someone who has installed the dependencies SHALL be able to start the application with one command and see the shell in a browser. Being unable to reach the database SHALL NOT be reported as a failure to start or to serve. The manifest SHALL keep the existing import command alongside the application commands, so that the tool and the application are run from one place.
+The system SHALL fail startup with a non-zero exit and serve no request when the database cannot be used: the address is missing or empty, the database cannot be reached, or a pending migration cannot be applied. The failure message SHALL name the missing configuration or the failing condition without including an address or a credential.
+
+#### Scenario: Startup without an address
+
+- **WHEN** the server is started with no address in the environment
+- **THEN** startup fails with a non-zero exit before any request is served, and the message names the missing variable without including any credential
+
+#### Scenario: Startup with an empty address
+
+- **WHEN** the server is started with the address set to an empty value
+- **THEN** startup fails with a non-zero exit and no request is served
+
+#### Scenario: A stopped database is a start-up failure
+
+- **WHEN** the application is started with no database running
+- **THEN** it exits non-zero without serving the shell or the health endpoint
+
+#### Scenario: A failed migration is a start-up failure
+
+- **WHEN** a pending migration cannot be applied
+- **THEN** the application exits non-zero without serving the shell or the health endpoint
+
+### Requirement: The database address comes from the environment at run time
+
+The system SHALL read the database address from the process environment at run time, and SHALL NOT require a configuration file in the repository to hold it. The system SHALL NOT ship a default address, and SHALL NOT resolve the address while the application is built, so that one build can be pointed at any database by changing only the environment.
+
+#### Scenario: The address comes from the environment
+
+- **WHEN** the server is started with the address present in the environment
+- **THEN** the server reads that address and holds it for later use
+
+#### Scenario: The address is resolved at run time rather than at build time
+
+- **WHEN** one build of the application is run twice against two different addresses
+- **THEN** each run reaches the database its own environment names, with no rebuild in between
+
+### Requirement: No credential is committed and none is disclosed
+
+No file committed to the repository SHALL hold a real database address, a user name, or a password; an example file MAY name the variables the application expects with no value for any of them. The system SHALL NOT include the address, a user name, a password, or any part of a connection string in a response body, in an error message shown to a browser, or in a log line.
+
+#### Scenario: No credential is committed
+
+- **WHEN** the repository is inspected
+- **THEN** no file in it holds a real database address, user name, or password, and the example file holds variable names with empty values
+
+#### Scenario: The address is never disclosed
+
+- **WHEN** any response is returned or any log line is written
+- **THEN** neither the response nor the log line contains the address, a user name, a password, or any part of a connection string
+
+### Requirement: The application is installed, started, built, and served with no separate migration process
+
+The system SHALL be installed, started, built, and served by commands declared in the project's package manifest, and SHALL NOT require a container runtime, a separate migration process or tool, or an external tool beyond a Node package installation. Someone who has installed the dependencies and configured a reachable database SHALL be able to start the application with one command and see the shell in a browser.
 
 #### Scenario: One command starts the application
 
-- **WHEN** the dependencies are installed and the start command is run
+- **WHEN** the dependencies are installed, a reachable database is configured, and the start command is run
 - **THEN** the application is served on a local address and the shell loads in a browser
 
-#### Scenario: No other service is required
+#### Scenario: No orchestration is required
 
 - **WHEN** the application is started
-- **THEN** no database, no container runtime, and no process other than the application itself is needed for the shell to be served
-
-#### Scenario: A stopped database is not a start-up failure
-
-- **WHEN** the application is started with no database running
-- **THEN** it starts and serves the shell and the health endpoint, and the absence of the database is not reported as a failure
+- **THEN** no container runtime and no separate migration process or tool is needed, because migrations run inside the application process against the externally provided database
 
 #### Scenario: The built output serves the same shell
 
 - **WHEN** the application is built and the built output is served
 - **THEN** the shell and the health endpoint behave as they do when the application is started for development
+
+### Requirement: The import command remains in the same manifest
+
+The manifest SHALL keep the existing import command alongside the application commands, so that the tool and the application are run from one place.
 
 #### Scenario: The import command remains in the same manifest
 

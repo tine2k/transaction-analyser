@@ -75,7 +75,7 @@ async function storedRows(): Promise<{ transactions: unknown[]; categories: unkn
     SELECT id, booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id
     FROM transactions ORDER BY id
   `);
-  const categories = await database.query('SELECT id, name, patterns, hidden, windows FROM categories ORDER BY id');
+  const categories = await database.query('SELECT id, name, patterns, hidden, windows, expense_type FROM categories ORDER BY id');
   return { transactions: transactions.rows, categories: categories.rows };
 }
 
@@ -95,7 +95,7 @@ async function append(id: string, text: unknown): Promise<Response> {
   return post(`/api/categories/${id}/patterns`, { text });
 }
 
-async function categories(): Promise<Array<{ id: string; name: string; patterns: string[]; hidden: boolean; windows: Array<{ from: string; to: string }> }>> {
+async function categories(): Promise<Array<{ id: string; name: string; patterns: string[]; hidden: boolean; windows: Array<{ from: string; to: string }>; expenseType: 'recurring' | 'one-time' | null }>> {
   return request('/api/categories').then((result) => result.json());
 }
 
@@ -152,7 +152,7 @@ describe('category pattern append API integration', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      category: { id: '1', name: 'Groceries', patterns: ['rewe', 'market', 'organic'], hidden: false, windows: [] },
+      category: { id: '1', name: 'Groceries', patterns: ['rewe', 'market', 'organic'], hidden: false, windows: [], expenseType: null },
       added: true,
     });
   });
@@ -194,6 +194,7 @@ describe('category pattern append API integration', () => {
         patterns: ['urlaub', 'strand'],
         hidden: true,
         windows: [{ from: '2026-07-01', to: '2026-07-14' }],
+        expenseType: null,
       },
       added: true,
     });
@@ -205,7 +206,7 @@ describe('category pattern append API integration', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      category: { id: '1', name: 'Groceries', patterns: ['rewe', 'market'], hidden: false, windows: [] },
+      category: { id: '1', name: 'Groceries', patterns: ['rewe', 'market'], hidden: false, windows: [], expenseType: null },
       added: false,
     });
     assert.deepEqual(await storedRows(), before);
@@ -361,5 +362,106 @@ describe('category pattern append API integration', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ count: 0 });
+  });
+
+  it('stores and returns the expense type on create', async () => {
+    const created = await post('/api/categories', {
+      name: 'New car',
+      patterns: ['dealer'],
+      expenseType: 'one-time',
+    });
+
+    expect(created.status).toBe(201);
+    expect((await created.json()).expenseType).toBe('one-time');
+
+    const listed = (await categories()).find((category) => category.name === 'New car');
+    expect(listed?.expenseType).toBe('one-time');
+  });
+
+  it('changes and clears the expense type on edit', async () => {
+    const created = await post('/api/categories', { name: 'Food', patterns: ['food'], expenseType: 'recurring' });
+    const id = (await created.json()).id as string;
+
+    const changed = await request(`/api/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Food', patterns: ['food'], expenseType: 'one-time' }),
+    });
+    expect(changed.status).toBe(200);
+    expect((await changed.json()).expenseType).toBe('one-time');
+
+    const cleared = await request(`/api/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Food', patterns: ['food'] }),
+    });
+    expect(cleared.status).toBe(200);
+    expect((await cleared.json()).expenseType).toBeNull();
+  });
+
+  it('refuses an unknown expense type without changing stored data', async () => {
+    const before = await storedRows();
+
+    const unknownLabel = await post('/api/categories', { name: 'Unknown type', patterns: ['x'], expenseType: 'monthly' });
+    expect(unknownLabel.status).toBe(400);
+
+    const notAString = await post('/api/categories', { name: 'Unknown type', patterns: ['x'], expenseType: true });
+    expect(notAString.status).toBe(400);
+
+    assert.deepEqual(await storedRows(), before);
+  });
+
+  it('leaves the expense type unchanged on an append', async () => {
+    const created = await post('/api/categories', { name: 'Utilities', patterns: ['power'], expenseType: 'recurring' });
+    const id = (await created.json()).id as string;
+
+    const response = await append(id, 'water');
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).category.expenseType).toBe('recurring');
+  });
+
+  it('changes no transaction when a category is classified', async () => {
+    await insertTransaction('Dealer purchase', 'Car dealer');
+    const created = await post('/api/categories', { name: 'New car', patterns: ['dealer'] });
+    const id = (await created.json()).id as string;
+
+    const before = await storedRows();
+
+    const classified = await request(`/api/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'New car', patterns: ['dealer'], expenseType: 'one-time' }),
+    });
+    expect(classified.status).toBe(200);
+
+    const after = await storedRows();
+    expect(after.transactions).toEqual(before.transactions);
+  });
+
+  it('reads every category that predates the expense type column as unset', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+
+    const result = await database.query('SELECT name, expense_type FROM categories ORDER BY id');
+
+    expect(result.rows).toEqual([
+      { name: 'Groceries', expense_type: null },
+      { name: 'Transport', expense_type: null },
+      { name: 'Internal', expense_type: null },
+    ]);
+  });
+
+  it('rejects an unknown expense type at the database', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+
+    await expect(
+      database.query(
+        `INSERT INTO categories (name, patterns, expense_type) VALUES ('Unknown type', ARRAY['unknown'], 'monthly')`,
+      ),
+    ).rejects.toThrow('categories_expense_type_check');
   });
 });

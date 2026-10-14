@@ -28,7 +28,7 @@ Prerequisites: Docker, Git, and Node.js 24 with npm (Node is needed only for the
 
    Replace the example password. The volume is mounted at `/var/lib/postgresql`, the PostgreSQL 18 image's data volume; do not use the older `/var/lib/postgresql/data` path with this image.
 
-3. Create the schema by applying every migration in order (the latest, `0007_import_runs_categorised.sql`, adds the categorised count to the import log).
+3. Create the schema by applying every migration in order (the latest, `0008_category_expense_type.sql`, adds the optional expense type to categories).
 
    ```sh
    for migration in db/migrations/*.sql; do
@@ -106,10 +106,10 @@ The window defaults to the first day of the preceding calendar quarter through t
 ## What it does
 
 - **Transactions** - filterable by category and period (a calendar month or a whole calendar year), with the sum of displayed rows; select text to add it as a pattern to a category without leaving the table.
-- **Categories** - regular expressions matched against the purpose line or the counterparty name, and inclusive date windows, assign transactions, with match previews and a hidden flag.
-- **Analytics** - category spending pie charts for each of the last 12 months, switchable to whole-calendar-year totals for every year with data.
-- **Monthly totals** - a month-by-category matrix over every month with data.
-- **Monthly average** - average spend per category over a chosen number of months.
+- **Categories** - regular expressions matched against the purpose line or the counterparty name, and inclusive date windows, assign transactions, with match previews, a hidden flag, and an optional expense type (recurring or one-time) that classifies the category for the analysis screens.
+- **Analytics** - category spending pie charts for each of the last 12 months, switchable to whole-calendar-year totals for every year with data; filterable by expense type.
+- **Monthly totals** - a month-by-category matrix over every month with data; filterable by expense type.
+- **Monthly average** - average spend per category over a chosen number of months; filterable by expense type.
 
 ## Development
 

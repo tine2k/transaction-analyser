@@ -8,19 +8,24 @@
 // A category carries regular expressions and date windows, so the form holds a list
 // of expression inputs and a list of windows with add and remove controls. A window
 // is entered with two native date inputs, which produce a full YYYY-MM-DD date with
-// no time of day and no time-zone shift. The form is shared by create and edit: with
+// no time of day and no time-zone shift. It may also carry an expense type —
+// recurring or one-time, or unset — which classifies it for the analysis views and
+// never changes what it matches. The form is shared by create and edit: with
 // no category being edited it creates, and with one it replaces that category's name,
-// expressions, and windows.
+// expressions, windows, hidden flag, and expense type.
 //
 // See openspec/changes/allow-multiple-category-expressions/specs/category-management-screen/spec.md
 // and openspec/changes/add-category-date-windows/specs/category-management-screen/spec.md
+// and openspec/changes/add-category-expense-type/specs/category-management-screen/spec.md
 type CategoryWindow = { from: string; to: string };
+type CategoryExpenseType = 'recurring' | 'one-time';
 type Category = {
   id: string;
   name: string;
   patterns: string[];
   hidden: boolean;
   windows: CategoryWindow[];
+  expenseType: CategoryExpenseType | null;
 };
 
 const { data: categories, error, pending, refresh } = useFetch<Category[]>('/api/categories', {
@@ -45,6 +50,7 @@ const name = ref('');
 const patterns = ref<string[]>(['']);
 const windows = ref<CategoryWindow[]>([]);
 const hidden = ref(false);
+const expenseType = ref<'unset' | CategoryExpenseType>('unset');
 const editingId = ref<string | null>(null);
 const saving = ref(false);
 const formError = ref<string | null>(null);
@@ -69,6 +75,7 @@ function startEdit(category: Category): void {
   patterns.value = category.patterns.length > 0 ? [...category.patterns] : [''];
   windows.value = category.windows.map((window) => ({ ...window }));
   hidden.value = category.hidden;
+  expenseType.value = category.expenseType ?? 'unset';
   formError.value = null;
   void nextTick(() => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -85,6 +92,7 @@ function cancelEdit(): void {
   patterns.value = [''];
   windows.value = [];
   hidden.value = false;
+  expenseType.value = 'unset';
   formError.value = null;
 }
 
@@ -237,6 +245,23 @@ onBeforeUnmount(() => {
   }
 });
 
+// The expense type the form sends: the stored labels, or null for the unset choice,
+// which the server stores as no expense type. The choice never changes membership,
+// so it is sent alongside the other values without any preview.
+function submittedExpenseType(): CategoryExpenseType | null {
+  return expenseType.value === 'unset' ? null : expenseType.value;
+}
+
+function expenseTypeLabel(value: CategoryExpenseType | null): string {
+  if (value === 'recurring') {
+    return 'Recurring';
+  }
+  if (value === 'one-time') {
+    return 'One-time';
+  }
+  return 'Unset';
+}
+
 async function submit(): Promise<void> {
   formError.value = null;
   const submitted = enteredPatterns();
@@ -247,16 +272,17 @@ async function submit(): Promise<void> {
   }
   saving.value = true;
   try {
+    const body = {
+      name: name.value,
+      patterns: submitted,
+      hidden: hidden.value,
+      windows: submittedWindows,
+      expenseType: submittedExpenseType(),
+    };
     if (editingId.value === null) {
-      await $fetch('/api/categories', {
-        method: 'POST',
-        body: { name: name.value, patterns: submitted, hidden: hidden.value, windows: submittedWindows },
-      });
+      await $fetch('/api/categories', { method: 'POST', body });
     } else {
-      await $fetch(`/api/categories/${editingId.value}`, {
-        method: 'PUT',
-        body: { name: name.value, patterns: submitted, hidden: hidden.value, windows: submittedWindows },
-      });
+      await $fetch(`/api/categories/${editingId.value}`, { method: 'PUT', body });
     }
     cancelEdit();
     await refresh();
@@ -291,7 +317,8 @@ async function remove(category: Category): Promise<void> {
       A category is a name with regular expressions matched against a transaction's purpose line
       and optional from/to date windows matched against its booking date. An expression is applied
       first; a date window is applied only when no expression matches. Both window dates are
-      inclusive.
+      inclusive. A category may also carry an expense type, recurring or one-time, which
+      classifies it for the analysis screens without changing what it matches.
     </p>
 
     <form
@@ -401,6 +428,49 @@ async function remove(category: Category): Promise<void> {
         Hidden from the analysis
       </label>
 
+      <fieldset class="mt-3 min-w-0">
+        <legend class="text-sm text-slate-700">Expense type</legend>
+        <p class="mt-1 text-xs text-slate-500">
+          Classifies the category for the analysis screens. The type changes no matching and no
+          stored transaction.
+        </p>
+        <div class="mt-1 flex flex-wrap items-center gap-4 text-sm text-slate-700">
+          <label class="inline-flex min-h-11 items-center gap-2">
+            <input
+              v-model="expenseType"
+              type="radio"
+              name="expense-type"
+              value="unset"
+              data-testid="expense-type-unset"
+              class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500"
+            >
+            Unset
+          </label>
+          <label class="inline-flex min-h-11 items-center gap-2">
+            <input
+              v-model="expenseType"
+              type="radio"
+              name="expense-type"
+              value="recurring"
+              data-testid="expense-type-recurring"
+              class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500"
+            >
+            Recurring
+          </label>
+          <label class="inline-flex min-h-11 items-center gap-2">
+            <input
+              v-model="expenseType"
+              type="radio"
+              name="expense-type"
+              value="one-time"
+              data-testid="expense-type-one-time"
+              class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500"
+            >
+            One-time
+          </label>
+        </div>
+      </fieldset>
+
       <p class="mt-3 text-sm text-slate-600" role="status" aria-live="polite" data-testid="pattern-match-count">
         <template v-if="matchCountState === 'empty'">
           Enter an expression to preview matching transactions.
@@ -482,6 +552,7 @@ async function remove(category: Category): Promise<void> {
             <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Expression count</th>
             <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Window count</th>
             <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Analysis</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Type</th>
             <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Actions</th>
           </tr>
         </thead>
@@ -498,6 +569,9 @@ async function remove(category: Category): Promise<void> {
             </td>
             <td class="px-3 py-2 align-middle text-slate-900" data-testid="category-hidden-state">
               {{ category.hidden ? 'Hidden' : 'Visible' }}
+            </td>
+            <td class="px-3 py-2 align-middle text-slate-900" data-testid="category-expense-type">
+              {{ expenseTypeLabel(category.expenseType) }}
             </td>
             <td class="px-3 py-2 align-middle">
               <div class="flex gap-2">

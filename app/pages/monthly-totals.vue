@@ -1,16 +1,25 @@
 <script setup lang="ts">
 import {
   createMonthlyCategoryMatrixData,
+  filterTransactionsByExpenseType,
   formatEuroAmount,
   groupTransactionsByAvailableMonth,
   isZeroAmountString,
   type CategorySpendingTransaction,
+  type ExpenseTypeChoice,
 } from '../utils/category-spending';
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
+const expenseType = ref<ExpenseTypeChoice>('all');
+
+// The expense-type choice is a selection over the already-fetched transactions, so
+// the table is rebuilt from them and no further request is made.
+const selectedTransactions = computed(() =>
+  filterTransactionsByExpenseType(transactions.value ?? [], expenseType.value),
+);
 
 const matrix = computed(() => createMonthlyCategoryMatrixData(
-  groupTransactionsByAvailableMonth(transactions.value ?? []),
+  groupTransactionsByAvailableMonth(selectedTransactions.value),
 ));
 
 function hasAmount(amount: string | undefined): amount is string {
@@ -45,6 +54,43 @@ function transactionLocation(month: string, categoryKey: string) {
     </p>
     <p v-else-if="pending" class="mt-4 text-slate-600">Loading monthly category totals…</p>
     <template v-else-if="transactions">
+      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-700" data-testid="expense-type-filter">
+        <legend class="sr-only">Expense type filter</legend>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="expenseType"
+            type="radio"
+            name="expense-type"
+            value="all"
+            data-testid="expense-type-all"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          All
+        </label>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="expenseType"
+            type="radio"
+            name="expense-type"
+            value="recurring"
+            data-testid="expense-type-recurring"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          Recurring
+        </label>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="expenseType"
+            type="radio"
+            name="expense-type"
+            value="one-time"
+            data-testid="expense-type-one-time"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          One-time
+        </label>
+      </fieldset>
+
       <p id="monthly-totals-scroll-help" class="mb-2 mt-6 text-xs text-slate-500 sm:hidden">
         Scroll horizontally to view all category columns.
       </p>

@@ -126,7 +126,7 @@ describe('API integration', () => {
         purpose: 'Internal transfer',
         counterpartyName: 'Own account',
         counterpartyAccount: null,
-        category: { id: '3', name: 'Internal', hidden: true },
+        category: { id: '3', name: 'Internal', hidden: true, expenseType: null },
       },
       {
         id: '2',
@@ -136,7 +136,7 @@ describe('API integration', () => {
         purpose: 'Rail ticket',
         counterpartyName: 'Transit',
         counterpartyAccount: 'DE00000000000000000000',
-        category: { id: '2', name: 'Transport', hidden: false },
+        category: { id: '2', name: 'Transport', hidden: false, expenseType: null },
       },
       {
         id: '1',
@@ -146,7 +146,7 @@ describe('API integration', () => {
         purpose: 'REWE Market',
         counterpartyName: 'REWE',
         counterpartyAccount: null,
-        category: { id: '1', name: 'Groceries', hidden: false },
+        category: { id: '1', name: 'Groceries', hidden: false, expenseType: null },
       },
       {
         id: '4',
@@ -170,10 +170,10 @@ describe('API integration', () => {
 
     expect(response.status).toBe(201);
     expect(await response.json())
-      .toEqual({ id: '4', name: 'Reading', patterns: ['bookshop'], hidden: false, windows: [] });
+      .toEqual({ id: '4', name: 'Reading', patterns: ['bookshop'], hidden: false, windows: [], expenseType: null });
     const transactions = await request('/api/transactions').then((result) => result.json());
     expect(transactions.find((transaction: { purpose: string }) => transaction.purpose === 'Bookshop').category)
-      .toEqual({ id: '4', name: 'Reading', hidden: false });
+      .toEqual({ id: '4', name: 'Reading', hidden: false, expenseType: null });
   });
 
   it('stores, lists, and toggles the hidden flag without changing transactions', async () => {
@@ -185,7 +185,7 @@ describe('API integration', () => {
     });
     expect(created.status).toBe(201);
     expect(await created.json())
-      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: true, windows: [] });
+      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: true, windows: [], expenseType: null });
 
     const listed = await request('/api/categories').then((result) => result.json());
     expect(listed.find((category: { name: string }) => category.name === 'Internal 2').hidden).toBe(true);
@@ -197,7 +197,7 @@ describe('API integration', () => {
     });
     expect(edited.status).toBe(200);
     expect(await edited.json())
-      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: false, windows: [] });
+      .toEqual({ id: '4', name: 'Internal 2', patterns: ['internal'], hidden: false, windows: [], expenseType: null });
 
     const after = await storedRows();
     expect(after.transactions).toEqual(before.transactions);
@@ -212,7 +212,7 @@ describe('API integration', () => {
 
     expect(response.status).toBe(201);
     expect(await response.json())
-      .toEqual({ id: '4', name: 'Visible default', patterns: ['bookshop'], hidden: false, windows: [] });
+      .toEqual({ id: '4', name: 'Visible default', patterns: ['bookshop'], hidden: false, windows: [], expenseType: null });
   });
 
   it('rejects a non-boolean hidden flag without changing stored data', async () => {
@@ -239,6 +239,20 @@ describe('API integration', () => {
       body: JSON.stringify({ name: 'Groceries', patterns: ['rewe', 'market'], hidden: true }),
     });
     expect(await hiddenTransaction()).toBe(true);
+  });
+
+  it('follows an expense type change through the transaction category reference', async () => {
+    const expenseType = () => request('/api/transactions').then((result) => result.json())
+      .then((transactions: Array<{ purpose: string; category: { expenseType: string | null } | null }>) =>
+        transactions.find((transaction) => transaction.purpose === 'REWE Market')?.category?.expenseType);
+
+    expect(await expenseType()).toBeNull();
+    await request('/api/categories/1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Groceries', patterns: ['rewe', 'market'], expenseType: 'recurring' }),
+    });
+    expect(await expenseType()).toBe('recurring');
   });
 
   it('rejects an invalid category expression without changing stored data', async () => {
@@ -290,6 +304,7 @@ describe('API integration', () => {
         { from: '2026-07-01', to: '2026-07-14' },
         { from: '2026-08-01', to: '2026-08-14' },
       ],
+      expenseType: null,
     });
   });
 
@@ -307,6 +322,7 @@ describe('API integration', () => {
       patterns: ['bookshop'],
       hidden: false,
       windows: [],
+      expenseType: null,
     });
   });
 

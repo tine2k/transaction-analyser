@@ -133,8 +133,9 @@ The system SHALL hold the counterparty as a name together with an account identi
 The system SHALL define a `Category` as a name that identifies it, one or more
 regular expressions that state which transactions it covers by purpose line or
 counterparty name, a `hidden` flag that states whether the category is out of scope
-for the analysis views, and a set of zero or more date windows that state a bounded
-period whose transactions it covers. The expressions SHALL be applied to the purpose
+for the analysis views, a set of zero or more date windows that state a bounded
+period whose transactions it covers, and an expense type that classifies the
+category's spending as recurring, one-time, or unset. The expressions SHALL be applied to the purpose
 line and the counterparty name of a transaction, and the date windows SHALL be
 applied to the transaction's booking date. A date window SHALL consist of a `from`
 date and a `to` date, each a full calendar date at day precision with no time of
@@ -145,17 +146,19 @@ the category covers a transaction when its purpose line or counterparty name mat
 at least one expression, or when no category's expression matches the purpose line
 or the counterparty name and its booking date falls in at least one of the category's
 windows. The `hidden` flag SHALL NOT take part in membership: a hidden category
-covers a transaction exactly as a visible one does. A category SHALL carry at least
+covers a transaction exactly as a visible one does. The expense type SHALL NOT take
+part in membership: a category classified recurring, one-time, or unset covers a
+transaction exactly as its expressions and windows define. A category SHALL carry at least
 one regular expression or at least one date window; a category carrying neither is
 not a well-formed category, because it would define no membership. The system SHALL
 NOT define a category by any other means, and SHALL NOT require a category to carry
-any element beyond its name, its regular expressions, its hidden flag, and its date
-windows.
+any element beyond its name, its regular expressions, its hidden flag, its date
+windows, and its expense type.
 
 #### Scenario: A category is configured with a name and a regular expression
 
-- **WHEN** a category is configured with the name "Urlaub", the regular expressions `rewe` and `edeka`, hidden `false`, and the window 2026-07-01 to 2026-07-14
-- **THEN** the category holds that name, both regular expressions, that hidden flag, and that window, and no fifth element
+- **WHEN** a category is configured with the name "Urlaub", the regular expressions `rewe` and `edeka`, hidden `false`, the window 2026-07-01 to 2026-07-14, and the expense type `recurring`
+- **THEN** the category holds that name, both regular expressions, that hidden flag, that window, and that expense type, and no sixth element
 
 #### Scenario: A category may be defined by date windows alone
 
@@ -175,12 +178,27 @@ windows.
 #### Scenario: A category carries nothing beyond its name and expression
 
 - **WHEN** a category is read
-- **THEN** it exposes a name, one or more regular expressions or at least one date window, a hidden flag, and its date windows, and no fifth element that defines or qualifies which transactions it covers
+- **THEN** it exposes a name, one or more regular expressions or at least one date window, a hidden flag, its date windows, and its expense type, and no sixth element that defines or qualifies which transactions it covers
 
 #### Scenario: A hidden category still defines membership
 
 - **WHEN** a category is hidden and its regular expression matches a purpose line
 - **THEN** the transaction falls within that hidden category, because hiding does not change which transactions the expressions match
+
+#### Scenario: An unset expense type is well-formed
+
+- **WHEN** a category carries no expense type
+- **THEN** the category is well-formed and covers exactly the transactions its regular expressions and date windows define
+
+#### Scenario: The expense type does not decide membership
+
+- **WHEN** a category classified `one-time` has a regular expression that matches a purpose line
+- **THEN** the transaction falls within that category, because the classification does not change which transactions the expressions match
+
+#### Scenario: Changing the expense type changes no membership
+
+- **WHEN** a category's expense type changes from unset to `recurring`
+- **THEN** the transactions the category covers are unchanged
 
 #### Scenario: Any one expression defines membership
 

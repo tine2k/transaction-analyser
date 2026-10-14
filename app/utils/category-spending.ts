@@ -1,7 +1,12 @@
 export type CategorySpendingTransaction = {
   bookingDate: string;
   amount: string;
-  category: { id: string; name: string; hidden: boolean } | null;
+  category: {
+    id: string;
+    name: string;
+    hidden: boolean;
+    expenseType: 'recurring' | 'one-time' | null;
+  } | null;
 };
 
 export type CategoryTransactionGroup = {
@@ -179,6 +184,25 @@ export function excludeHiddenCategoryTransactions(
   transactions: CategorySpendingTransaction[],
 ): CategorySpendingTransaction[] {
   return transactions.filter(({ category }) => category?.hidden !== true);
+}
+
+// The expense-type choice the analysis views offer. `all` keeps every
+// transaction, so the pages read exactly as they did before the control existed.
+export type ExpenseTypeChoice = 'all' | 'recurring' | 'one-time';
+
+// Selects the transactions an expense-type choice admits before a view groups or
+// averages them. `all` returns the input unchanged. A typed choice keeps only the
+// transactions whose category carries exactly that expense type, so unset
+// categories and uncategorised transactions drop out. Selection only: no stored
+// data changes and the returned array is the same array for `all`.
+export function filterTransactionsByExpenseType(
+  transactions: CategorySpendingTransaction[],
+  choice: ExpenseTypeChoice,
+): CategorySpendingTransaction[] {
+  if (choice === 'all') {
+    return transactions;
+  }
+  return transactions.filter(({ category }) => category?.expenseType === choice);
 }
 
 export function getMonthlyCategorySpendingTotals(

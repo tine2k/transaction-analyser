@@ -5,6 +5,7 @@ import {
   createCategoryColorMap,
   createMonthlyCategoryChartData,
   createYearlyCategoryChartData,
+  filterTransactionsByExpenseType,
   formatEuroAmount,
   getLocalDateString,
   getMonthlyCategorySpendingTotals,
@@ -14,6 +15,7 @@ import {
   type CategoryPieDatum,
   type CategorySpendingTotal,
   type CategorySpendingTransaction,
+  type ExpenseTypeChoice,
 } from '../utils/category-spending';
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
@@ -21,16 +23,23 @@ const router = useRouter();
 const today = getLocalDateString(new Date());
 const hideUncategorised = ref(false);
 const view = ref<'months' | 'years'>('months');
+const expenseType = ref<ExpenseTypeChoice>('all');
+
+// The expense-type choice is a selection over the already-fetched transactions, so
+// every panel is recomputed from them and no further request is made.
+const selectedTransactions = computed(() =>
+  filterTransactionsByExpenseType(transactions.value ?? [], expenseType.value),
+);
 
 const monthlyCharts = computed(() =>
   createMonthlyCategoryChartData(
-    getMonthlyCategorySpendingTotals(groupTransactionsByMonth(transactions.value ?? [], today)),
+    getMonthlyCategorySpendingTotals(groupTransactionsByMonth(selectedTransactions.value, today)),
   ),
 );
 
 const yearlyCharts = computed(() =>
   createYearlyCategoryChartData(
-    getYearlyCategorySpendingTotals(groupTransactionsByAvailableYear(transactions.value ?? [])),
+    getYearlyCategorySpendingTotals(groupTransactionsByAvailableYear(selectedTransactions.value)),
   ),
 );
 
@@ -170,6 +179,43 @@ function chartOption(chart: DisplayedChart): EChartsOption {
             class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
           >
           Years
+        </label>
+      </fieldset>
+
+      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-700" data-testid="expense-type-filter">
+        <legend class="sr-only">Expense type filter</legend>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="expenseType"
+            type="radio"
+            name="expense-type"
+            value="all"
+            data-testid="expense-type-all"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          All
+        </label>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="expenseType"
+            type="radio"
+            name="expense-type"
+            value="recurring"
+            data-testid="expense-type-recurring"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          Recurring
+        </label>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="expenseType"
+            type="radio"
+            name="expense-type"
+            value="one-time"
+            data-testid="expense-type-one-time"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          One-time
         </label>
       </fieldset>
 

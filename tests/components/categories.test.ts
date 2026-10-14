@@ -22,9 +22,9 @@ let pageState: PageState;
 function response(): PageState {
   pageState = {
     data: ref([
-      { id: '10', name: 'Groceries', patterns: ['food', 'market'], hidden: false, windows: [{ from: '2026-07-01', to: '2026-07-14' }] },
-      { id: '3', name: 'alpha', patterns: ['^lower$'], hidden: true, windows: [] },
-      { id: '7', name: 'Alpha', patterns: ['^upper$'], hidden: false, windows: [] },
+      { id: '10', name: 'Groceries', patterns: ['food', 'market'], hidden: false, windows: [{ from: '2026-07-01', to: '2026-07-14' }], expenseType: 'recurring' },
+      { id: '3', name: 'alpha', patterns: ['^lower$'], hidden: true, windows: [], expenseType: 'one-time' },
+      { id: '7', name: 'Alpha', patterns: ['^upper$'], hidden: false, windows: [], expenseType: null },
     ]),
     error: ref(null),
     pending: ref(false),
@@ -168,7 +168,7 @@ describe('category management page', () => {
 
     expect(mocks.fetch).toHaveBeenCalledWith('/api/categories', expect.objectContaining({
       method: 'POST',
-      body: { name: 'Internal', patterns: ['internal'], hidden: true, windows: [] },
+      body: { name: 'Internal', patterns: ['internal'], hidden: true, windows: [], expenseType: null },
     }));
   });
 
@@ -191,6 +191,7 @@ describe('category management page', () => {
         patterns: ['holiday'],
         hidden: false,
         windows: [{ from: '2026-07-01', to: '2026-07-14' }],
+        expenseType: null,
       },
     }));
   });
@@ -213,6 +214,7 @@ describe('category management page', () => {
         patterns: [],
         hidden: false,
         windows: [{ from: '2026-07-01', to: '2026-07-14' }],
+        expenseType: null,
       },
     }));
   });
@@ -365,5 +367,69 @@ describe('category management page', () => {
 
     expect(wrapper.get('[data-testid="pattern-match-count"]').text()).toContain('Matches 2');
     expect(wrapper.get('[data-testid="window-match-count"]').text()).toContain('Windows claim 5');
+  });
+
+  it('states the expense type of every category row', async () => {
+    const wrapper = await mountSuspended(Categories);
+
+    expect(wrapper.findAll('[data-testid="category-expense-type"]').map((cell) => cell.text()))
+      .toEqual(['One-time', 'Unset', 'Recurring']);
+  });
+
+  it('pre-populates the expense type when editing a classified category', async () => {
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.findAll('tbody tr')[2]?.find('button').trigger('click');
+
+    expect((wrapper.get('[data-testid="expense-type-recurring"]').element as HTMLInputElement).checked).toBe(true);
+    expect((wrapper.get('[data-testid="expense-type-unset"]').element as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('sends the chosen expense type when creating a category', async () => {
+    mocks.fetch.mockResolvedValue({});
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('form label input').setValue('New car');
+    await wrapper.get('[data-testid="pattern-input"]').setValue('dealer');
+    await wrapper.get('[data-testid="expense-type-one-time"]').setValue();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/categories', expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({ expenseType: 'one-time' }),
+    }));
+  });
+
+  it('sends the changed expense type when editing a category', async () => {
+    mocks.fetch.mockResolvedValue({});
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.findAll('tbody tr')[2]?.find('button').trigger('click');
+    await wrapper.get('[data-testid="expense-type-one-time"]').setValue();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/categories/10', expect.objectContaining({
+      method: 'PUT',
+      body: expect.objectContaining({ expenseType: 'one-time' }),
+    }));
+  });
+
+  it('sends an unset expense type as null when cleared', async () => {
+    mocks.fetch.mockResolvedValue({});
+    const wrapper = await mountSuspended(Categories);
+
+    await wrapper.get('form label input').setValue('Internal');
+    await wrapper.get('[data-testid="pattern-input"]').setValue('internal');
+    await wrapper.get('[data-testid="expense-type-recurring"]').setValue();
+    await wrapper.get('[data-testid="expense-type-unset"]').setValue();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/categories', expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({ expenseType: null }),
+    }));
   });
 });

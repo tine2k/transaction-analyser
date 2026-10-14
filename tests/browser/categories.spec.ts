@@ -104,3 +104,52 @@ test('starting an edit brings the form into view with reduced motion', async ({ 
 
   await expect(form).toBeInViewport();
 });
+
+test('the form sends and the table shows the expense types', async ({ page }) => {
+  const typedCategories = [
+    { id: '1', name: 'Groceries', patterns: ['rewe'], hidden: false, windows: [], expenseType: 'recurring' },
+    { id: '2', name: 'Internal', patterns: ['internal'], hidden: true, windows: [], expenseType: null },
+    { id: '3', name: 'New car', patterns: ['dealer'], hidden: false, windows: [], expenseType: 'one-time' },
+  ];
+  let submitted: Record<string, unknown> | null = null;
+
+  await page.route('**/api/**', async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const method = route.request().method();
+
+    if (pathname === '/api/categories' && method === 'GET') {
+      await route.fulfill({ json: typedCategories });
+      return;
+    }
+
+    if (pathname === '/api/categories' && method === 'POST') {
+      submitted = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ status: 201, json: { id: '4', ...submitted } });
+      return;
+    }
+
+    if (pathname.startsWith('/api/categories/')) {
+      await route.fulfill({ json: { count: 0 } });
+      return;
+    }
+
+    await route.fulfill({ status: 404, json: { message: 'No test fixture for this endpoint' } });
+  });
+
+  await page.goto('/categories', { waitUntil: 'networkidle' });
+
+  const types = await page.getByTestId('category-expense-type').allTextContents();
+  expect(types).toEqual(['Recurring', 'Unset', 'One-time']);
+
+  await page.locator('tbody tr').first().getByRole('button', { name: 'Edit' }).click();
+  await expect(page.getByTestId('expense-type-recurring')).toBeChecked();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.locator('form label input').first().fill('Utilities');
+  await page.getByTestId('pattern-input').first().fill('power');
+  await page.getByTestId('expense-type-one-time').check();
+  await page.getByRole('button', { name: 'Add category' }).click();
+
+  await expect.poll(() => submitted).not.toBeNull();
+  expect(submitted).toMatchObject({ name: 'Utilities', patterns: ['power'], expenseType: 'one-time' });
+});

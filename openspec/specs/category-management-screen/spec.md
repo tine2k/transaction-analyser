@@ -58,20 +58,20 @@ SHALL NOT remove the frame's other properties, which remain as `frontend-shell` 
 When the category management screen is loaded, the browser SHALL request `GET /api/categories`
 from the same origin and SHALL show a row for each returned category carrying its name, the
 count of regular expressions in that category's `patterns` array, the count of date windows in
-that category's `windows` array, and whether the category is hidden. The list SHALL NOT display
-the regular-expression values or the window values themselves; they remain available in the
-create and edit forms. It SHALL show every returned category, dropping none, including hidden
-categories. The rows SHALL be ordered by category name in ascending, case-insensitive
-alphabetical order, with category identity in ascending order as a tie-breaker for equal names.
-It SHALL show a defined state when no category is returned, stating that there are no categories
-rather than an empty list. It SHALL show a distinct state when the request fails, stating that
-the categories could not be loaded. It SHALL NOT invent a category, a count, or a hidden state,
-or show a category that the endpoint did not return.
+that category's `windows` array, whether the category is hidden, and its expense type. The list
+SHALL NOT display the regular-expression values or the window values themselves; they remain
+available in the create and edit forms. It SHALL show every returned category, dropping none,
+including hidden categories. The rows SHALL be ordered by category name in ascending,
+case-insensitive alphabetical order, with category identity in ascending order as a tie-breaker
+for equal names. It SHALL show a defined state when no category is returned, stating that there
+are no categories rather than an empty list. It SHALL show a distinct state when the request
+fails, stating that the categories could not be loaded. It SHALL NOT invent a category, a count,
+a hidden state, or an expense type, or show a category that the endpoint did not return.
 
 #### Scenario: Every category gets a row
 
 - **WHEN** the endpoint returns several categories
-- **THEN** the screen shows one row for each category, carrying its name, expression count, and window count
+- **THEN** the screen shows one row for each category, carrying its name, expression count, window count, and expense type
 
 #### Scenario: The list shows expression counts but not expression values
 
@@ -93,6 +93,11 @@ or show a category that the endpoint did not return.
 - **WHEN** the endpoint returns both hidden and visible categories
 - **THEN** each row distinguishes a hidden category from a visible one, using the returned `hidden` value
 
+#### Scenario: Every row states the category's expense type
+
+- **WHEN** the endpoint returns categories carrying `recurring`, `one-time`, and no expense type
+- **THEN** each row names the expense type it returned, and the category carrying none reads as unset rather than as recurring or one-time
+
 #### Scenario: Categories are ordered by name
 
 - **WHEN** the endpoint returns categories in an order different from their names
@@ -111,15 +116,16 @@ or show a category that the endpoint did not return.
 ### Requirement: The screen creates a category
 
 The screen SHALL offer a form with one field for the name, zero or more fields for the regular
-expressions, zero or more controls for the date windows, and a control for the hidden flag, and a
-control that submits them. The form SHALL let an expression field and a window be added and
-removed, so that a category can be given more than one expression or window, or defined by date
-windows alone with no expression. Submitting SHALL send `POST /api/categories` with the values as
-entered, including the hidden flag and the windows, and SHALL send every expression and every
-window that was entered. A window SHALL be entered and sent as a `from` and a `to` full date with
-no time of day. On success the new category SHALL appear in the list, and on failure the screen
-SHALL report the failure rather than showing the category as created. The screen SHALL NOT send a
-category that carries neither an expression nor a window.
+expressions, zero or more controls for the date windows, a control for the hidden flag, a control
+for the expense type, and a control that submits them. The form SHALL let an expression field and a
+window be added and removed, so that a category can be given more than one expression or window, or
+defined by date windows alone with no expression. The expense-type control SHALL offer unset,
+recurring, and one-time, and SHALL default to unset. Submitting SHALL send `POST /api/categories`
+with the values as entered, including the hidden flag, the windows, and the expense type, and SHALL
+send every expression and every window that was entered. A window SHALL be entered and sent as a
+`from` and a `to` full date with no time of day. On success the new category SHALL appear in the
+list, and on failure the screen SHALL report the failure rather than showing the category as
+created. The screen SHALL NOT send a category that carries neither an expression nor a window.
 
 #### Scenario: A category is created from the form
 
@@ -140,6 +146,16 @@ category that carries neither an expression nor a window.
 
 - **WHEN** the hidden control is set on and the form is submitted
 - **THEN** `POST /api/categories` carries `hidden` as `true`
+
+#### Scenario: The expense type is sent as entered
+
+- **WHEN** the expense-type control is set to recurring and the form is submitted
+- **THEN** `POST /api/categories` carries `expenseType` `recurring` and, on success, the row shows that expense type
+
+#### Scenario: An unset expense type is sent as null
+
+- **WHEN** the form is submitted without choosing an expense type
+- **THEN** `POST /api/categories` carries `expenseType` `null`, and, on success, the row reads as unset
 
 #### Scenario: Several expressions are created together
 
@@ -164,14 +180,15 @@ category that carries neither an expression nor a window.
 ### Requirement: The screen edits a category
 
 The screen SHALL offer a way to change an existing category's name, its regular expressions, its
-date windows, and its hidden flag. It SHALL present every expression the category carries and
-every date window it carries for editing and SHALL present the category's current hidden state,
-and SHALL let an expression or a window be added or removed and the hidden state be changed.
-Submitting an edit SHALL send `PUT /api/categories/:id` with the changed values, including the
-hidden flag and the remaining windows, sending the expressions and windows that remain. On
-success the list SHALL reflect the new name, expressions, windows, and hidden state, and on
-failure the screen SHALL report the failure rather than showing the change as applied. The screen
-SHALL NOT submit a category that carries neither an expression nor a window.
+date windows, its hidden flag, and its expense type. It SHALL present every expression the category
+carries and every date window it carries for editing and SHALL present the category's current
+hidden state and current expense type, and SHALL let an expression or a window be added or removed
+and the hidden state and the expense type be changed. Submitting an edit SHALL send
+`PUT /api/categories/:id` with the changed values, including the hidden flag, the expense type, and
+the remaining windows, sending the expressions and windows that remain. On success the list SHALL
+reflect the new name, expressions, windows, hidden state, and expense type, and on failure the
+screen SHALL report the failure rather than showing the change as applied. The screen SHALL NOT
+submit a category that carries neither an expression nor a window.
 
 #### Scenario: A category is edited from the screen
 
@@ -182,6 +199,16 @@ SHALL NOT submit a category that carries neither an expression nor a window.
 
 - **WHEN** a category's hidden state is changed in the edit form and the change is submitted
 - **THEN** `PUT /api/categories/:id` carries the changed `hidden` value and, on success, the row shows the new hidden state
+
+#### Scenario: The expense type is edited from the screen
+
+- **WHEN** a category's expense type is changed in the edit form and the change is submitted
+- **THEN** `PUT /api/categories/:id` carries the changed `expenseType` value and, on success, the row shows the new expense type
+
+#### Scenario: An unset expense type is presented as unset
+
+- **WHEN** the edit form is opened for a category carrying no expense type
+- **THEN** the form's expense-type control reads as unset, and submitting without changing it sends `expenseType` `null`
 
 #### Scenario: An expression is added to an existing category
 

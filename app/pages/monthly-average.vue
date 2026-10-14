@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import {
   compareDecimalStrings,
+  filterTransactionsByExpenseType,
   formatEuroAmount,
   getCategoryMonthlyAverages,
   getLocalDateString,
   type CategorySpendingTransaction,
   type CategoryMonthlyAverage,
+  type ExpenseTypeChoice,
 } from '../utils/category-spending';
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
@@ -15,6 +17,7 @@ const monthCount = ref('12');
 const appliedMonthCount = ref(12);
 const sortColumn = ref<'amount' | 'category'>('amount');
 const sortDirection = ref<'asc' | 'desc'>('desc');
+const expenseType = ref<ExpenseTypeChoice>('all');
 
 function onMonthCountInput(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
@@ -26,8 +29,15 @@ function onMonthCountInput(event: Event): void {
   }
 }
 
+// The expense-type choice is a selection over the already-fetched transactions and
+// is independent of the averaging window: changing either recomputes the list from
+// the same data, without another request.
+const selectedTransactions = computed(() =>
+  filterTransactionsByExpenseType(transactions.value ?? [], expenseType.value),
+);
+
 const averages = computed(() => getCategoryMonthlyAverages(
-  transactions.value ?? [],
+  selectedTransactions.value,
   today,
   appliedMonthCount.value,
 ));
@@ -95,6 +105,43 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
       <p class="mt-2 text-sm text-slate-600" data-testid="applied-window">
         Averaging over the last {{ appliedMonthCount }} months.
       </p>
+
+      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-700" data-testid="expense-type-filter">
+        <legend class="sr-only">Expense type filter</legend>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="expenseType"
+            type="radio"
+            name="expense-type"
+            value="all"
+            data-testid="expense-type-all"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          All
+        </label>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="expenseType"
+            type="radio"
+            name="expense-type"
+            value="recurring"
+            data-testid="expense-type-recurring"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          Recurring
+        </label>
+        <label class="inline-flex min-h-11 items-center gap-2">
+          <input
+            v-model="expenseType"
+            type="radio"
+            name="expense-type"
+            value="one-time"
+            data-testid="expense-type-one-time"
+            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          >
+          One-time
+        </label>
+      </fieldset>
 
       <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
         <label class="inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-slate-700">

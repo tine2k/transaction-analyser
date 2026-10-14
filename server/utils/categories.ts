@@ -3,7 +3,8 @@
 // Categories are listed, created, edited, and deleted here, and every change to the
 // category set re-evaluates the transactions it can affect. A category holds zero or
 // more regular expressions and zero or more date windows, with at least one of the
-// two. It matches a purpose line when any expression matches — using the database's
+// two, and may carry an expense type — recurring or one-time — which classifies it
+// for the analysis views and never takes part in membership. It matches a purpose line when any expression matches — using the database's
 // case-insensitive match operator `~*`, matching a part of the line rather than
 // anchoring to the whole of it — and it covers a booking date when one of its
 // inclusive from/to windows contains it. Expressions are considered first: a date
@@ -30,6 +31,7 @@
 //
 // See openspec/changes/allow-multiple-category-expressions/specs/category-management-api/spec.md
 // and openspec/changes/allow-multiple-category-expressions/specs/category-assignment/spec.md
+// and openspec/changes/add-category-expense-type/specs/category-management-api/spec.md
 import type { Pool, PoolClient } from 'pg';
 import { matchingCategorySql } from '../../shared/category-assignment';
 import { escapeLiteralPattern } from '../../shared/literal-pattern';
@@ -40,16 +42,22 @@ import { useDatabase } from './db';
 // category's domain elements, held together with the others on the category's row.
 export type CategoryWindow = { from: string; to: string };
 
+// A category's expense type: the classification an operator gives it for the
+// analysis views. It is metadata about the category, not part of membership.
+export type CategoryExpenseType = 'recurring' | 'one-time';
+
 // A category as the management surface returns it: the identity rendered as a
-// string, and the four domain elements — the name, every regular expression, the
-// hidden flag that takes the category out of the analysis views, and the date
-// windows that cover a bounded period.
+// string, and the five domain elements — the name, every regular expression, the
+// hidden flag that takes the category out of the analysis views, the date
+// windows that cover a bounded period, and the expense type that classifies the
+// spending (unset when null).
 export type Category = {
   id: string;
   name: string;
   patterns: string[];
   hidden: boolean;
   windows: CategoryWindow[];
+  expenseType: CategoryExpenseType | null;
 };
 
 // A create or an edit request that the surface refused, carrying the status the
@@ -65,13 +73,13 @@ export class CategoryError extends Error {
 }
 
 const SELECT_CATEGORIES = `
-  SELECT id, name, patterns, hidden, windows
+  SELECT id, name, patterns, hidden, windows, expense_type AS "expenseType"
   FROM categories
   ORDER BY id
 `;
 
 const SELECT_CATEGORY = `
-  SELECT id, name, patterns, hidden, windows
+  SELECT id, name, patterns, hidden, windows, expense_type AS "expenseType"
   FROM categories
   WHERE id = $1
 `;
@@ -83,16 +91,16 @@ const SELECT_CATEGORY = `
 const CATEGORY_MUTATION_LOCK_KEY = 20261007;
 
 const INSERT_CATEGORY = `
-  INSERT INTO categories (name, patterns, hidden, windows)
-  VALUES ($1, $2, $3, $4::jsonb)
-  RETURNING id, name, patterns, hidden, windows
+  INSERT INTO categories (name, patterns, hidden, windows, expense_type)
+  VALUES ($1, $2, $3, $4::jsonb, $5)
+  RETURNING id, name, patterns, hidden, windows, expense_type AS "expenseType"
 `;
 
 const UPDATE_CATEGORY = `
   UPDATE categories
-  SET name = $2, patterns = $3, hidden = $4, windows = $5::jsonb
+  SET name = $2, patterns = $3, hidden = $4, windows = $5::jsonb, expense_type = $6
   WHERE id = $1
-  RETURNING id, name, patterns, hidden, windows
+  RETURNING id, name, patterns, hidden, windows, expense_type AS "expenseType"
 `;
 
 // Appends one escaped literal to a category, but only when the category does
@@ -103,7 +111,7 @@ const APPEND_PATTERN = `
   UPDATE categories
   SET patterns = patterns || $2::text
   WHERE id = $1 AND NOT patterns @> ARRAY[$2::text]
-  RETURNING id, name, patterns, hidden, windows
+  RETURNING id, name, patterns, hidden, windows, expense_type AS "expenseType"
 `;
 
 const DELETE_CATEGORY = 'DELETE FROM categories WHERE id = $1';
@@ -271,7 +279,7 @@ export async function countWindowClaims(input: unknown): Promise<number> {
 }
 
 export async function createCategory(input: unknown): Promise<Category> {
-  const { name, patterns, hidden, windows } = readCategoryInput(input);
+  const { name, patterns, hidden, windows, expenseType } = readCategoryInput(input);
   const database = useDatabase();
   await assertPatternsCompile(database, patterns);
 
@@ -283,6 +291,7 @@ export async function createCategory(input: unknown): Promise<Category> {
       patterns,
       hidden,
       JSON.stringify(windows),
+      expenseType,
     ]);
     await client.query(RECOMPUTE_ASSIGNMENTS);
     return inserted.rows[0] as Category;
@@ -291,7 +300,7 @@ export async function createCategory(input: unknown): Promise<Category> {
 
 export async function editCategory(id: string, input: unknown): Promise<Category> {
   assertIdentity(id);
-  const { name, patterns, hidden, windows } = readCategoryInput(input);
+  const { name, patterns, hidden, windows, expenseType } = readCategoryInput(input);
   const database = useDatabase();
   await assertPatternsCompile(database, patterns);
 
@@ -304,6 +313,7 @@ export async function editCategory(id: string, input: unknown): Promise<Category
       patterns,
       hidden,
       JSON.stringify(windows),
+      expenseType,
     ]);
     if (updated.rowCount === 0) {
       throw new CategoryError(404, 'no category carries that identity');
@@ -432,6 +442,7 @@ function readCategoryInput(input: unknown): {
   patterns: string[];
   hidden: boolean;
   windows: CategoryWindow[];
+  expenseType: CategoryExpenseType | null;
 } {
   if (typeof input !== 'object' || input === null) {
     throw new CategoryError(400, 'a category needs a name and at least one pattern or date window');
@@ -445,7 +456,7 @@ function readCategoryInput(input: unknown): {
   if (patterns.length === 0 && windows.length === 0) {
     throw new CategoryError(400, 'a category needs at least one pattern or date window');
   }
-  return { name, patterns, windows, hidden: readHidden(input) };
+  return { name, patterns, windows, hidden: readHidden(input), expenseType: readExpenseType(input) };
 }
 
 // The expressions of a create or an edit. Unlike the preview, a category may carry
@@ -555,6 +566,22 @@ function readHidden(input: unknown): boolean {
     throw new CategoryError(400, 'the hidden flag must be a boolean');
   }
   return hidden;
+}
+
+// The expense type is optional in the body. Absent or null means unset, because a
+// create and an edit replace the stored category and the type is not required. A
+// value that is present and neither declared label is refused rather than coerced.
+const EXPENSE_TYPES: readonly CategoryExpenseType[] = ['recurring', 'one-time'];
+
+function readExpenseType(input: unknown): CategoryExpenseType | null {
+  const expenseType = (input as { expenseType?: unknown }).expenseType;
+  if (expenseType === undefined || expenseType === null) {
+    return null;
+  }
+  if (!EXPENSE_TYPES.includes(expenseType as CategoryExpenseType)) {
+    throw new CategoryError(400, 'the expense type must be recurring, one-time, or null');
+  }
+  return expenseType as CategoryExpenseType;
 }
 
 // The literal text of an append or a literal preview. It must be a string whose

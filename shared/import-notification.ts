@@ -11,7 +11,12 @@
 // the caller passes, travel in the request body only, and never appear in a
 // returned reason.
 //
+// It also sends the fixed test message the imports screen's test control uses,
+// so the configured credentials can be checked without waiting for a sync. Both
+// entry points share one request path and one failure-reason rule.
+//
 // See openspec/changes/add-import-notification/specs/import-notification/spec.md
+// and openspec/changes/add-pushover-test-button/specs/import-notification/spec.md
 import type { ImportPlan } from './transactions-import.ts';
 
 export type ImportNotificationConfig = {
@@ -101,20 +106,15 @@ function notificationFailure(error: unknown): string {
   return error.message === '' ? error.name : error.message;
 }
 
-// Sends the run's summary when there is one and the credentials are configured,
-// and reports what it did. Every failure is returned, never thrown, so the
-// caller can log it and leave the import untouched. The request is bounded by
-// its timeout so a Pushover that never answers cannot hold a screen-started
-// sync's answer open.
-export async function notifyImport(
+// Sends one summary through Pushover and reports what it did. Every failure is
+// returned, never thrown, so the caller can log it and leave whatever triggered
+// the send untouched. The request is bounded by its timeout so a Pushover that
+// never answers cannot hold a screen-started sync's answer open. The caller
+// checks the configuration first, so the credentials are present here.
+async function sendMessage(
   config: ImportNotificationConfig,
-  plan: ImportPlan,
+  summary: ImportNotificationSummary,
 ): Promise<ImportNotificationOutcome> {
-  const summary = uncategorisedSummary(plan);
-  if (summary === null || !isConfigured(config)) {
-    return { status: 'skipped' };
-  }
-
   const fetchImpl = config.fetchImpl ?? fetch;
   const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
   const body = new URLSearchParams({
@@ -147,4 +147,39 @@ export async function notifyImport(
   } catch (error) {
     return { status: 'failed', reason: notificationFailure(error) };
   }
+}
+
+// Sends the run's summary when there is one and the credentials are configured,
+// and reports what it did.
+export async function notifyImport(
+  config: ImportNotificationConfig,
+  plan: ImportPlan,
+): Promise<ImportNotificationOutcome> {
+  const summary = uncategorisedSummary(plan);
+  if (summary === null || !isConfigured(config)) {
+    return { status: 'skipped' };
+  }
+
+  return sendMessage(config, summary);
+}
+
+// The fixed text the configuration test sends. It identifies itself as a test
+// and carries no counts, no transaction detail, and no credential, so it is
+// distinguishable from a run's summary.
+const TEST_SUMMARY: ImportNotificationSummary = {
+  title: 'Pushover test',
+  message: 'This is a test message from the transaction analyser.',
+};
+
+// Sends the test message when the credentials are configured, and reports what
+// it did. A skipped answer means the configuration is absent, because the test
+// summary always exists.
+export async function sendTestNotification(
+  config: ImportNotificationConfig,
+): Promise<ImportNotificationOutcome> {
+  if (!isConfigured(config)) {
+    return { status: 'skipped' };
+  }
+
+  return sendMessage(config, TEST_SUMMARY);
 }

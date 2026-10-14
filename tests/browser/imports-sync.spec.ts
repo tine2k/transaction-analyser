@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test';
 
-// The imports screen's Sync now control. The API is intercepted, so the check
-// exercises the screen's request, status, and refresh rather than a live sync.
+// The imports screen's action controls. The API is intercepted, so the checks
+// exercise the screen's requests, status, and refresh rather than a live
+// backend.
 //
 // See openspec/changes/add-easybank-sync-button/specs/easybank-sync/spec.md
+// and openspec/changes/add-pushover-test-button/specs/import-notification/spec.md
 
 const scheduledRun = {
   id: '1',
@@ -116,4 +118,39 @@ test('the re-categorise control reports a failure rather than a zero count', asy
 
   await expect(page.getByTestId('recategorise-status')).toContainText('could not be completed');
   await expect(page.getByTestId('recategorise-status')).not.toContainText('0 transactions changed');
+});
+
+test('the notification-test control sends a POST and shows the sent message', async ({ page }) => {
+  let testMethod: string | null = null;
+
+  await page.route('**/api/imports', async (route) => {
+    await route.fulfill({ json: [scheduledRun] });
+  });
+  await page.route('**/api/imports/test-notification', async (route) => {
+    testMethod = route.request().method();
+    await route.fulfill({ json: { status: 'sent' } });
+  });
+
+  await page.goto('/imports');
+  await page.getByTestId('test-notification-button').click();
+
+  await expect(page.getByTestId('test-notification-status')).toContainText('was sent');
+  expect(testMethod).toBe('POST');
+});
+
+test('the notification-test control reports a refused send with its reason', async ({ page }) => {
+  await page.route('**/api/imports', async (route) => {
+    await route.fulfill({ json: [scheduledRun] });
+  });
+  await page.route('**/api/imports/test-notification', async (route) => {
+    await route.fulfill({
+      json: { status: 'failed', reason: 'Pushover answered 400: application token is invalid' },
+    });
+  });
+
+  await page.goto('/imports');
+  await page.getByTestId('test-notification-button').click();
+
+  await expect(page.getByTestId('test-notification-status')).toContainText('The test failed');
+  await expect(page.getByTestId('test-notification-status')).toContainText('application token is invalid');
 });

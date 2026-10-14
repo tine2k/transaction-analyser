@@ -316,4 +316,87 @@ describe('imports page', () => {
     expect(status.text()).toContain('could not be completed');
     expect(status.text()).not.toContain('0 transactions changed');
   });
+
+  it('posts to the notification-test endpoint, waits, and shows the sent message without refreshing', async () => {
+    const log = response(runs);
+    mocks.useFetch.mockReturnValue(log);
+    const answer = deferred<{ status: string }>();
+    mocks.fetch.mockReturnValue(answer.promise);
+
+    const wrapper = await mountSuspended(Imports);
+    const button = wrapper.get('[data-testid="test-notification-button"]');
+    expect(button.text()).toBe('Send test notification');
+
+    await button.trigger('click');
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/imports/test-notification', { method: 'POST' });
+    expect(button.attributes('disabled')).toBeDefined();
+    expect(button.text()).toBe('Sending…');
+    expect(wrapper.find('[data-testid="test-notification-status"]').exists()).toBe(false);
+
+    answer.resolve({ status: 'sent' });
+    await flushPromises();
+
+    expect(button.attributes('disabled')).toBeUndefined();
+    expect(button.text()).toBe('Send test notification');
+    expect(wrapper.get('[data-testid="test-notification-status"]').text()).toContain('was sent');
+    expect(log.refresh).not.toHaveBeenCalled();
+  });
+
+  it('ignores a second test-notification click while a request is in flight', async () => {
+    mocks.useFetch.mockReturnValue(response(runs));
+    const answer = deferred<{ status: string }>();
+    mocks.fetch.mockReturnValue(answer.promise);
+
+    const wrapper = await mountSuspended(Imports);
+    const button = wrapper.get('[data-testid="test-notification-button"]');
+
+    await button.trigger('click');
+    await button.trigger('click');
+
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+
+    answer.resolve({ status: 'sent' });
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('states that Pushover is not configured on the server', async () => {
+    mocks.useFetch.mockReturnValue(response(runs));
+    mocks.fetch.mockResolvedValue({ status: 'unconfigured' });
+
+    const wrapper = await mountSuspended(Imports);
+    await wrapper.get('[data-testid="test-notification-button"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="test-notification-status"]').text()).toContain('not configured');
+  });
+
+  it('states the failure reason the endpoint returned', async () => {
+    mocks.useFetch.mockReturnValue(response(runs));
+    mocks.fetch.mockResolvedValue({
+      status: 'failed',
+      reason: 'Pushover answered 400: application token is invalid',
+    });
+
+    const wrapper = await mountSuspended(Imports);
+    await wrapper.get('[data-testid="test-notification-button"]').trigger('click');
+    await flushPromises();
+
+    const status = wrapper.get('[data-testid="test-notification-status"]');
+    expect(status.text()).toContain('The test failed');
+    expect(status.text()).toContain('application token is invalid');
+  });
+
+  it('states that the test message could not be sent when the request fails', async () => {
+    mocks.useFetch.mockReturnValue(response(runs));
+    mocks.fetch.mockRejectedValue(new Error('request failed'));
+
+    const wrapper = await mountSuspended(Imports);
+    await wrapper.get('[data-testid="test-notification-button"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="test-notification-status"]').text()).toContain('could not be sent');
+  });
 });

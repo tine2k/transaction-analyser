@@ -81,7 +81,7 @@ PUSHOVER_TOKEN=...
 PUSHOVER_USER=...
 ```
 
-Without `PUSHOVER_TOKEN` and `PUSHOVER_USER`, no notification is sent and nothing else changes. A notification that fails — refused, unreachable, or silent — is logged and never fails the sync, changes its record, or changes what was imported. The manual CSV import never notifies. To point the notification at a test server instead of the real Pushover, set `PUSHOVER_BASE_URL` to that server's address; leave it unset to use the real Pushover.
+Without `PUSHOVER_TOKEN` and `PUSHOVER_USER`, no notification is sent and nothing else changes. A notification that fails — refused, unreachable, or silent — is logged and never fails the sync, changes its record, or changes what was imported. The manual CSV import never notifies. To point the notification at a test server instead of the real Pushover, set `PUSHOVER_BASE_URL` to that server's address; leave it unset to use the real Pushover. To check the configured credentials without waiting for a sync, use **Send test notification** on the Imports screen; it sends one fixed test message and reports whether Pushover accepted it, whether the configuration is absent, or why it failed.
 
 The Imports screen also offers a control that re-applies the stored categories to every stored transaction on demand and reports how many transactions changed. The report is transient: nothing is recorded, and reloading the screen clears it.
 

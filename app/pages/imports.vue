@@ -14,8 +14,15 @@
 // transactions. The operation records no run, so the log is not refreshed, and
 // the count is a transient message rather than stored data.
 //
+// Its Send test notification control asks the server to send one fixed test
+// message through Pushover, so the configured credentials can be verified
+// without waiting for a sync. It shows the returned outcome — sent, not
+// configured, or a failure with its reason — and starts no import, so the log
+// is not refreshed.
+//
 // See openspec/changes/add-easybank-sync-button/specs/easybank-sync/spec.md
 // and openspec/changes/match-counterparty-and-recategorise/specs/category-recategorisation/spec.md
+// and openspec/changes/add-pushover-test-button/specs/import-notification/spec.md
 type ImportRun = {
   id: string;
   startedAt: string;
@@ -38,6 +45,8 @@ const syncing = ref(false);
 const syncMessage = ref<string | null>(null);
 const recategorising = ref(false);
 const recategoriseMessage = ref<string | null>(null);
+const testing = ref(false);
+const testMessage = ref<string | null>(null);
 
 // The server refuses overlapping runs and answers with the run's outcome; a
 // click while a request is in flight is ignored here as well.
@@ -84,6 +93,37 @@ async function recategorise(): Promise<void> {
     recategoriseMessage.value = 'The re-categorisation could not be completed.';
   } finally {
     recategorising.value = false;
+  }
+}
+
+// The server sends one fixed test message through Pushover using the
+// environment credentials and answers whether it was sent, whether the
+// configuration is absent, or why it failed. A click while a request is in
+// flight is ignored here as well.
+async function testNotification(): Promise<void> {
+  if (testing.value) {
+    return;
+  }
+  testing.value = true;
+  testMessage.value = null;
+  try {
+    const answer = await $fetch<{ status: string; reason?: string }>(
+      '/api/imports/test-notification',
+      { method: 'POST' },
+    );
+    if (answer.status === 'sent') {
+      testMessage.value = 'The test message was sent.';
+    } else if (answer.status === 'unconfigured') {
+      testMessage.value = 'Pushover is not configured on the server.';
+    } else if (answer.status === 'failed') {
+      testMessage.value = `The test failed: ${answer.reason ?? 'no reason was given'}.`;
+    } else {
+      testMessage.value = 'The test answered an unknown outcome.';
+    }
+  } catch {
+    testMessage.value = 'The test message could not be sent.';
+  } finally {
+    testing.value = false;
   }
 }
 
@@ -164,6 +204,23 @@ function outcomeLabel(run: ImportRun): string {
         role="status"
       >
         {{ recategoriseMessage }}
+      </p>
+      <button
+        type="button"
+        class="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+        data-testid="test-notification-button"
+        :disabled="testing"
+        @click="testNotification"
+      >
+        {{ testing ? 'Sending…' : 'Send test notification' }}
+      </button>
+      <p
+        v-if="testMessage !== null"
+        class="text-sm text-slate-600"
+        data-testid="test-notification-status"
+        role="status"
+      >
+        {{ testMessage }}
       </p>
     </div>
 

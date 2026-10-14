@@ -35,7 +35,9 @@ at `/api/categories`, which lists, creates, changes, and deletes categories as t
 `category-recategorisation` capability defines; a read-only import log at `/api/imports`,
 which returns recent import runs as the `import-log` capability defines; and a sync-start
 endpoint at `POST /api/easybank/sync`, which starts the Easybank sync as the `easybank-sync`
-capability defines. The health endpoint
+capability defines; and a notification-test endpoint at `POST /api/imports/test-notification`,
+which sends one test notification as the `import-notification` capability defines without
+starting an import or changing stored data. The health endpoint
 SHALL report on the server alone and SHALL NOT report on the database, so that a database which
 is unreachable is never presented as the application being down. The system SHALL NOT expose any
 further endpoint, SHALL NOT expose any endpoint other than the sync-start endpoint and the
@@ -53,7 +55,7 @@ or write a row in the database, and SHALL NOT be reported as a missing resource.
 
 #### Scenario: Only the named endpoints exist
 
-- **WHEN** a request is made for a path under `/api` other than the health endpoint, the transactions endpoint, the category management surface and its re-categorisation operation, the import log, and the sync-start endpoint
+- **WHEN** a request is made for a path under `/api` other than the health endpoint, the transactions endpoint, the category management surface and its re-categorisation operation, the import log, the sync-start endpoint, and the notification-test endpoint
 - **THEN** no API endpoint answers it and no row is read or written, and the request is answered by the browser application shell rather than reported as a missing resource
 
 #### Scenario: The transactions endpoint reads stored data
@@ -80,6 +82,11 @@ or write a row in the database, and SHALL NOT be reported as a missing resource.
 
 - **WHEN** a `POST` request is made for the sync-start endpoint
 - **THEN** the server starts the Easybank sync as the `easybank-sync` capability defines, through the same task and import path the scheduled sync uses
+
+#### Scenario: The notification-test endpoint sends the test
+
+- **WHEN** a `POST` request is made for the notification-test endpoint
+- **THEN** the server sends one test notification as the `import-notification` capability defines, starts no import, and writes no row in the database
 
 #### Scenario: No request can alter stored data
 

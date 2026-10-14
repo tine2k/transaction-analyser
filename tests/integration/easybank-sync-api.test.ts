@@ -5,20 +5,25 @@ import { createServer } from 'node:net';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { startFakeBank, type FakeBank } from '../helpers/fake-bank';
+import { startFakePushover, type FakePushover } from '../helpers/fake-pushover';
 
 // The sync-start endpoint, exercised through the built server: a spawned Nitro
 // process reaches the fake bank over HTTP and the disposable database over
 // PostgreSQL. The task records the run under the 'ui' source, and the tests read
-// the run table directly to check it.
+// the run table directly to check it. A writing server also reaches the fake
+// Pushover, so a screen-started sync's notification is observed without the
+// network.
 //
 // See openspec/changes/add-easybank-sync-button/specs/easybank-sync/spec.md
 // and openspec/changes/add-easybank-sync-button/specs/import-log/spec.md
+// and openspec/changes/add-import-notification/specs/import-notification/spec.md
 
 const testDatabaseUrl = process.env['TEST_DATABASE_URL'];
 const startupTimeoutMs = 15_000;
 
 let database: pg.Pool | undefined;
 let bank: FakeBank;
+let pushover: FakePushover;
 
 function connection(): pg.Pool {
   if (database === undefined) {
@@ -120,6 +125,7 @@ describe('sync-start endpoint against a spawned server', () => {
     }
     database = new pg.Pool({ connectionString: testDatabaseUrl });
     bank = await startFakeBank();
+    pushover = await startFakePushover();
   });
 
   beforeEach(async () => {
@@ -131,6 +137,7 @@ describe('sync-start endpoint against a spawned server', () => {
   afterAll(async () => {
     await database?.end();
     await bank.close();
+    await pushover.close();
   });
 
   describe('with credentials and writing disabled', () => {
@@ -215,11 +222,34 @@ describe('sync-start endpoint against a spawned server', () => {
     let server: TestServer;
 
     beforeAll(async () => {
-      server = await startServer({ EASYBANK_USER: 'user', EASYBANK_PIN: 'pin', EASYBANK_SYNC_WRITE: 'true' });
+      server = await startServer({
+        EASYBANK_USER: 'user',
+        EASYBANK_PIN: 'pin',
+        EASYBANK_SYNC_WRITE: 'true',
+        PUSHOVER_TOKEN: 'app-token',
+        PUSHOVER_USER: 'user-key',
+        PUSHOVER_BASE_URL: pushover.baseUrl,
+      });
     });
 
     afterAll(async () => {
       await stopServer(server);
+    });
+
+    it('notifies the fake Pushover once when it writes uncategorised rows', async () => {
+      pushover.requests.length = 0;
+
+      const response = await startSync(server);
+
+      expect(await response.json()).toEqual({ status: 'success' });
+      expect(pushover.requests).toHaveLength(1);
+      expect(pushover.requests[0]?.method).toBe('POST');
+      expect(pushover.requests[0]?.path).toBe('/1/messages.json');
+      const body = new URLSearchParams(pushover.requests[0]!.body);
+      expect(body.get('token')).toBe('app-token');
+      expect(body.get('user')).toBe('user-key');
+      expect(body.get('title')).toBe('2 new transactions need a category');
+      expect(body.get('message')).toBe('2 new: 0 categorised, 2 without a category.');
     });
 
     it('writes the new rows and skips them on a repeated start', async () => {

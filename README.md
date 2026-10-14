@@ -74,6 +74,15 @@ EASYBANK_PIN=...
 
 The nightly task runs at 03:00 Europe/Vienna while the server runs. Until `EASYBANK_SYNC_WRITE=true` is set, every run is non-writing: it records what it would import and changes no transaction. The result of every run appears on the Imports screen, which also offers a control that starts the same sync on demand. Once the non-writing runs look right, set `EASYBANK_SYNC_WRITE=true` to let it write.
 
+When a writing sync adds new transactions of which at least one received no category, it can send a Pushover notification with the run's counts — new, categorised, and without a category. Set the Pushover application token and recipient key in the environment or in a gitignored `.env` file:
+
+```sh
+PUSHOVER_TOKEN=...
+PUSHOVER_USER=...
+```
+
+Without `PUSHOVER_TOKEN` and `PUSHOVER_USER`, no notification is sent and nothing else changes. A notification that fails — refused, unreachable, or silent — is logged and never fails the sync, changes its record, or changes what was imported. The manual CSV import never notifies. To point the notification at a test server instead of the real Pushover, set `PUSHOVER_BASE_URL` to that server's address; leave it unset to use the real Pushover.
+
 The Imports screen also offers a control that re-applies the stored categories to every stored transaction on demand and reports how many transactions changed. The report is transient: nothing is recorded, and reloading the screen clears it.
 
 To point the sync at a test bank instead of the real Easybank site, set `EASYBANK_BASE_URL` to that server's address; leave it unset to use the real bank.

@@ -4,11 +4,13 @@
 // pool, and leaves a run record. Until EASYBANK_SYNC_WRITE is set to true it
 // only reports what it would import, so the path can be watched on the Imports
 // screen before it is trusted. EASYBANK_BASE_URL, when set, points the retrieval
-// at a test bank instead of the real one.
+// at a test bank instead of the real one; PUSHOVER_BASE_URL does the same for
+// the notification.
 //
 // See openspec/changes/add-easybank-sync/specs/easybank-sync/spec.md
 // and openspec/changes/add-easybank-sync-button/specs/easybank-sync/spec.md
 import { defaultWindow, syncEasybank, syncSourceFromPayload } from '../../../shared/easybank-sync';
+import { notificationConfigFromEnv } from '../../../shared/import-notification';
 
 export default defineTask({
   meta: {
@@ -26,6 +28,7 @@ export default defineTask({
       dryRun: process.env['EASYBANK_SYNC_WRITE'] !== 'true',
       source: syncSourceFromPayload(payload),
       baseUrl: baseUrl === '' ? undefined : baseUrl,
+      notification: notificationConfigFromEnv(process.env),
     });
 
     if (result.status === 'failed') {

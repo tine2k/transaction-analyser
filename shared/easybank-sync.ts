@@ -2,11 +2,16 @@
 // starts a run record, retrieves the Giro account's transactions, imports them
 // through the same path as the manual CSV import, and finishes the record. A
 // failure is recorded with a redacted reason; unset credentials record nothing,
-// because an unconfigured sync is not a failed one.
+// because an unconfigured sync is not a failed one. After the record is
+// finished, a run that wrote uncategorised transactions sends a Pushover
+// notification; its failure is logged and never changes the run's outcome.
 //
 // See openspec/changes/add-easybank-sync/specs/easybank-sync/spec.md
+// and openspec/changes/add-import-notification/specs/import-notification/spec.md
 import { ImportFailure, finishImportRun, importRows, redact, startImportRun } from './transactions-import.ts';
 import type { Database, ImportPlan, ImportRow, ImportSourceKind } from './transactions-import.ts';
+import { notifyImport } from './import-notification.ts';
+import type { ImportNotificationConfig } from './import-notification.ts';
 import { retrieveGiroTransactions } from './easybank.ts';
 
 // The value date below which the sync imports nothing. The history already held
@@ -29,6 +34,7 @@ export type EasybankSyncOptions = {
   source: ImportSourceKind;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
+  notification?: ImportNotificationConfig;
 };
 
 export type EasybankSyncResult =
@@ -91,6 +97,15 @@ export async function syncEasybank(
       rowsCategorised: plan.rowsCategorised,
       error: null,
     });
+
+    // The record is final before the notification is attempted, and the
+    // notification's outcome never changes the run's. A non-writing run has
+    // nothing written, so the trigger rule skips it without a separate check.
+    const notification = await notifyImport(options.notification ?? { token: null, user: null }, plan);
+    if (notification.status === 'failed') {
+      console.error(`import notification failed: ${notification.reason}`);
+    }
+
     return { status: 'success', runId, plan };
   } catch (error) {
     const reason = redact(error instanceof Error ? error.message : String(error));

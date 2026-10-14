@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { describeError, redact } from '../shared/transactions-import.ts';
 import { defaultWindow, syncEasybank } from '../shared/easybank-sync.ts';
+import { notificationConfigFromEnv } from '../shared/import-notification.ts';
 
 type Options = { from: string | null; to: string | null; dsn: string | null; write: boolean };
 
@@ -61,6 +62,8 @@ const USAGE = [
   '  --write               Write the new rows. Without it the run only reports.',
   '',
   'Credentials come from EASYBANK_USER and EASYBANK_PIN in the environment.',
+  'Pushover notifications use PUSHOVER_TOKEN and PUSHOVER_USER; without them',
+  'no notification is sent and the sync is unaffected.',
 ].join('\n');
 
 async function main(): Promise<number> {
@@ -101,6 +104,7 @@ async function main(): Promise<number> {
       to,
       dryRun: !options.write,
       source: 'manual',
+      notification: notificationConfigFromEnv(process.env),
     });
 
     if (result.status === 'unconfigured') {

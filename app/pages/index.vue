@@ -570,6 +570,7 @@ onBeforeUnmount(() => {
 
       <p class="mt-4 text-sm font-semibold text-slate-900" data-testid="visible-total">
         Sum of displayed transactions: <span class="tabular-nums">{{ formatEuroAmount(visibleTotal) }}</span>
+        (<span data-testid="visible-count">{{ visibleTransactions.length }} transaction{{ visibleTransactions.length === 1 ? '' : 's' }}</span>)
       </p>
 
       <p v-if="transactions.length === 0" class="mt-4 text-slate-600">

@@ -146,6 +146,7 @@ describe('transaction list filters', () => {
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['1']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-0.25'));
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1 transaction');
     expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('All categories (5)');
     expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('Uncategorised (1)');
     expect(mocks.useFetch).toHaveBeenCalledTimes(2);
@@ -198,6 +199,7 @@ describe('transaction list filters', () => {
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['2']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-12.50'));
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1 transaction');
     expect(wrapper.findAll('tbody tr')[0]?.findAll('td')[2]?.text()).toBe('-12.50');
     expect(mocks.useFetch).toHaveBeenCalledTimes(2);
   });
@@ -218,12 +220,14 @@ describe('transaction list filters', () => {
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['3', '2', '5', '1']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-18.74'));
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('4 transactions');
 
     await categoryFilter.setValue('2');
     await flushPromises();
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['3']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('4.00'));
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1 transaction');
 
     await categoryFilter.setValue('uncategorised');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
@@ -240,6 +244,7 @@ describe('transaction list filters', () => {
     await flushPromises();
     expect(wrapper.findAll('tbody tr')).toHaveLength(0);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('0'));
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('0 transactions');
   });
 
   it('falls back safely for unknown query values', async () => {

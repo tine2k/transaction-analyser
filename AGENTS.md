@@ -13,8 +13,8 @@
 
 ## Database Tests
 
-- For PostgreSQL-backed tests, use the locally installed PostgreSQL server and create a uniquely named disposable test database. Seed it only with test fixtures; do not use the project's configured database or real transaction data.
-- Require the local PostgreSQL server and client tools to be available, and use a role with permission to create and drop its test database. Pass only the disposable database connection through `TEST_DATABASE_URL` and unset inherited `DATABASE_URL` before running tests.
+- For PostgreSQL-backed tests, use the locally installed PostgreSQL server and create a uniquely named disposable test database. When no server is reachable and no explicit `PGHOST`, `PGPORT`, or `PGHOSTADDR` is set, the test launcher starts a disposable cluster from the locally installed `initdb` and `pg_ctl` binaries and removes it after the run. Seed only with test fixtures; do not use the project's configured database or real transaction data.
+- Require the local PostgreSQL client tools and, for the fallback, the server binaries to be available, and use a role with permission to create and drop its test database. Pass only the disposable database connection through `TEST_DATABASE_URL` and unset inherited `DATABASE_URL` before running tests.
 - Drop the disposable database after the test run, including when tests fail or are interrupted. Keep test setup and teardown repeatable so the database can be recreated on demand; Docker is not required for PostgreSQL-backed tests.
 
 ## OpenSpec Archive

@@ -11,6 +11,8 @@ fi
 
 database_name="transaction_analyser_test_${PPID}_${RANDOM}_${RANDOM}"
 database_created=false
+cluster_directory=""
+cluster_started=false
 
 cleanup() {
   exit_code=$?
@@ -20,6 +22,15 @@ cleanup() {
     if ((exit_code == 0)); then
       exit_code=1
     fi
+  fi
+  if [[ "$cluster_started" == true ]] && ! pg_ctl -D "$cluster_directory/data" stop -m fast >/dev/null 2>&1; then
+    echo "Could not stop the disposable PostgreSQL cluster in '$cluster_directory'. Remove it manually after checking no test process is using it." >&2
+    if ((exit_code == 0)); then
+      exit_code=1
+    fi
+  fi
+  if [[ -n "$cluster_directory" ]]; then
+    rm -rf -- "$cluster_directory" || true
   fi
   exit "$exit_code"
 }
@@ -40,9 +51,52 @@ if [[ ! -x node_modules/.bin/node-pg-migrate ]]; then
   exit 127
 fi
 
-if ! pg_isready --dbname=postgres >/dev/null 2>&1; then
-  echo "Local PostgreSQL is not ready. Start the local PostgreSQL server and confirm 'pg_isready --dbname=postgres' succeeds, then retry." >&2
+start_disposable_cluster() {
+  for command_name in initdb pg_ctl; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+      echo "No local PostgreSQL server is reachable and the PostgreSQL server tool '$command_name' was not found in PATH. Start the local PostgreSQL server, or install the PostgreSQL server binaries to let the launcher create a disposable cluster." >&2
+      exit 127
+    fi
+  done
+
+  mkdir -p node_modules/.cache
+  cluster_directory=$(mktemp -d node_modules/.cache/test-postgres.XXXXXX)
+  local cluster_superuser="${PGUSER:-$(id -un)}"
+
+  if ! initdb -D "$cluster_directory/data" -U "$cluster_superuser" -A trust -E UTF8 --no-instructions >"$cluster_directory/initdb.log" 2>&1; then
+    echo "Could not initialize the disposable PostgreSQL cluster. See '$cluster_directory/initdb.log'." >&2
+    exit 1
+  fi
+
+  local attempt cluster_port
+  for attempt in 1 2 3 4 5; do
+    cluster_port=$((20000 + RANDOM % 40000))
+    if pg_ctl -D "$cluster_directory/data" -l "$cluster_directory/postgres.log" \
+      -o "-p $cluster_port -c listen_addresses=127.0.0.1 -c unix_socket_directories=" \
+      start >/dev/null 2>&1; then
+      cluster_started=true
+      export PGHOST=127.0.0.1
+      export PGPORT="$cluster_port"
+      echo "No local PostgreSQL server is reachable; using a disposable cluster on 127.0.0.1:$cluster_port."
+      return 0
+    fi
+  done
+
+  echo "Could not start the disposable PostgreSQL cluster. Last log lines:" >&2
+  tail -n 20 "$cluster_directory/postgres.log" >&2 || true
   exit 1
+}
+
+if ! pg_isready --dbname=postgres >/dev/null 2>&1; then
+  if [[ -n "${PGHOST-}" || -n "${PGPORT-}" || -n "${PGHOSTADDR-}" ]]; then
+    echo "Local PostgreSQL is not ready. Start the local PostgreSQL server and confirm 'pg_isready --dbname=postgres' succeeds, then retry." >&2
+    exit 1
+  fi
+  start_disposable_cluster
+  if ! pg_isready --dbname=postgres >/dev/null 2>&1; then
+    echo "The disposable PostgreSQL cluster did not accept connections." >&2
+    exit 1
+  fi
 fi
 
 connection_settings=$(psql --no-psqlrc --no-align --tuples-only --field-separator=$'\t' \

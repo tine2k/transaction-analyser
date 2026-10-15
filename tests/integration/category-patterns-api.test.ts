@@ -175,6 +175,113 @@ describe('category pattern append API integration', () => {
     expect(byPurpose['Pay aabc now']).toBeNull();
   });
 
+  it('re-evaluates matching transactions and leaves a non-matching transaction unchanged', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+    await database.query(
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id)
+       VALUES ('2026-03-01', '2026-03-01', -2.00, 'Bookshop Special', 'Books', NULL, 2)`,
+    );
+    await insertTransaction('Zzz special vendor');
+
+    const response = await append('1', 'Zzz special vendor');
+    expect(response.status).toBe(200);
+    expect((await response.json()).added).toBe(true);
+
+    const transactions = await request('/api/transactions').then((result) => result.json()) as Array<{
+      purpose: string;
+      category: { id: string } | null;
+    }>;
+    const byPurpose = Object.fromEntries(transactions.map((transaction) => [transaction.purpose, transaction.category]));
+
+    expect(byPurpose['Zzz special vendor']).toMatchObject({ id: '1' });
+    expect(byPurpose['Bookshop Special']).toMatchObject({ id: '2' });
+  });
+
+  it('applies the full rule to matching transactions: expression beats window and the smallest identity wins', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+    await database.query(
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account)
+       VALUES ('2026-04-15', '2026-04-15', -3.00, 'Window special', 'Test', NULL)`,
+    );
+
+    const windowCategory = await post('/api/categories', {
+      name: 'Holiday',
+      windows: [{ from: '2026-04-01', to: '2026-04-30' }],
+    });
+    expect(windowCategory.status).toBe(201);
+
+    let transactions = await request('/api/transactions').then((result) => result.json()) as Array<{
+      purpose: string;
+      category: { id: string; name: string } | null;
+    }>;
+    expect(transactions.find((transaction) => transaction.purpose === 'Window special')?.category)
+      .toMatchObject({ name: 'Holiday' });
+
+    const appended = await append('1', 'Window special');
+    expect(appended.status).toBe(200);
+
+    await insertTransaction('base pattern plus extra');
+    const laterCategory = await post('/api/categories', { name: 'Later', patterns: ['base pattern'] });
+    expect(laterCategory.status).toBe(201);
+
+    const secondAppend = await append('1', 'extra');
+    expect(secondAppend.status).toBe(200);
+
+    transactions = await request('/api/transactions').then((result) => result.json()) as Array<{
+      purpose: string;
+      category: { id: string } | null;
+    }>;
+    const byPurpose = Object.fromEntries(transactions.map((transaction) => [transaction.purpose, transaction.category]));
+
+    expect(byPurpose['Window special']).toMatchObject({ id: '1' });
+    expect(byPurpose['base pattern plus extra']).toMatchObject({ id: '1' });
+  });
+
+  it('rolls back the append and the re-evaluation together when the re-evaluation fails', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+    await insertTransaction('Atomic rollback target');
+    await database.query(`
+      CREATE OR REPLACE FUNCTION test_block_target_update() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.purpose = 'Atomic rollback target' THEN
+          RAISE EXCEPTION 'blocked by test trigger';
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+      CREATE TRIGGER test_block_target_update
+        BEFORE UPDATE ON transactions
+        FOR EACH ROW EXECUTE FUNCTION test_block_target_update();
+    `);
+
+    let response: Response | undefined;
+    try {
+      response = await append('1', 'Atomic rollback target');
+    } finally {
+      await database.query(
+        'DROP TRIGGER IF EXISTS test_block_target_update ON transactions; DROP FUNCTION IF EXISTS test_block_target_update();',
+      );
+    }
+
+    expect(response?.status).toBe(500);
+
+    const storedCategory = (await categories()).find((category) => category.id === '1');
+    expect(storedCategory?.patterns).toEqual(['rewe', 'market']);
+
+    const transactions = await request('/api/transactions').then((result) => result.json()) as Array<{
+      purpose: string;
+      category: unknown;
+    }>;
+    expect(transactions.find((transaction) => transaction.purpose === 'Atomic rollback target')?.category)
+      .toBeNull();
+  });
+
   it('leaves the name, hidden flag, windows, and other patterns unchanged', async () => {
     const created = await post('/api/categories', {
       name: 'Urlaub',

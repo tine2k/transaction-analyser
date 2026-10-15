@@ -22,7 +22,10 @@
 // shortcut sends text a user selected, and `appendPattern` escapes it so the
 // stored expression matches that text literally. The append is one conditional
 // UPDATE, so a stale client cannot overwrite another tab's patterns, windows,
-// or hidden flag.
+// or hidden flag. The re-evaluation the append triggers covers only the
+// transactions whose purpose line or counterparty name matches the appended
+// pattern, because those are the only ones its outcome can change; every other
+// transaction keeps the category it held.
 //
 // Every mutation takes a transaction-scoped advisory lock before it touches
 // data. The re-evaluation reads the whole category set, so two concurrent
@@ -32,6 +35,7 @@
 // See openspec/changes/allow-multiple-category-expressions/specs/category-management-api/spec.md
 // and openspec/changes/allow-multiple-category-expressions/specs/category-assignment/spec.md
 // and openspec/changes/add-category-expense-type/specs/category-management-api/spec.md
+// and openspec/changes/scope-pattern-append-recompute/specs/category-management-api/spec.md
 import type { Pool, PoolClient } from 'pg';
 import { matchingCategorySql } from '../../shared/category-assignment';
 import { escapeLiteralPattern } from '../../shared/literal-pattern';
@@ -157,6 +161,21 @@ const COUNT_CLAIMED_TRANSACTIONS = `
 const RECOMPUTE_ASSIGNMENTS = `
   UPDATE transactions AS t
   SET category_id = ${matchingCategorySql()}
+`;
+
+// The scoped recompute an append runs: only the transactions the appended
+// pattern can affect are re-evaluated. Appending a pattern adds its category to
+// a transaction's candidate set exactly when the transaction matches the
+// pattern — the purpose line or the counterparty name, the two columns the
+// shared rule reads — so every other transaction's winner is unchanged and is
+// deliberately left alone. The matching rows are assigned by the same rule a
+// global recompute applies, including the expression-before-window order and
+// the smallest-identity tiebreak, so the outcome is identical to the global
+// recompute's. `$1` is the escaped literal pattern the append stored.
+const RECOMPUTE_APPENDED_PATTERN = `
+  UPDATE transactions AS t
+  SET category_id = ${matchingCategorySql()}
+  WHERE t.purpose ~* $1 OR t.counterparty_name ~* $1
 `;
 
 // The on-demand re-categorisation: every stored transaction is assigned the
@@ -326,8 +345,8 @@ export async function editCategory(id: string, input: unknown): Promise<Category
 // Appends one literal pattern to the category the identity names. The text is
 // escaped so the stored expression matches it literally, and the conditional
 // update makes the append atomic and idempotent. A real change re-evaluates the
-// stored transactions in the same transaction; an append that stores nothing
-// changes nothing and reports that.
+// transactions the pattern can affect in the same transaction; an append that
+// stores nothing changes nothing and reports that.
 export async function appendPattern(
   id: string,
   input: unknown,
@@ -340,7 +359,7 @@ export async function appendPattern(
     await lockCategoryMutations(client);
     const updated = await client.query(APPEND_PATTERN, [id, pattern]);
     if ((updated.rowCount ?? 0) > 0) {
-      await client.query(RECOMPUTE_ASSIGNMENTS);
+      await client.query(RECOMPUTE_APPENDED_PATTERN, [pattern]);
       return { category: updated.rows[0] as Category, added: true };
     }
 

@@ -51,7 +51,7 @@ npm run import -- /path/to/statement.csv --dsn postgres://analyser:change-me@loc
 
 The file must be UTF-8, semicolon-delimited, and carry exactly this header: `Date;Value date;Category;Name;Purpose;Account;Bank;Amount;Currency`.
 
-Dates are `DD.MM.YYYY`, amounts use a comma decimal separator (`-1.234,56`), the currency must be `EUR`, and zero amounts are rejected. A row already stored is skipped rather than imported again, so re-running an import of the same statement adds nothing; a statement that legitimately contains the same transaction twice still produces two rows. `--dry-run` validates the whole file, reads the database to report which rows are new and which are already stored, and writes nothing. Every run is recorded and shown on the Imports screen. Each newly imported transaction is categorised by the categories stored at import time; the stored transactions are re-evaluated whenever the category set changes. Without `--dsn` the importer uses `$DATABASE_URL`.
+Dates are `DD.MM.YYYY`, amounts use a comma decimal separator (`-1.234,56`), the currency must be `EUR`, and zero amounts are rejected. A row already stored is skipped rather than imported again, so re-running an import of the same statement adds nothing; a statement that legitimately contains the same transaction twice still produces two rows. `--dry-run` validates the whole file, reads the database to report which rows are new and which are already stored, and writes nothing. Every run is recorded and shown on the Imports screen. Each newly imported transaction is categorised by the categories stored at import time; the stored transactions are re-evaluated whenever the category set changes, except transactions you have assigned by hand, which keep their category. Without `--dsn` the importer uses `$DATABASE_URL`.
 
 ## Keeping the account current
 
@@ -75,7 +75,7 @@ PUSHOVER_USER=...
 
 Without `PUSHOVER_TOKEN` and `PUSHOVER_USER`, no notification is sent and nothing else changes. A notification that fails — refused, unreachable, or silent — is logged and never fails the sync, changes its record, or changes what was imported. The manual CSV import never notifies. To point the notification at a test server instead of the real Pushover, set `PUSHOVER_BASE_URL` to that server's address; leave it unset to use the real Pushover. To check the configured credentials without waiting for a sync, use **Send test notification** on the Imports screen; it sends one fixed test message and reports whether Pushover accepted it, whether the configuration is absent, or why it failed.
 
-The Imports screen also offers a control that re-applies the stored categories to every stored transaction on demand and reports how many transactions changed. The report is transient: nothing is recorded, and reloading the screen clears it.
+The Imports screen also offers a control that re-applies the stored categories to every stored transaction that was not assigned by hand on demand and reports how many transactions changed. The report is transient: nothing is recorded, and reloading the screen clears it.
 
 To point the sync at a test bank instead of the real Easybank site, set `EASYBANK_BASE_URL` to that server's address; leave it unset to use the real bank.
 
@@ -97,7 +97,7 @@ The window defaults to the first day of the preceding calendar quarter through t
 
 ## What it does
 
-- **Transactions** - filterable by category and period (a calendar month or a whole calendar year), with the sum of displayed rows; select text to add it as a pattern to a category without leaving the table.
+- **Transactions** - filterable by category and period (a calendar month or a whole calendar year), with the sum of displayed rows; select text to add it as a pattern to a category without leaving the table, and assign a category by hand to one row or to a checked selection, keeping that choice when the categories are re-applied.
 - **Categories** - regular expressions matched against the purpose line or the counterparty name, and inclusive date windows, assign transactions, with match previews, a hidden flag, and an optional expense type (recurring or one-time) that classifies the category for the analysis screens.
 - **Analytics** - category spending pie charts for each of the last 12 months, switchable to whole-calendar-year totals for every year with data; filterable by expense type.
 - **Monthly totals** - a month-by-category matrix over every month with data; filterable by expense type.

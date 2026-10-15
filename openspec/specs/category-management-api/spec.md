@@ -20,7 +20,9 @@ expressions, and the date windows of the category the identity names. A `DELETE 
 SHALL delete the category the identity names. A `POST /api/categories/:id/patterns` SHALL append one
 literal pattern to the category the identity names. The surface SHALL answer JSON in every case,
 including its errors. The system SHALL NOT expose any other endpoint that creates, changes, or
-deletes a category, and SHALL NOT allow a category to be written through the transactions endpoint.
+deletes a category, and SHALL NOT allow a category's stored elements to be written through the
+transactions endpoint: a manual category assignment written there changes a transaction's category
+reference and SHALL create, change, or delete no category.
 
 #### Scenario: A category is created
 
@@ -98,10 +100,10 @@ added.
 ### Requirement: An append re-evaluates only the transactions the appended pattern can affect
 
 A `POST /api/categories/:id/patterns` SHALL re-evaluate only the stored transactions the appended
-pattern can affect: those whose purpose line or counterparty name matches the appended literal
-pattern. Each such transaction SHALL be assigned by the category assignment rule as part of the
-append's single operation. Every transaction that does not match the appended pattern SHALL keep the
-category it held.
+pattern can affect and that are not manually assigned: those whose purpose line or counterparty
+name matches the appended literal pattern. Each such transaction SHALL be assigned by the category
+assignment rule as part of the append's single operation. Every transaction that does not match the
+appended pattern, and every manually assigned transaction, SHALL keep the category it held.
 
 #### Scenario: Matching transactions are re-evaluated
 
@@ -113,10 +115,15 @@ category it held.
 - **WHEN** an append adds a pattern that matches no part of a stored transaction's purpose line or counterparty name
 - **THEN** that transaction's category is unchanged
 
+#### Scenario: A manually assigned matching transaction keeps its category
+
+- **WHEN** an append adds a pattern that matches a manually assigned transaction's purpose line or counterparty name
+- **THEN** that transaction keeps the category its manual assignment names
+
 #### Scenario: The outcome equals a full re-evaluation
 
 - **WHEN** an append has been applied
-- **THEN** every stored transaction holds the category the category assignment rule selects against the stored categories as they now stand
+- **THEN** every stored transaction that is not manually assigned holds the category the category assignment rule selects against the stored categories as they now stand, and every manually assigned transaction keeps the category its manual assignment names
 
 #### Scenario: The re-evaluation is atomic with the append
 
@@ -386,11 +393,12 @@ well-formed expression.
 
 A delete SHALL remove the named category and SHALL leave no transaction referencing it, because
 the schema forbids deleting a category that a transaction references. Before removing the
-category, the system SHALL reassign every transaction that referenced it to the winning category
-among the remaining categories for that transaction's purpose line, or to uncategorised when no
-remaining category matches, as `category-assignment` defines. The delete SHALL then remove the
-category. The system SHALL NOT leave a transaction pointing at a category that no longer exists,
-and SHALL NOT delete a transaction.
+category, the system SHALL clear every manual assignment that references it, so those transactions
+fall back to the assignment rule, and SHALL reassign every transaction that referenced it to the
+winning category among the remaining categories for that transaction's purpose line, or to
+uncategorised when no remaining category matches, as `category-assignment` defines. The delete
+SHALL then remove the category. The system SHALL NOT leave a transaction pointing at a category
+that no longer exists, and SHALL NOT delete a transaction.
 
 #### Scenario: A referenced category can be deleted after its transactions are reassigned
 
@@ -401,6 +409,11 @@ and SHALL NOT delete a transaction.
 
 - **WHEN** a category is deleted and no remaining category matches a transaction that referenced it
 - **THEN** that transaction is left uncategorised rather than pointing at the deleted category
+
+#### Scenario: A manually assigned transaction loses its manual assignment
+
+- **WHEN** a category that a manually assigned transaction names is deleted
+- **THEN** the transaction is assigned among the remaining categories (or left uncategorised) and no longer carries a manual assignment
 
 #### Scenario: Every transaction survives the delete
 

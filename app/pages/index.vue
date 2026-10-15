@@ -21,9 +21,18 @@ import { formatEuroAmount, sumSignedAmountStrings } from '../utils/category-spen
 // read reflects the result, and the table's own loading state is never used for
 // a refresh.
 //
+// The page also offers manual category assignment. Every row's category cell
+// hosts a select that pins the row to a chosen category or clears the pin by
+// choosing Uncategorised; a selection column with a select-all control backs the
+// fixed bulk bar, which assigns one category to every selected row. The
+// assignment writes go through the manual-category-assignment endpoint, share
+// the row markers and the coalesced refresh with the shortcut, and the two fixed
+// bars render in one bottom stack so they never overlap.
+//
 // See openspec/changes/add-transactions-table/specs/transaction-table/spec.md,
 // openspec/changes/disable-server-side-rendering/specs/frontend-shell/spec.md,
-// and openspec/changes/add-transaction-pattern-shortcut/specs/transaction-pattern-shortcut/spec.md
+// openspec/changes/add-transaction-pattern-shortcut/specs/transaction-pattern-shortcut/spec.md,
+// and openspec/changes/add-manual-category-assignment/specs/manual-category-assignment/spec.md
 type Category = { id: string; name: string };
 
 type Transaction = {
@@ -34,6 +43,7 @@ type Transaction = {
   purpose: string;
   counterpartyName: string;
   counterpartyAccount: string | null;
+  categoryAssignment: 'manual' | 'automatic';
   category: Category | null;
 };
 
@@ -220,16 +230,20 @@ const visibleTotal = computed(() =>
 );
 
 // The shortcut's own state. `captured` holds the current single-cell selection;
-// `markers` counts, per transaction row, the appends whose result is not yet
-// reflected; `inFlight` counts the appends that have not settled.
+// `markers` counts, per transaction row, the writes whose result is not yet
+// reflected; `inFlight` names, per unsettled request, the transaction rows it
+// writes. `selectedIds` holds the rows the bulk bar would assign to, and
+// `bulkPending` states that a bulk assignment is in flight.
 const tableRegion = ref<HTMLElement | null>(null);
 const captured = ref<CapturedSelection | null>(null);
 const previewState = ref<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
 const previewCount = ref<number | null>(null);
 const statusMessage = ref<string | null>(null);
 const statusKind = ref<'info' | 'error'>('info');
-const inFlight = ref(new Map<number, string>());
+const inFlight = ref(new Map<number, string[]>());
 const markers = ref(new Map<string, number>());
+const selectedIds = ref(new Set<string>());
+const bulkPending = ref(false);
 let appendSequence = 0;
 
 const pickerCategories = computed(() =>
@@ -240,6 +254,14 @@ const pickerCategories = computed(() =>
 );
 
 const inFlightCount = computed(() => inFlight.value.size);
+
+// The rows an unsettled write names, so a row's control can be disabled while
+// its result is on its way and its marker can clear once the refresh reflects it.
+const rowsInFlight = computed(() => new Set([...inFlight.value.values()].flat()));
+
+function rowInFlight(transactionId: string): boolean {
+  return rowsInFlight.value.has(transactionId);
+}
 
 // A failure is never hidden behind the in-flight count; otherwise the count is
 // what the bar reports while writes run.
@@ -254,6 +276,45 @@ const barStatus = computed(() => {
 });
 
 const shortcutVisible = computed(() => captured.value !== null || barStatus.value !== null);
+
+// The selection holds only shown rows: the select-all control covers the rows the
+// filters currently show, and changing either filter clears the selection so a
+// row that is no longer shown cannot remain selected.
+const allVisibleSelected = computed(() =>
+  visibleTransactions.value.length > 0
+  && visibleTransactions.value.every(({ id }) => selectedIds.value.has(id)));
+
+const someVisibleSelected = computed(() =>
+  visibleTransactions.value.some(({ id }) => selectedIds.value.has(id)));
+
+const bulkBarVisible = computed(() => selectedIds.value.size > 0);
+
+const bottomBarsVisible = computed(() =>
+  (shortcutVisible.value ? 1 : 0) + (bulkBarVisible.value ? 1 : 0));
+
+function toggleSelected(transactionId: string): void {
+  const next = new Set(selectedIds.value);
+  if (next.has(transactionId)) {
+    next.delete(transactionId);
+  } else {
+    next.add(transactionId);
+  }
+  selectedIds.value = next;
+}
+
+function toggleAllVisible(): void {
+  selectedIds.value = allVisibleSelected.value
+    ? new Set()
+    : new Set(visibleTransactions.value.map(({ id }) => id));
+}
+
+function clearSelection(): void {
+  selectedIds.value = new Set();
+}
+
+watch([categoryFilter, periodFilter], () => {
+  clearSelection();
+});
 
 let previewGeneration = 0;
 let previewTimer: ReturnType<typeof setTimeout> | null = null;
@@ -427,7 +488,7 @@ async function chooseCategory(categoryId: string): Promise<void> {
   captured.value = null;
   resetPreview();
   clearStatus();
-  inFlight.value.set(requestId, selection.transactionId);
+  inFlight.value.set(requestId, [selection.transactionId]);
   markRow(selection.transactionId);
 
   try {
@@ -463,6 +524,65 @@ async function chooseCategory(categoryId: string): Promise<void> {
   }
 }
 
+// The manual assignment write shared by the per-row select and the bulk bar. It
+// names every written row in flight, marks each of them until the coalesced
+// refresh reflects the result, and a failure reports through the shared status
+// region, clears the in-flight markers, and changes no displayed value.
+async function submitAssignment(transactionIds: string[], categoryId: string | null): Promise<boolean> {
+  const requestId = ++appendSequence;
+  clearStatus();
+  inFlight.value.set(requestId, transactionIds);
+  for (const transactionId of transactionIds) {
+    markRow(transactionId);
+  }
+
+  try {
+    await $fetch('/api/transactions/category-assignments', {
+      method: 'POST',
+      body: { transactionIds, categoryId },
+    });
+    return true;
+  } catch (failure) {
+    const subject = transactionIds.length === 1 ? 'the category' : 'the selected transactions';
+    showStatus(`Could not assign ${subject}: ${messageOf(failure)}`, 'error', false);
+    for (const transactionId of transactionIds) {
+      unmarkRow(transactionId);
+    }
+    return false;
+  } finally {
+    inFlight.value.delete(requestId);
+    if (inFlight.value.size === 0) {
+      scheduleRefresh();
+    }
+  }
+}
+
+// The per-row control is put back to the category the row still holds when its
+// assignment fails, so the select never shows a value the server did not accept.
+async function chooseRowCategory(transaction: Transaction, event: Event): Promise<void> {
+  const select = event.target as HTMLSelectElement;
+  const categoryId = select.value === '' ? null : select.value;
+  const applied = await submitAssignment([transaction.id], categoryId);
+  if (!applied) {
+    select.value = transaction.category?.id ?? '';
+  }
+}
+
+async function applyBulkAssignment(categoryId: string | null): Promise<void> {
+  const transactionIds = [...selectedIds.value];
+  if (transactionIds.length === 0 || bulkPending.value) {
+    return;
+  }
+  bulkPending.value = true;
+  try {
+    if (await submitAssignment(transactionIds, categoryId)) {
+      clearSelection();
+    }
+  } finally {
+    bulkPending.value = false;
+  }
+}
+
 // One read after the last append settles collapses a burst of appends into a
 // single background refresh. The response is assigned to the existing data ref,
 // so the table's own loading state is never raised.
@@ -484,7 +604,7 @@ async function refreshTransactions(): Promise<void> {
       return;
     }
     transactions.value = fresh;
-    const inFlightRows = new Set(inFlight.value.values());
+    const inFlightRows = new Set([...inFlight.value.values()].flat());
     for (const transactionId of [...markers.value.keys()]) {
       if (!inFlightRows.has(transactionId)) {
         markers.value.delete(transactionId);
@@ -521,7 +641,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="{ 'pb-28': shortcutVisible }">
+  <div :class="{ 'pb-28': bottomBarsVisible === 1, 'pb-56': bottomBarsVisible === 2 }">
     <h1 class="text-2xl font-bold text-slate-900">Transactions</h1>
 
     <p v-if="error" class="mt-4 text-slate-600">
@@ -597,6 +717,19 @@ onBeforeUnmount(() => {
         <table class="w-max min-w-full border-collapse text-left text-sm">
           <thead>
             <tr class="border-b border-slate-200">
+              <th scope="col" class="px-3 py-2 font-semibold text-slate-700">
+                <label class="flex min-h-11 items-center justify-center">
+                  <input
+                    type="checkbox"
+                    data-testid="select-all-visible"
+                    :checked="allVisibleSelected"
+                    :indeterminate="someVisibleSelected && !allVisibleSelected"
+                    class="size-5 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+                    @change="toggleAllVisible"
+                  >
+                  <span class="sr-only">Select all shown transactions</span>
+                </label>
+              </th>
               <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Booking date</th>
               <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Value date</th>
               <th scope="col" class="px-3 py-2 text-right font-semibold text-slate-700">Amount</th>
@@ -614,6 +747,18 @@ onBeforeUnmount(() => {
               :aria-busy="markers.has(transaction.id) ? 'true' : undefined"
               class="border-b border-slate-100"
             >
+              <td class="px-3 py-2">
+                <label class="flex min-h-11 items-center justify-center">
+                  <input
+                    type="checkbox"
+                    data-testid="row-select"
+                    :checked="selectedIds.has(transaction.id)"
+                    class="size-5 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+                    @change="toggleSelected(transaction.id)"
+                  >
+                  <span class="sr-only">Select {{ transaction.purpose }}</span>
+                </label>
+              </td>
               <td class="px-3 py-2 whitespace-nowrap text-slate-900">
                 <time :datetime="transaction.bookingDate">{{ transaction.bookingDate }}</time>
               </td>
@@ -639,13 +784,29 @@ onBeforeUnmount(() => {
                   data-testid="row-updating"
                   class="mr-1 inline-block size-2 rounded-full bg-slate-400 align-middle"
                 ></span>
-                <template v-if="transaction.category !== null">
-                  {{ transaction.category.name }}
-                </template>
-                <template v-else>
-                  <span aria-hidden="true" class="text-slate-400">—</span>
-                  <span class="sr-only">Uncategorised</span>
-                </template>
+                <span
+                  v-if="transaction.categoryAssignment === 'manual'"
+                  data-testid="manual-assignment-marker"
+                  class="mr-1 inline-flex text-slate-500 align-middle"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor" class="size-3.5">
+                    <path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 3.3-4.5 8.5-4.5 8.5S3.5 9.3 3.5 6A4.5 4.5 0 0 1 8 1.5Zm0 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" />
+                  </svg>
+                  <span class="sr-only">Manually assigned</span>
+                </span>
+                <select
+                  data-testid="row-category-select"
+                  :value="transaction.category?.id ?? ''"
+                  :disabled="rowInFlight(transaction.id)"
+                  :aria-label="`Category for ${transaction.purpose}`"
+                  class="min-h-11 max-w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                  @change="chooseRowCategory(transaction, $event)"
+                >
+                  <option value="">Uncategorised</option>
+                  <option v-for="category in pickerCategories" :key="category.id" :value="category.id">
+                    {{ category.hidden ? `${category.name} (hidden)` : category.name }}
+                  </option>
+                </select>
                 <span v-if="markers.has(transaction.id)" class="sr-only">Updating category</span>
               </td>
             </tr>
@@ -655,15 +816,25 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <PatternShortcutBar
-      :text="captured?.text ?? null"
-      :categories="pickerCategories"
-      :preview-state="previewState"
-      :preview-count="previewCount"
-      :status="barStatus"
-      :status-kind="statusKind"
-      @choose="chooseCategory"
-      @dismiss="dismissShortcut"
-    />
+    <div v-if="shortcutVisible || bulkBarVisible" class="fixed inset-x-0 bottom-0 z-20">
+      <BulkAssignmentBar
+        v-if="bulkBarVisible"
+        :count="selectedIds.size"
+        :categories="pickerCategories"
+        :disabled="bulkPending"
+        @assign="applyBulkAssignment"
+        @clear="clearSelection"
+      />
+      <PatternShortcutBar
+        :text="captured?.text ?? null"
+        :categories="pickerCategories"
+        :preview-state="previewState"
+        :preview-count="previewCount"
+        :status="barStatus"
+        :status-kind="statusKind"
+        @choose="chooseCategory"
+        @dismiss="dismissShortcut"
+      />
+    </div>
   </div>
 </template>

@@ -1,8 +1,10 @@
 // The transactions read endpoint. It returns every stored transaction as a
 // JSON array, ordered newest booking date first, with each transaction's
-// category resolved from the categories table by following its reference.
-// It runs a single SELECT and writes nothing: no row is created, altered, or
-// deleted, and no category's regular expression is evaluated.
+// category resolved from the categories table by following its reference and
+// the assignment provenance — manual when the category was chosen by hand,
+// automatic when the matching rule set it. It runs a single SELECT and writes
+// nothing: no row is created, altered, or deleted, and no category's regular
+// expression is evaluated.
 //
 // The two dates are formatted in SQL rather than passed through, because the
 // `pg` driver parses a `date` into a JavaScript Date, whose JSON form carries a
@@ -11,6 +13,7 @@
 //
 // See openspec/changes/add-transactions-read-endpoint/specs/transaction-read-api/spec.md
 // and openspec/changes/add-transactions-read-endpoint/specs/backend-shell/spec.md
+// and openspec/changes/add-manual-category-assignment/specs/transaction-read-api/spec.md
 const SELECT_TRANSACTIONS = `
   SELECT t.id,
          to_char(t.booking_date, 'YYYY-MM-DD') AS booking_date,
@@ -19,6 +22,7 @@ const SELECT_TRANSACTIONS = `
          t.purpose,
          t.counterparty_name,
          t.counterparty_account,
+         t.category_locked,
          c.id AS category_id,
          c.name AS category_name,
          c.hidden AS category_hidden,
@@ -38,6 +42,7 @@ type TransactionRow = {
   purpose: string;
   counterparty_name: string;
   counterparty_account: string | null;
+  category_locked: boolean;
   category_id: string | null;
   category_name: string | null;
   category_hidden: boolean | null;
@@ -83,6 +88,7 @@ export default defineEventHandler(async () => {
     purpose: row.purpose,
     counterpartyName: row.counterparty_name,
     counterpartyAccount: row.counterparty_account,
+    categoryAssignment: row.category_locked ? 'manual' : 'automatic',
     category:
       row.category_id === null
         ? null

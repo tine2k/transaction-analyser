@@ -1,7 +1,11 @@
 // Category management and assignment.
 //
 // Categories are listed, created, edited, and deleted here, and every change to the
-// category set re-evaluates the transactions it can affect. A category holds zero or
+// category set re-evaluates the transactions it can affect that are not manually
+// assigned: a transaction whose category was chosen by hand carries a lock that the
+// rule-driven recomputes, the on-demand re-categorisation, and the delete retirement
+// all respect. Deleting a category clears the locks that named it, because a manual
+// assignment cannot outlive its category. A category holds zero or
 // more regular expressions and zero or more date windows, with at least one of the
 // two, and may carry an expense type — recurring or one-time — which classifies it
 // for the analysis views and never takes part in membership. It matches a purpose line when any expression matches — using the database's
@@ -155,50 +159,86 @@ const COUNT_CLAIMED_TRANSACTIONS = `
   )
 `;
 
-// The global recompute: every stored transaction is assigned the category the
-// shared matching rule selects. It is run after a create or an edit and is
-// idempotent.
+// The global recompute: every stored transaction that is not manually assigned
+// is assigned the category the shared matching rule selects. It is run after a
+// create or an edit and is idempotent. A locked transaction is skipped, because
+// its category was chosen by hand and the rule must not overwrite it.
 const RECOMPUTE_ASSIGNMENTS = `
   UPDATE transactions AS t
   SET category_id = ${matchingCategorySql()}
+  WHERE NOT t.category_locked
 `;
 
 // The scoped recompute an append runs: only the transactions the appended
-// pattern can affect are re-evaluated. Appending a pattern adds its category to
-// a transaction's candidate set exactly when the transaction matches the
-// pattern — the purpose line or the counterparty name, the two columns the
-// shared rule reads — so every other transaction's winner is unchanged and is
-// deliberately left alone. The matching rows are assigned by the same rule a
-// global recompute applies, including the expression-before-window order and
+// pattern can affect that are not manually assigned are re-evaluated. Appending
+// a pattern adds its category to a transaction's candidate set exactly when the
+// transaction matches the pattern — the purpose line or the counterparty name,
+// the two columns the shared rule reads — so every other transaction's winner
+// is unchanged and is deliberately left alone, and a manually assigned
+// transaction keeps its choice. The matching rows are assigned by the same rule
+// a global recompute applies, including the expression-before-window order and
 // the smallest-identity tiebreak, so the outcome is identical to the global
 // recompute's. `$1` is the escaped literal pattern the append stored.
 const RECOMPUTE_APPENDED_PATTERN = `
   UPDATE transactions AS t
   SET category_id = ${matchingCategorySql()}
-  WHERE t.purpose ~* $1 OR t.counterparty_name ~* $1
+  WHERE (t.purpose ~* $1 OR t.counterparty_name ~* $1) AND NOT t.category_locked
 `;
 
-// The on-demand re-categorisation: every stored transaction is assigned the
-// category the shared matching rule selects, and only the rows whose reference
-// actually changes are updated and returned, so the driver's row count is the
-// number of changed transactions. It is idempotent: an immediate repeat changes
-// and reports nothing.
+// The on-demand re-categorisation: every stored transaction that is not
+// manually assigned is assigned the category the shared matching rule selects,
+// and only the rows whose reference actually changes are updated and returned,
+// so the driver's row count is the number of changed transactions. Manually
+// assigned transactions are left exactly as they are and are never counted. It
+// is idempotent: an immediate repeat changes and reports nothing.
 const RECATEGORISE_TRANSACTIONS = `
   UPDATE transactions AS t
   SET category_id = ${matchingCategorySql()}
-  WHERE t.category_id IS DISTINCT FROM (${matchingCategorySql()})
+  WHERE NOT t.category_locked
+    AND t.category_id IS DISTINCT FROM (${matchingCategorySql()})
   RETURNING 1
+`;
+
+// The manual assignment: every named transaction holds the target category and
+// is locked, so no rule-driven recompute overwrites the choice until the
+// assignment is cleared or its category is deleted.
+const PIN_CATEGORY = `
+  UPDATE transactions
+  SET category_id = $2, category_locked = true
+  WHERE id = ANY($1::bigint[])
+`;
+
+// Clearing a manual assignment: every named transaction is unlocked and
+// re-evaluated by the shared matching rule in the same statement, so its
+// category agrees with the stored categories at once rather than after the next
+// category change.
+const CLEAR_MANUAL_ASSIGNMENT = `
+  UPDATE transactions AS t
+  SET category_locked = false, category_id = ${matchingCategorySql()}
+  WHERE t.id = ANY($1::bigint[])
+`;
+
+// Counts the stored transactions among the named identities, so the operation
+// can refuse a request that names a transaction that does not exist before it
+// writes anything.
+const COUNT_NAMED_TRANSACTIONS = `
+  SELECT count(*)::text AS count
+  FROM transactions
+  WHERE id = ANY($1::bigint[])
 `;
 
 // The reassignment that lets a category be deleted. The category being retired is
 // excluded from the candidate set, and only the transactions that referenced it are
 // touched. It follows the same two-tier rule as the recompute, so a transaction may
 // fall back to a remaining category's date window when no remaining expression
-// matches. Once this has run, no transaction references the category, so the delete
-// no longer violates the foreign key.
+// matches. A manual assignment to the retiring category is cleared as part of the
+// same update, because a pin cannot outlive its category. Once this has run, no
+// transaction references the category, so the delete no longer violates the foreign
+// key.
 const REASSIGN_RETIRING_CATEGORY = `
   UPDATE transactions AS t
-  SET category_id = ${matchingCategorySql({ excludeCategoryId: '$1' })}
+  SET category_id = ${matchingCategorySql({ excludeCategoryId: '$1' })},
+      category_locked = false
   WHERE t.category_id = $1
 `;
 
@@ -400,6 +440,41 @@ export async function recategoriseTransactions(): Promise<number> {
     await lockCategoryMutations(client);
     const updated = await client.query(RECATEGORISE_TRANSACTIONS);
     return updated.rowCount ?? 0;
+  });
+}
+
+// Sets or clears the manual category assignment of every named transaction as
+// one all-or-nothing unit and answers with the number of named transactions it
+// wrote. A stored category identity pins each transaction to it; null clears the
+// manual assignment and immediately re-evaluates the named transactions with the
+// matching rule. A request naming no transaction, a transaction that is not
+// stored, or a category that is not stored is refused with no stored change. The
+// operation takes the same transaction-scoped advisory lock every category
+// mutation takes, so it cannot name a category a concurrent delete removes, and
+// no category is created, changed, or deleted.
+export async function assignTransactionCategories(input: unknown): Promise<number> {
+  const { transactionIds, categoryId } = readAssignmentInput(input);
+  const database = useDatabase();
+
+  return inTransaction(database, async (client) => {
+    await lockCategoryMutations(client);
+
+    const found = await client.query(COUNT_NAMED_TRANSACTIONS, [transactionIds]);
+    if (Number(found.rows[0]?.count) !== transactionIds.length) {
+      throw new CategoryError(404, 'no transaction carries one of those identities');
+    }
+
+    if (categoryId === null) {
+      await client.query(CLEAR_MANUAL_ASSIGNMENT, [transactionIds]);
+    } else {
+      const category = await client.query(SELECT_CATEGORY, [categoryId]);
+      if ((category.rowCount ?? 0) === 0) {
+        throw new CategoryError(404, 'no category carries that identity');
+      }
+      await client.query(PIN_CATEGORY, [transactionIds, categoryId]);
+    }
+
+    return transactionIds.length;
   });
 }
 
@@ -619,6 +694,42 @@ function readLiteralText(input: unknown): string {
     throw new CategoryError(400, 'the pattern text must be at least three characters');
   }
   return trimmed;
+}
+
+// The input of a manual assignment: a non-empty list of transaction identities
+// and a category identity or null. The identities are deduplicated, so a
+// repeated identity is assigned and counted once. A missing, empty, or malformed
+// list, or a present category identity that is not a storage identity, is
+// refused here; whether the named rows and category exist is checked by the
+// operation itself, inside its transaction.
+function readAssignmentInput(input: unknown): { transactionIds: string[]; categoryId: string | null } {
+  if (typeof input !== 'object' || input === null) {
+    throw new CategoryError(400, 'an assignment needs a non-empty list of transaction identities');
+  }
+  const requested = (input as { transactionIds?: unknown }).transactionIds;
+  if (!Array.isArray(requested) || requested.length === 0) {
+    throw new CategoryError(400, 'an assignment needs a non-empty list of transaction identities');
+  }
+  if (requested.some((identity) => typeof identity !== 'string' || !isStorageIdentity(identity))) {
+    throw new CategoryError(400, 'every transaction identity must be a whole number rendered as a string');
+  }
+  const transactionIds = [...new Set(requested as string[])];
+
+  const categoryId = (input as { categoryId?: unknown }).categoryId;
+  if (categoryId === undefined || categoryId === null) {
+    return { transactionIds, categoryId: null };
+  }
+  if (typeof categoryId !== 'string' || !isStorageIdentity(categoryId)) {
+    throw new CategoryError(400, 'the category identity must be a whole number rendered as a string or null');
+  }
+  return { transactionIds, categoryId };
+}
+
+// A storage identity: a whole number rendered as a string that the bigint
+// identity column can hold. The range check keeps an out-of-range value a
+// refused request rather than a database error.
+function isStorageIdentity(value: string): boolean {
+  return IDENTITY.test(value) && BigInt(value) <= 9223372036854775807n;
 }
 
 function readPatterns(input: unknown): string[] {

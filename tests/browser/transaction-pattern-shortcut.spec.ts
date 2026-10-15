@@ -89,7 +89,7 @@ async function interceptApi(page: Page, options: { failAppend?: boolean } = {}):
 
 async function selectTextInCell(page: Page, transactionId: string, start: number, end: number): Promise<string> {
   return page.evaluate(({ transactionId: id, start: startIndex, end: endIndex }) => {
-    const cell = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(4)`);
+    const cell = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(5)`);
     const node = cell?.firstChild ?? null;
     if (node === null) {
       throw new Error('purpose cell is not rendered');
@@ -106,8 +106,8 @@ async function selectTextInCell(page: Page, transactionId: string, start: number
 
 async function selectAcrossCells(page: Page, transactionId: string): Promise<void> {
   await page.evaluate((id) => {
-    const purpose = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(4)`)?.firstChild ?? null;
-    const counterparty = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(5)`)?.firstChild ?? null;
+    const purpose = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(5)`)?.firstChild ?? null;
+    const counterparty = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(6)`)?.firstChild ?? null;
     if (purpose === null || counterparty === null) {
       throw new Error('row is not rendered');
     }
@@ -140,7 +140,7 @@ test('a selection appends a literal pattern, marks the row, and refreshes in pla
   await expect(page.getByTestId('pattern-shortcut-text')).toHaveCount(0);
 
   const row = page.locator('[data-transaction-id="2"]');
-  await expect(row.locator('td').nth(6)).toHaveText('Groceries');
+  await expect(row.getByTestId('row-category-select')).toHaveValue('1');
   await expect(page.getByTestId('row-updating')).toHaveCount(0);
 
   const appends = recorded.filter((entry) => entry.pathname === '/api/categories/1/patterns');
@@ -179,6 +179,5 @@ test('a failed append keeps the bar with the captured text and the error', async
 
   await expect(page.getByTestId('pattern-shortcut-status')).toContainText('Could not add to Groceries');
   await expect(page.getByTestId('pattern-shortcut-text')).toHaveText('REWE Markt');
-  await expect(page.locator('[data-transaction-id="2"] td').nth(6)).toContainText('—');
-  await expect(page.locator('[data-transaction-id="2"] td').nth(6)).not.toContainText('Groceries');
+  await expect(page.locator('[data-transaction-id="2"]').getByTestId('row-category-select')).toHaveValue('');
 });

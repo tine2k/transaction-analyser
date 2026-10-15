@@ -35,7 +35,7 @@ function choose(event: Event): void {
   <div
     v-if="text !== null || status !== null"
     data-testid="pattern-shortcut-bar"
-    class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(15,23,42,0.08)]"
+    class="border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(15,23,42,0.08)]"
   >
     <div class="w-full">
       <p

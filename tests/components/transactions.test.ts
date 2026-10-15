@@ -19,6 +19,7 @@ type TestTransaction = {
   purpose: string;
   counterpartyName: string;
   counterpartyAccount: string | null;
+  categoryAssignment: 'manual' | 'automatic';
   category: { id: string; name: string; hidden: boolean } | null;
 };
 
@@ -26,26 +27,31 @@ const transactions: TestTransaction[] = [
   {
     id: '4', bookingDate: '2026-03-03', valueDate: '2026-03-03', amount: '5.00',
     purpose: 'March travel', counterpartyName: 'Rail', counterpartyAccount: null,
+    categoryAssignment: 'automatic',
     category: { id: '2', name: 'Travel', hidden: false },
   },
   {
     id: '3', bookingDate: '2026-02-20', valueDate: '2026-02-19', amount: '4.00',
     purpose: 'February travel', counterpartyName: 'Rail', counterpartyAccount: null,
+    categoryAssignment: 'automatic',
     category: { id: '2', name: 'Travel', hidden: false },
   },
   {
     id: '2', bookingDate: '2026-02-15', valueDate: '2026-02-15', amount: '-12.50',
     purpose: 'Groceries', counterpartyName: 'Market', counterpartyAccount: null,
+    categoryAssignment: 'manual',
     category: { id: '1', name: 'Groceries', hidden: false },
   },
   {
     id: '5', bookingDate: '2026-02-10', valueDate: '2026-02-10', amount: '-9.99',
     purpose: 'Internal transfer', counterpartyName: 'Own account', counterpartyAccount: null,
+    categoryAssignment: 'automatic',
     category: { id: '3', name: 'Internal', hidden: true },
   },
   {
     id: '1', bookingDate: '2026-02-01', valueDate: '2026-02-01', amount: '-0.25',
     purpose: 'Uncategorised purchase', counterpartyName: 'Shop', counterpartyAccount: null,
+    categoryAssignment: 'automatic',
     category: null,
   },
 ];
@@ -94,11 +100,11 @@ function clearSelection(): void {
 }
 
 function purposeNode(wrapper: Awaited<ReturnType<typeof mountTransactions>>, transactionId: string): Node {
-  return wrapper.get(`[data-transaction-id="${transactionId}"] td:nth-child(4)`).element.firstChild as Node;
+  return wrapper.get(`[data-transaction-id="${transactionId}"] td:nth-child(5)`).element.firstChild as Node;
 }
 
 function counterpartyNode(wrapper: Awaited<ReturnType<typeof mountTransactions>>, transactionId: string): Node {
-  return wrapper.get(`[data-transaction-id="${transactionId}"] td:nth-child(5)`).element.firstChild as Node;
+  return wrapper.get(`[data-transaction-id="${transactionId}"] td:nth-child(6)`).element.firstChild as Node;
 }
 
 function wait(ms: number): Promise<void> {
@@ -200,7 +206,7 @@ describe('transaction list filters', () => {
       .toEqual(['2']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-12.50'));
     expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1 transaction');
-    expect(wrapper.findAll('tbody tr')[0]?.findAll('td')[2]?.text()).toBe('-12.50');
+    expect(wrapper.findAll('tbody tr')[0]?.findAll('td')[3]?.text()).toBe('-12.50');
     expect(mocks.useFetch).toHaveBeenCalledTimes(2);
   });
 
@@ -549,7 +555,8 @@ describe('transaction pattern shortcut', () => {
     expect(fetchCalls('/api/transactions')).toHaveLength(1);
     expect(wrapper.find('[data-testid="row-updating"]').exists()).toBe(false);
     expect(wrapper.get('[data-transaction-id="1"]').attributes('aria-busy')).toBeUndefined();
-    expect(wrapper.get('[data-transaction-id="1"] td:nth-child(7)').text()).toContain('Groceries');
+    expect((wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]').element as HTMLSelectElement).value)
+      .toBe('1');
   });
 
   it('coalesces several overlapping appends into one refresh', async () => {
@@ -637,11 +644,13 @@ describe('transaction pattern shortcut', () => {
 
     refreshes[1]?.resolve(groceries);
     await flushPromises();
-    expect(wrapper.get('[data-transaction-id="1"] td:nth-child(7)').text()).toContain('Groceries');
+    expect((wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]').element as HTMLSelectElement).value)
+      .toBe('1');
 
     refreshes[0]?.resolve(travel);
     await flushPromises();
-    expect(wrapper.get('[data-transaction-id="1"] td:nth-child(7)').text()).toContain('Groceries');
+    expect((wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]').element as HTMLSelectElement).value)
+      .toBe('1');
   });
 
   it('keeps the displayed rows and reports when the refresh fails', async () => {
@@ -669,5 +678,213 @@ describe('transaction pattern shortcut', () => {
     expect(wrapper.get('[data-testid="pattern-shortcut-status"]').text())
       .toBe('The transactions could not be refreshed.');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id'))).toEqual(['1']);
+  });
+});
+
+describe('manual category assignment', () => {
+  beforeEach(() => {
+    mocks.useFetch.mockReset();
+    mocks.fetch.mockReset();
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(transactions) : categoriesResponse());
+  });
+
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) {
+      wrapper.unmount();
+    }
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('renders each row category in an assignment control offering the stored categories', async () => {
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+
+    const control = wrapper.get('[data-transaction-id="2"] [data-testid="row-category-select"]');
+    expect((control.element as HTMLSelectElement).value).toBe('1');
+    expect(control.classes()).toContain('min-h-11');
+    expect(control.findAll('option').map((option) => option.text())).toEqual([
+      'Uncategorised',
+      'Groceries',
+      'Internal (hidden)',
+      'Travel',
+    ]);
+    expect(control.findAll('option').map((option) => option.attributes('value')))
+      .toEqual(['', '1', '3', '2']);
+
+    const uncategorised = wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]');
+    expect((uncategorised.element as HTMLSelectElement).value).toBe('');
+  });
+
+  it('choosing a category invokes the assignment with the single identity', async () => {
+    mocks.fetch.mockResolvedValue({ updated: 1 });
+    const wrapper = await mountTransactions();
+
+    await wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]').setValue('2');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/transactions/category-assignments', {
+      method: 'POST',
+      body: { transactionIds: ['1'], categoryId: '2' },
+    });
+  });
+
+  it('choosing Uncategorised invokes the assignment with no category', async () => {
+    mocks.fetch.mockResolvedValue({ updated: 1 });
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+
+    await wrapper.get('[data-transaction-id="2"] [data-testid="row-category-select"]').setValue('');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/transactions/category-assignments', {
+      method: 'POST',
+      body: { transactionIds: ['2'], categoryId: null },
+    });
+  });
+
+  it('marks a manually assigned row and leaves rule-derived rows unmarked', async () => {
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+
+    expect(wrapper.get('[data-transaction-id="2"] [data-testid="manual-assignment-marker"]').exists()).toBe(true);
+    expect(wrapper.get('[data-transaction-id="2"]').text()).toContain('Manually assigned');
+    expect(wrapper.find('[data-transaction-id="3"] [data-testid="manual-assignment-marker"]').exists()).toBe(false);
+  });
+
+  it('puts the control back and reports when the assignment fails', async () => {
+    mocks.fetch.mockRejectedValue({ data: { message: 'the request could not be completed' } });
+    const wrapper = await mountTransactions();
+
+    const select = wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]');
+    await select.setValue('2');
+    await flushPromises();
+
+    expect((select.element as HTMLSelectElement).value).toBe('');
+    const status = wrapper.get('[data-testid="pattern-shortcut-status"]');
+    expect(status.text()).toContain('Could not assign the category');
+    expect(status.classes()).toContain('text-red-700');
+  });
+
+  it('disables the control while its assignment is in flight and refreshes once it settles', async () => {
+    const assignment = deferred<{ updated: number }>();
+    mocks.fetch.mockImplementation((url: string) =>
+      url === '/api/transactions' ? Promise.resolve(transactions) : assignment.promise);
+    const wrapper = await mountTransactions();
+
+    const select = wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]');
+    await select.setValue('2');
+    await flushPromises();
+
+    expect((select.element as HTMLSelectElement).disabled).toBe(true);
+    expect(wrapper.get('[data-transaction-id="1"]').attributes('aria-busy')).toBe('true');
+
+    assignment.resolve({ updated: 1 });
+    await flushPromises();
+    await wait(350);
+    await flushPromises();
+
+    expect(fetchCalls('/api/transactions')).toHaveLength(1);
+    const refreshed = wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]');
+    expect((refreshed.element as HTMLSelectElement).disabled).toBe(false);
+    expect(wrapper.get('[data-transaction-id="1"]').attributes('aria-busy')).toBeUndefined();
+  });
+
+  it('select-all selects every shown row and clears when every shown row is selected', async () => {
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+
+    const selectAll = wrapper.get('[data-testid="select-all-visible"]');
+    await selectAll.setValue(true);
+
+    expect(wrapper.findAll('[data-testid="row-select"]').map((box) => (box.element as HTMLInputElement).checked))
+      .toEqual([true, true, true, true, true]);
+    expect(wrapper.get('[data-testid="bulk-assignment-bar"]').text()).toContain('5 transactions selected');
+    expect((selectAll.element as HTMLInputElement).checked).toBe(true);
+
+    await selectAll.setValue(false);
+
+    expect(wrapper.find('[data-testid="bulk-assignment-bar"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="row-select"]').every((box) => !(box.element as HTMLInputElement).checked))
+      .toBe(true);
+  });
+
+  it('reflects a partial selection in the select-all control', async () => {
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+
+    await wrapper.findAll('[data-testid="row-select"]')[0]?.setValue(true);
+
+    const selectAll = wrapper.get('[data-testid="select-all-visible"]').element as HTMLInputElement;
+    expect(selectAll.checked).toBe(false);
+    expect(selectAll.indeterminate).toBe(true);
+    expect(wrapper.get('[data-testid="bulk-assignment-bar"]').text()).toContain('1 transaction selected');
+  });
+
+  it('clears the selection when either filter changes', async () => {
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+    await wrapper.findAll('[data-testid="row-select"]')[0]?.setValue(true);
+    expect(wrapper.find('[data-testid="bulk-assignment-bar"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="period-filter"]').setValue('2026-02');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="bulk-assignment-bar"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="row-select"]').every((box) => !(box.element as HTMLInputElement).checked))
+      .toBe(true);
+  });
+
+  it('applies one assignment to every selected row and clears the selection on success', async () => {
+    mocks.fetch.mockImplementation((url: string) =>
+      url === '/api/transactions' ? Promise.resolve(transactions) : Promise.resolve({ updated: 2 }));
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+
+    await wrapper.findAll('[data-testid="row-select"]')[0]?.setValue(true);
+    await wrapper.findAll('[data-testid="row-select"]')[1]?.setValue(true);
+    await wrapper.get('[data-testid="bulk-assignment-category"]').setValue('1');
+    await wrapper.get('[data-testid="bulk-assignment-apply"]').trigger('click');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/transactions/category-assignments', {
+      method: 'POST',
+      body: { transactionIds: ['4', '3'], categoryId: '1' },
+    });
+    expect(wrapper.find('[data-testid="bulk-assignment-bar"]').exists()).toBe(false);
+
+    await wait(350);
+    await flushPromises();
+    expect(fetchCalls('/api/transactions')).toHaveLength(1);
+  });
+
+  it('keeps the selection and reports when a bulk assignment fails', async () => {
+    mocks.fetch.mockImplementation((url: string) =>
+      url === '/api/transactions'
+        ? Promise.resolve(transactions)
+        : Promise.reject({ data: { message: 'the request could not be completed' } }));
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+
+    await wrapper.findAll('[data-testid="row-select"]')[0]?.setValue(true);
+    await wrapper.findAll('[data-testid="row-select"]')[1]?.setValue(true);
+    await wrapper.get('[data-testid="bulk-assignment-category"]').setValue('1');
+    await wrapper.get('[data-testid="bulk-assignment-apply"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="bulk-assignment-bar"]').text()).toContain('2 transactions selected');
+    const status = wrapper.get('[data-testid="pattern-shortcut-status"]');
+    expect(status.text()).toContain('Could not assign the selected transactions');
+    expect(status.classes()).toContain('text-red-700');
   });
 });

@@ -37,7 +37,7 @@ The system SHALL request `GET /api/transactions` from the same origin when the i
 
 ### Requirement: Each row carries one column per transaction element
 
-The system SHALL give the table one column for each piece of a transaction: booking date, value date, amount, purpose, counterparty name, counterparty account, and category. Each cell SHALL show the value for that transaction and that element alone. The system SHALL NOT add a column that holds a value the transaction does not carry, such as a running balance, a total, or a derived direction.
+The system SHALL give the table one column for each piece of a transaction: booking date, value date, amount, purpose, counterparty name, counterparty account, and category. Each cell SHALL show the value for that transaction and that element alone. The table MAY carry one selection-control column, which holds no transaction value and states nothing about the transaction. The system SHALL NOT add any other column, and SHALL NOT add a column that holds a value the transaction does not carry, such as a running balance, a total, or a derived direction.
 
 #### Scenario: A fully populated transaction fills every column
 
@@ -47,7 +47,12 @@ The system SHALL give the table one column for each piece of a transaction: book
 #### Scenario: No derived column is added
 
 - **WHEN** the table's columns are inspected
-- **THEN** every column corresponds to a transaction element, and no column shows a total, balance, count, or other value computed from the transactions
+- **THEN** every column corresponds to a transaction element or is the selection-control column, and no column shows a total, balance, count, or other value computed from the transactions
+
+#### Scenario: The selection column holds no transaction value
+
+- **WHEN** the selection-control column is inspected
+- **THEN** it offers no transaction value and adds no column that states anything about the transaction
 
 ### Requirement: The amount is shown exactly as the read endpoint returned it
 
@@ -70,7 +75,7 @@ The system SHALL present each transaction's amount as the signed decimal value t
 
 ### Requirement: An absent value is shown as an explicit gap
 
-The system SHALL distinguish an absent optional value from a present one. When a transaction's counterparty account is absent, the system SHALL show a visible gap in that column rather than an empty string or a borrowed value. When a transaction is uncategorised, the system SHALL show a visible gap in the category column rather than a category name, and SHALL NOT invent a category for the absence. The system SHALL NOT present an absent value as an empty string that could be mistaken for a value the transaction carries.
+The system SHALL distinguish an absent optional value from a present one. When a transaction's counterparty account is absent, the system SHALL show a visible gap in that column rather than an empty string or a borrowed value. When a transaction is uncategorised, the category column's assignment control SHALL present the absence explicitly — as the `Uncategorised` choice — rather than a category name, and SHALL NOT invent a category for the absence. The system SHALL NOT present an absent value as an empty string that could be mistaken for a value the transaction carries.
 
 #### Scenario: An absent counterparty account reads as absent
 
@@ -80,12 +85,12 @@ The system SHALL distinguish an absent optional value from a present one. When a
 #### Scenario: An uncategorised transaction reads as uncategorised
 
 - **WHEN** a returned transaction carries no category
-- **THEN** its category cell shows an explicit absence, and no category name is shown for it
+- **THEN** its category control presents the explicit `Uncategorised` choice, and no category name is shown for it
 
 #### Scenario: A present value is not confused with an absent one
 
 - **WHEN** one returned transaction carries a category and another does not
-- **THEN** the first shows the category's name and the second shows an explicit absence, and the two cells are distinguishable
+- **THEN** the first shows the category's name as its category control's value and the second shows the explicit absence, and the two cells are distinguishable
 
 ### Requirement: Dates are shown as the calendar dates they are
 
@@ -131,7 +136,7 @@ The system SHALL present a defined state when the endpoint returns no transactio
 
 ### Requirement: The table offers a read-only category-presence filter
 
-The system SHALL offer a category filter with choices for all categories, uncategorised transactions, and each category represented in the returned transaction data. It SHALL offer a single period filter with choices for all periods, each calendar month represented by at least one returned transaction, and each calendar year represented by at least one returned transaction. The period choices SHALL be presented in two labelled groups: a `Years` group listing each represented calendar year newest first, and a `Months` group listing each represented calendar month newest first, with the months group after the years group. The all-periods choice SHALL appear before both groups. A month choice SHALL be labelled with its calendar month and year, and a year choice SHALL be labelled with its calendar year alone. The category filter SHALL default to uncategorised when no category is specified, preserving the existing initial selection; the period filter SHALL default to all periods. A supplied category and period filter SHALL initialize the controls and matching rows, and the selected filters SHALL be represented in the index route's query so a filtered list can be linked to directly: a calendar month as `month=YYYY-MM` and a calendar year as `year=YYYY`. The period filter SHALL match a transaction whose booking date falls in the selected calendar month or calendar year. When both filters are selected, a transaction SHALL be shown only if it matches both. Changing either filter SHALL change which returned rows are shown without changing their relative order, making another data request, or creating, altering, or deleting stored data or categories. The table SHALL NOT offer controls for searching, sorting, grouping, or paging transactions.
+The system SHALL offer a category filter with choices for all categories, uncategorised transactions, and each category represented in the returned transaction data. It SHALL offer a single period filter with choices for all periods, each calendar month represented by at least one returned transaction, and each calendar year represented by at least one returned transaction. The period choices SHALL be presented in two labelled groups: a `Years` group listing each represented calendar year newest first, and a `Months` group listing each represented calendar month newest first, with the months group after the years group. The all-periods choice SHALL appear before both groups. A month choice SHALL be labelled with its calendar month and year, and a year choice SHALL be labelled with its calendar year alone. The category filter SHALL default to uncategorised when no category is specified, preserving the existing initial selection; the period filter SHALL default to all periods. A supplied category and period filter SHALL initialize the controls and matching rows, and the selected filters SHALL be represented in the index route's query so a filtered list can be linked to directly: a calendar month as `month=YYYY-MM` and a calendar year as `year=YYYY`. The period filter SHALL match a transaction whose booking date falls in the selected calendar month or calendar year. When both filters are selected, a transaction SHALL be shown only if it matches both. Changing either filter SHALL change which returned rows are shown without changing their relative order, making another data request, or creating, altering, or deleting stored data or categories. The table SHALL NOT offer controls for searching, sorting, grouping, or paging transactions; the category-assignment controls defined by `manual-category-assignment` are not filter controls and remain permitted, and the filter controls themselves SHALL NOT create, alter, or delete stored data.
 
 #### Scenario: The existing uncategorised default is retained
 
@@ -201,7 +206,7 @@ The system SHALL offer a category filter with choices for all categories, uncate
 #### Scenario: No unrelated table controls are added
 
 - **WHEN** the table is rendered
-- **THEN** it presents no control for searching, sorting, grouping, or paging the transactions, and no control creates, alters, or deletes transaction or category data
+- **THEN** it presents no control for searching, sorting, grouping, or paging the transactions, and the only controls that change stored data are the category-assignment controls, which change no category
 
 ### Requirement: The table shows the exact sum of visible transaction amounts
 

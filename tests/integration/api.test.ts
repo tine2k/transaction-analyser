@@ -126,6 +126,7 @@ describe('API integration', () => {
         purpose: 'Internal transfer',
         counterpartyName: 'Own account',
         counterpartyAccount: null,
+        categoryAssignment: 'automatic',
         category: { id: '3', name: 'Internal', hidden: true, expenseType: null },
       },
       {
@@ -136,6 +137,7 @@ describe('API integration', () => {
         purpose: 'Rail ticket',
         counterpartyName: 'Transit',
         counterpartyAccount: 'DE00000000000000000000',
+        categoryAssignment: 'automatic',
         category: { id: '2', name: 'Transport', hidden: false, expenseType: null },
       },
       {
@@ -146,6 +148,7 @@ describe('API integration', () => {
         purpose: 'REWE Market',
         counterpartyName: 'REWE',
         counterpartyAccount: null,
+        categoryAssignment: 'automatic',
         category: { id: '1', name: 'Groceries', hidden: false, expenseType: null },
       },
       {
@@ -156,9 +159,33 @@ describe('API integration', () => {
         purpose: 'Bookshop',
         counterpartyName: 'Books',
         counterpartyAccount: null,
+        categoryAssignment: 'automatic',
         category: null,
       },
     ]);
+  });
+
+  it('reports whether a transaction category is manual or rule-derived', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+    await database.query(
+      `UPDATE transactions
+       SET category_id = (SELECT id FROM categories WHERE name = 'Transport'), category_locked = true
+       WHERE purpose = 'REWE Market'`,
+    );
+
+    const transactions = await request('/api/transactions').then((result) => result.json()) as Array<{
+      purpose: string;
+      categoryAssignment: string;
+    }>;
+
+    expect(transactions.find((transaction) => transaction.purpose === 'REWE Market')?.categoryAssignment)
+      .toBe('manual');
+    expect(transactions.find((transaction) => transaction.purpose === 'Rail ticket')?.categoryAssignment)
+      .toBe('automatic');
+    expect(transactions.find((transaction) => transaction.purpose === 'Bookshop')?.categoryAssignment)
+      .toBe('automatic');
   });
 
   it('persists a created category and assigns matching transactions', async () => {

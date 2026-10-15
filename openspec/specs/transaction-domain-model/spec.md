@@ -229,11 +229,14 @@ category named for the absence of one, as an empty category, or as a default,
 catch-all, or fallback category. A category SHALL NOT be required for a transaction
 to be stored, reported, or analysed. A transaction's category SHALL change only as
 the result of applying the categories' regular expressions to its purpose line or
-counterparty name or, when no category's expression matches, applying the
-categories' date windows to its booking date, as the `category-assignment` capability
-defines. Configuring, editing, or deleting a category SHALL apply the current regular
-expressions and date windows to every transaction, so a transaction's category
-changes as a consequence of such a change.
+counterparty name, applying the categories' date windows to its booking date when no
+expression matches, as the `category-assignment` capability defines, or an explicit
+manual assignment that names a stored category. A manual assignment SHALL take
+precedence over the applying rules until it is cleared or its category is deleted.
+Configuring, editing, or deleting a category SHALL apply the current regular
+expressions and date windows to every transaction that is not manually assigned, so a
+transaction's category changes as a consequence of such a change unless a manual
+assignment holds it.
 
 #### Scenario: A transaction with no category is well-formed
 
@@ -259,6 +262,16 @@ changes as a consequence of such a change.
 
 - **WHEN** a category with a date window is configured and no category's regular expression matches a transaction's purpose line
 - **THEN** the current date windows are applied to every transaction, and a transaction whose booking date falls in the window holds the winning category
+
+#### Scenario: A manual assignment changes the category without applying any expression
+
+- **WHEN** a manual assignment naming a stored category is made for a transaction whose purpose line and counterparty name match nothing
+- **THEN** the transaction holds the named category, and no regular expression or date window decided it
+
+#### Scenario: Configuring a category leaves a manual assignment in place
+
+- **WHEN** a category with a regular expression is configured and it matches a manually assigned transaction's purpose line or counterparty name
+- **THEN** the transaction keeps the category its manual assignment names
 
 ### Requirement: A transaction holds at most one category, and the matching category is chosen by smallest identity
 

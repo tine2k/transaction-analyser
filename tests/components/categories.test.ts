@@ -106,13 +106,13 @@ describe('category management page', () => {
       .toBe(true);
   });
 
-  it('sizes the category table to its content and stripes its rows', async () => {
+  it('sizes the category table to its content and rules its rows', async () => {
     const wrapper = await mountSuspended(Categories);
 
     expect(wrapper.get('table').classes()).toContain('w-max');
     expect(wrapper.get('table').classes()).not.toContain('min-w-full');
     expect(wrapper.findAll('tbody tr').every((row) =>
-      row.classes().includes('odd:bg-white') && row.classes().includes('even:bg-slate-50'),
+      row.classes().includes('border-b') && row.classes().includes('border-rule'),
     )).toBe(true);
   });
 

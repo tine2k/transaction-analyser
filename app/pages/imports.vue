@@ -165,70 +165,76 @@ function outcomeLabel(run: ImportRun): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-slate-900">Imports</h1>
-    <p class="mt-2 text-sm text-slate-600">
+    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">Imports</h1>
+    <p class="mt-2 max-w-2xl text-sm text-muted">
       The most recent import runs, newest first, whether they wrote or only checked.
     </p>
 
-    <div class="mt-4 flex flex-wrap items-center gap-3">
-      <button
-        type="button"
-        class="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-        data-testid="sync-button"
-        :disabled="syncing"
-        @click="startSync"
-      >
-        {{ syncing ? 'Syncing…' : 'Sync now' }}
-      </button>
-      <p
-        v-if="syncMessage !== null"
-        class="text-sm text-slate-600"
-        data-testid="sync-status"
-        role="status"
-      >
-        {{ syncMessage }}
-      </p>
-      <button
-        type="button"
-        class="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-        data-testid="recategorise-button"
-        :disabled="recategorising"
-        @click="recategorise"
-      >
-        {{ recategorising ? 'Re-categorising…' : 'Re-categorise all' }}
-      </button>
-      <p
-        v-if="recategoriseMessage !== null"
-        class="text-sm text-slate-600"
-        data-testid="recategorise-status"
-        role="status"
-      >
-        {{ recategoriseMessage }}
-      </p>
-      <button
-        type="button"
-        class="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-        data-testid="test-notification-button"
-        :disabled="testing"
-        @click="testNotification"
-      >
-        {{ testing ? 'Sending…' : 'Send test notification' }}
-      </button>
-      <p
-        v-if="testMessage !== null"
-        class="text-sm text-slate-600"
-        data-testid="test-notification-status"
-        role="status"
-      >
-        {{ testMessage }}
-      </p>
+    <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          class="inline-flex min-h-11 items-center rounded-sheet bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
+          data-testid="sync-button"
+          :disabled="syncing"
+          @click="startSync"
+        >
+          {{ syncing ? 'Syncing…' : 'Sync now' }}
+        </button>
+        <p
+          v-if="syncMessage !== null"
+          class="text-sm text-muted"
+          data-testid="sync-status"
+          role="status"
+        >
+          {{ syncMessage }}
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          class="inline-flex min-h-11 items-center rounded-sheet border border-rule-strong bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
+          data-testid="recategorise-button"
+          :disabled="recategorising"
+          @click="recategorise"
+        >
+          {{ recategorising ? 'Re-categorising…' : 'Re-categorise all' }}
+        </button>
+        <p
+          v-if="recategoriseMessage !== null"
+          class="text-sm text-muted"
+          data-testid="recategorise-status"
+          role="status"
+        >
+          {{ recategoriseMessage }}
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          class="inline-flex min-h-11 items-center rounded-sheet border border-rule-strong bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
+          data-testid="test-notification-button"
+          :disabled="testing"
+          @click="testNotification"
+        >
+          {{ testing ? 'Sending…' : 'Send test notification' }}
+        </button>
+        <p
+          v-if="testMessage !== null"
+          class="text-sm text-muted"
+          data-testid="test-notification-status"
+          role="status"
+        >
+          {{ testMessage }}
+        </p>
+      </div>
     </div>
 
-    <p v-if="error" class="mt-4 text-slate-600" data-testid="imports-error">
+    <p v-if="error" class="mt-4 text-muted" data-testid="imports-error">
       The import log could not be loaded.
     </p>
-    <p v-else-if="pending" class="mt-4 text-slate-600">Loading the import log…</p>
-    <p v-else-if="runs.length === 0" class="mt-4 text-slate-600" data-testid="imports-empty">
+    <p v-else-if="pending" class="mt-4 text-muted">Loading the import log…</p>
+    <p v-else-if="runs.length === 0" class="mt-4 text-muted" data-testid="imports-empty">
       No import has run yet.
     </p>
     <div
@@ -236,7 +242,7 @@ function outcomeLabel(run: ImportRun): string {
       role="region"
       aria-label="Import log"
       tabindex="0"
-      class="mt-6 max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+      class="mt-6 max-w-full overflow-x-auto rounded-sheet border border-rule-strong bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
       data-testid="imports-scroll"
     >
       <table class="w-max min-w-full border-collapse text-left text-sm" data-testid="imports-table">
@@ -244,64 +250,72 @@ function outcomeLabel(run: ImportRun): string {
           The most recent import runs with their source, outcome, and row counts
         </caption>
         <thead>
-          <tr class="border-b border-slate-300">
-            <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">Started</th>
-            <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">Source</th>
-            <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">Mode</th>
-            <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">Outcome</th>
-            <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-900">Read</th>
-            <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-900">
+          <tr class="border-b border-rule-strong">
+            <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Started</th>
+            <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Source</th>
+            <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Mode</th>
+            <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Outcome</th>
+            <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-ink">Read</th>
+            <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-ink">
               Already stored
             </th>
-            <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-900">Written</th>
-            <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-900">
+            <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-ink">Written</th>
+            <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-ink">
               Categorised
             </th>
-            <th scope="col" class="px-3 py-2 font-semibold text-slate-900">Reason</th>
+            <th scope="col" class="px-3 py-2 font-semibold text-ink">Reason</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="run in runs"
             :key="run.id"
-            class="border-b border-slate-100 odd:bg-white even:bg-slate-50"
+            class="border-b border-rule"
             data-testid="import-run"
           >
-            <th scope="row" class="whitespace-nowrap px-3 py-2 font-medium tabular-nums text-slate-700">
+            <th scope="row" class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">
               {{ displayTime(run.startedAt) }}
             </th>
-            <td class="whitespace-nowrap px-3 py-2 text-slate-900">{{ sourceLabel(run.source) }}</td>
-            <td class="whitespace-nowrap px-3 py-2 text-slate-900" data-testid="import-run-mode">
+            <td class="whitespace-nowrap px-3 py-2 text-ink">{{ sourceLabel(run.source) }}</td>
+            <td class="whitespace-nowrap px-3 py-2 text-ink" data-testid="import-run-mode">
               {{ run.nonWriting ? 'Non-writing' : 'Writing' }}
             </td>
-            <td class="whitespace-nowrap px-3 py-2 text-slate-900" data-testid="import-run-outcome">
+            <td
+              class="whitespace-nowrap px-3 py-2"
+              :class="run.outcome === 'failed' ? 'text-failure' : 'text-ink'"
+              data-testid="import-run-outcome"
+            >
               {{ outcomeLabel(run) }}
             </td>
             <td
-              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900"
+              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
               data-testid="import-run-read"
             >
               {{ run.rowsRead }}
             </td>
             <td
-              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900"
+              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
               data-testid="import-run-already-stored"
             >
               {{ run.rowsAlreadyStored }}
             </td>
             <td
-              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900"
+              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
               data-testid="import-run-written"
             >
               {{ run.rowsWritten }}
             </td>
             <td
-              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900"
+              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
               data-testid="import-run-categorised"
             >
               {{ run.rowsCategorised }}
             </td>
-            <td class="px-3 py-2 text-slate-700" data-testid="import-run-error">{{ run.error ?? '' }}</td>
+            <td
+              class="px-3 py-2"
+              :class="run.error !== null ? 'text-failure' : 'text-muted'"
+              data-testid="import-run-error"
+            >{{ run.error ?? '' }}</td>
           </tr>
         </tbody>
       </table>

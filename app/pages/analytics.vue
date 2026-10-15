@@ -118,6 +118,7 @@ function onPieSliceClick(parameter: unknown, periodKey: 'month' | 'year', period
 
 function chartOption(chart: DisplayedChart): EChartsOption {
   return {
+    textStyle: { fontFamily: 'IBM Plex Sans Variable, sans-serif', color: '#20242B' },
     tooltip: {
       trigger: 'item',
       formatter: tooltipLabel,
@@ -125,7 +126,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
     legend: { show: false },
     series: [{
       type: 'pie',
-      radius: '68%',
+      radius: '58%',
       minShowLabelAngle: 0,
       labelLayout: { hideOverlap: false },
       data: chart.pieData.map((datum) => {
@@ -136,7 +137,16 @@ function chartOption(chart: DisplayedChart): EChartsOption {
           emphasis: { itemStyle: { color } },
         };
       }),
-      label: { show: true, formatter: sliceLabel },
+      label: {
+        show: true,
+        formatter: sliceLabel,
+        color: '#20242B',
+        fontSize: 12,
+        lineHeight: 16,
+        overflow: 'none',
+        alignTo: 'edge',
+        edgeDistance: 8,
+      },
     }],
   };
 }
@@ -144,19 +154,19 @@ function chartOption(chart: DisplayedChart): EChartsOption {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-slate-900">Category spending</h1>
-    <p class="mt-2 text-sm text-slate-600">
+    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">Category spending</h1>
+    <p class="mt-2 max-w-2xl text-sm text-muted">
       {{ view === 'months'
         ? 'Absolute transaction totals by category for each of the last 12 months.'
         : 'Absolute transaction totals by category for every calendar year with transaction data.' }}
     </p>
 
-    <p v-if="error" class="mt-4 text-slate-600">
+    <p v-if="error" class="mt-4 text-muted">
       Monthly category totals could not be loaded.
     </p>
-    <p v-else-if="pending" class="mt-4 text-slate-600">Loading monthly category totals…</p>
+    <p v-else-if="pending" class="mt-4 text-muted">Loading monthly category totals…</p>
     <template v-else-if="transactions">
-      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-700" data-testid="view-switch">
+      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted" data-testid="view-switch">
         <legend class="sr-only">Category spending view</legend>
         <label class="inline-flex min-h-11 items-center gap-2">
           <input
@@ -165,7 +175,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
             name="analytics-view"
             value="months"
             data-testid="view-months"
-            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
           Months
         </label>
@@ -176,13 +186,13 @@ function chartOption(chart: DisplayedChart): EChartsOption {
             name="analytics-view"
             value="years"
             data-testid="view-years"
-            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
           Years
         </label>
       </fieldset>
 
-      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-700" data-testid="expense-type-filter">
+      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted" data-testid="expense-type-filter">
         <legend class="sr-only">Expense type filter</legend>
         <label class="inline-flex min-h-11 items-center gap-2">
           <input
@@ -191,7 +201,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
             name="expense-type"
             value="all"
             data-testid="expense-type-all"
-            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
           All
         </label>
@@ -202,7 +212,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
             name="expense-type"
             value="recurring"
             data-testid="expense-type-recurring"
-            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
           Recurring
         </label>
@@ -213,18 +223,18 @@ function chartOption(chart: DisplayedChart): EChartsOption {
             name="expense-type"
             value="one-time"
             data-testid="expense-type-one-time"
-            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
           One-time
         </label>
       </fieldset>
 
-      <label class="mt-2 inline-flex min-h-11 items-center gap-3 py-2 text-sm text-slate-700">
+      <label class="mt-2 inline-flex min-h-11 items-center gap-3 py-2 text-sm text-muted">
         <input
           v-model="hideUncategorised"
           type="checkbox"
           data-testid="hide-uncategorised"
-          class="size-5 rounded border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          class="size-5 rounded border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         >
         Hide uncategorised
       </label>
@@ -237,11 +247,11 @@ function chartOption(chart: DisplayedChart): EChartsOption {
         <section
           v-for="month in displayedMonthlyCharts"
           :key="month.key"
-          class="min-w-0 rounded-md border border-slate-200 bg-white p-4"
+          class="min-w-0 rounded-sheet border border-rule-strong bg-surface p-4"
           data-testid="month-panel"
           :data-month-key="month.key"
         >
-          <h2 class="text-lg font-semibold text-slate-900">
+          <h2 class="font-display text-lg font-semibold text-ink">
             <NuxtLink
               :to="{ path: '/', query: { month: month.key, category: 'all' } }"
               :aria-label="`View all transactions for ${month.label}`"
@@ -258,7 +268,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
             </ClientOnly>
           </figure>
 
-          <p v-if="month.totals.length === 0" class="mt-2 text-sm text-slate-600">
+          <p v-if="month.totals.length === 0" class="mt-2 text-sm text-muted">
             No category data for {{ month.label }}.
           </p>
           <ul v-else aria-label="Category totals" class="mt-2 grid min-w-0 gap-2 text-sm">
@@ -271,7 +281,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
               <NuxtLink
                 :to="transactionLocation('month', month.key, total.key)"
                 :aria-label="`View ${total.name} transactions for ${month.label}`"
-                class="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                class="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                 data-testid="category-transaction-link"
               >
                 <span class="flex min-w-0 flex-1 items-center gap-2">
@@ -281,9 +291,9 @@ function chartOption(chart: DisplayedChart): EChartsOption {
                     data-testid="category-color"
                     :style="{ backgroundColor: categoryColor(total.key) }"
                   />
-                  <span class="min-w-0 break-words text-slate-700">{{ total.name }}</span>
+                  <span class="min-w-0 break-words text-muted">{{ total.name }}</span>
                 </span>
-                <span class="max-w-[55%] shrink-0 break-words text-right tabular-nums font-medium text-slate-900">
+                <span class="max-w-[55%] shrink-0 break-words text-right tabular-nums font-medium text-ink">
                   {{ formatEuroAmount(total.amount) }}
                 </span>
               </NuxtLink>
@@ -300,11 +310,11 @@ function chartOption(chart: DisplayedChart): EChartsOption {
         <section
           v-for="year in displayedYearlyCharts"
           :key="year.key"
-          class="min-w-0 rounded-md border border-slate-200 bg-white p-4"
+          class="min-w-0 rounded-sheet border border-rule-strong bg-surface p-4"
           data-testid="year-panel"
           :data-year-key="year.key"
         >
-          <h2 class="text-lg font-semibold text-slate-900">
+          <h2 class="font-display text-lg font-semibold text-ink">
             <NuxtLink
               :to="{ path: '/', query: { year: year.key, category: 'all' } }"
               :aria-label="`View all transactions for ${year.label}`"
@@ -321,7 +331,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
             </ClientOnly>
           </figure>
 
-          <p v-if="year.totals.length === 0" class="mt-2 text-sm text-slate-600">
+          <p v-if="year.totals.length === 0" class="mt-2 text-sm text-muted">
             No category data for {{ year.label }}.
           </p>
           <ul v-else aria-label="Category totals" class="mt-2 grid min-w-0 gap-2 text-sm">
@@ -334,7 +344,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
               <NuxtLink
                 :to="transactionLocation('year', year.key, total.key)"
                 :aria-label="`View ${total.name} transactions for ${year.label}`"
-                class="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                class="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                 data-testid="category-transaction-link"
               >
                 <span class="flex min-w-0 flex-1 items-center gap-2">
@@ -344,9 +354,9 @@ function chartOption(chart: DisplayedChart): EChartsOption {
                     data-testid="category-color"
                     :style="{ backgroundColor: categoryColor(total.key) }"
                   />
-                  <span class="min-w-0 break-words text-slate-700">{{ total.name }}</span>
+                  <span class="min-w-0 break-words text-muted">{{ total.name }}</span>
                 </span>
-                <span class="max-w-[55%] shrink-0 break-words text-right tabular-nums font-medium text-slate-900">
+                <span class="max-w-[55%] shrink-0 break-words text-right tabular-nums font-medium text-ink">
                   {{ formatEuroAmount(total.amount) }}
                 </span>
               </NuxtLink>
@@ -357,7 +367,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
 
       <p
         v-if="view === 'years' && displayedYearlyCharts.length === 0"
-        class="mt-4 text-sm text-slate-600"
+        class="mt-4 text-sm text-muted"
         data-testid="no-year-data"
       >
         No category data for any year.

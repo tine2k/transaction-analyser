@@ -75,8 +75,8 @@ export type CategoryMonthlyAverage = {
 type DecimalParts = { coefficient: bigint; scale: number };
 
 export const CATEGORY_COLOR_PALETTE = [
-  '#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F',
-  '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC',
+  '#2F5FA8', '#D97A2B', '#3E8E5A', '#7D5BA6', '#B08A1E',
+  '#2E8C8C', '#C2453C', '#5C6672', '#C25E7E', '#8A6B4F',
 ] as const;
 
 export function createCategoryColorMap(categoryKeys: string[]): Map<string, string> {

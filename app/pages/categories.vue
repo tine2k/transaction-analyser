@@ -312,8 +312,8 @@ async function remove(category: Category): Promise<void> {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-slate-900">Categories</h1>
-    <p class="mt-2 text-slate-600">
+    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">Categories</h1>
+    <p class="mt-2 max-w-2xl text-muted">
       A category is a name with regular expressions matched against a transaction's purpose line
       and optional from/to date windows matched against its booking date. An expression is applied
       first; a date window is applied only when no expression matches. Both window dates are
@@ -323,24 +323,24 @@ async function remove(category: Category): Promise<void> {
 
     <form
       ref="formElement"
-      class="mt-6 w-full min-w-0 max-w-2xl rounded-lg border border-slate-200 bg-white p-4"
+      class="mt-6 w-full min-w-0 max-w-2xl rounded-sheet border border-rule-strong bg-surface p-4"
       @submit.prevent="submit"
     >
-      <h2 class="text-sm font-semibold text-slate-700">
+      <h2 class="font-display text-lg font-semibold text-ink">
         {{ editingId === null ? 'Add a category' : 'Edit category' }}
       </h2>
 
-      <label class="mt-3 flex min-w-0 flex-col text-sm text-slate-700">
+      <label class="mt-3 flex min-w-0 flex-col text-sm text-muted">
         Name
         <input
           v-model="name"
           type="text"
-          class="mt-1 min-h-11 w-full min-w-0 rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          class="mt-1 min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         />
       </label>
 
       <fieldset class="mt-3 min-w-0">
-        <legend class="text-sm text-slate-700">Regular expressions</legend>
+        <legend class="text-sm text-muted">Regular expressions</legend>
         <div
           v-for="(_, index) in patterns"
           :key="index"
@@ -350,12 +350,12 @@ async function remove(category: Category): Promise<void> {
             v-model="patterns[index]"
             type="text"
             data-testid="pattern-input"
-            class="min-h-11 min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 font-mono text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="min-h-11 min-w-0 flex-1 rounded-sheet border border-rule-strong px-3 py-2 font-mono text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           />
           <button
             type="button"
             :disabled="patterns.length === 1"
-            class="min-h-11 shrink-0 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700 disabled:opacity-50"
+            class="min-h-11 shrink-0 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
             @click="removePattern(index)"
           >
             Remove
@@ -363,7 +363,7 @@ async function remove(category: Category): Promise<void> {
         </div>
         <button
           type="button"
-          class="mt-2 min-h-11 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700"
+          class="mt-2 min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           @click="addPattern"
         >
           Add expression
@@ -371,8 +371,8 @@ async function remove(category: Category): Promise<void> {
       </fieldset>
 
       <fieldset class="mt-3 min-w-0">
-        <legend class="text-sm text-slate-700">Date windows</legend>
-        <p class="mt-1 text-xs text-slate-500">
+        <legend class="text-sm text-muted">Date windows</legend>
+        <p class="mt-1 text-xs text-muted">
           A transaction whose booking date falls on or between the two dates is assigned to this
           category when no regular expression matches it.
         </p>
@@ -381,28 +381,28 @@ async function remove(category: Category): Promise<void> {
           :key="index"
           class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
         >
-          <label class="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
+          <label class="flex min-w-0 flex-col gap-1 text-xs text-muted">
             From
             <input
               v-model="windows[index].from"
               type="date"
               data-testid="window-from"
-              class="min-h-11 w-full min-w-0 rounded-md border border-slate-300 px-2 py-1 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+              class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong px-2 py-1 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             >
           </label>
-          <label class="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
+          <label class="flex min-w-0 flex-col gap-1 text-xs text-muted">
             To
             <input
               v-model="windows[index].to"
               type="date"
               data-testid="window-to"
-              class="min-h-11 w-full min-w-0 rounded-md border border-slate-300 px-2 py-1 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+              class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong px-2 py-1 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             >
           </label>
           <button
             type="button"
             data-testid="remove-window"
-            class="min-h-11 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700"
+            class="min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             @click="removeWindow(index)"
           >
             Remove
@@ -411,30 +411,30 @@ async function remove(category: Category): Promise<void> {
         <button
           type="button"
           data-testid="add-window"
-          class="mt-2 min-h-11 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700"
+          class="mt-2 min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           @click="addWindow"
         >
           Add window
         </button>
       </fieldset>
 
-      <label class="mt-3 flex min-h-11 items-center gap-3 py-2 text-sm text-slate-700">
+      <label class="mt-3 flex min-h-11 items-center gap-3 py-2 text-sm text-muted">
         <input
           v-model="hidden"
           type="checkbox"
           data-testid="hidden-input"
-          class="size-5 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+          class="size-5 rounded-sheet border-rule-strong text-ink focus:ring-ink"
         >
         Hidden from the analysis
       </label>
 
       <fieldset class="mt-3 min-w-0">
-        <legend class="text-sm text-slate-700">Expense type</legend>
-        <p class="mt-1 text-xs text-slate-500">
+        <legend class="text-sm text-muted">Expense type</legend>
+        <p class="mt-1 text-xs text-muted">
           Classifies the category for the analysis screens. The type changes no matching and no
           stored transaction.
         </p>
-        <div class="mt-1 flex flex-wrap items-center gap-4 text-sm text-slate-700">
+        <div class="mt-1 flex flex-wrap items-center gap-4 text-sm text-muted">
           <label class="inline-flex min-h-11 items-center gap-2">
             <input
               v-model="expenseType"
@@ -442,7 +442,7 @@ async function remove(category: Category): Promise<void> {
               name="expense-type"
               value="unset"
               data-testid="expense-type-unset"
-              class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500"
+              class="size-5 min-h-11 border-rule-strong text-ink focus:ring-ink"
             >
             Unset
           </label>
@@ -453,7 +453,7 @@ async function remove(category: Category): Promise<void> {
               name="expense-type"
               value="recurring"
               data-testid="expense-type-recurring"
-              class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500"
+              class="size-5 min-h-11 border-rule-strong text-ink focus:ring-ink"
             >
             Recurring
           </label>
@@ -464,14 +464,14 @@ async function remove(category: Category): Promise<void> {
               name="expense-type"
               value="one-time"
               data-testid="expense-type-one-time"
-              class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500"
+              class="size-5 min-h-11 border-rule-strong text-ink focus:ring-ink"
             >
             One-time
           </label>
         </div>
       </fieldset>
 
-      <p class="mt-3 text-sm text-slate-600" role="status" aria-live="polite" data-testid="pattern-match-count">
+      <p class="mt-3 text-sm text-muted" role="status" aria-live="polite" data-testid="pattern-match-count">
         <template v-if="matchCountState === 'empty'">
           Enter an expression to preview matching transactions.
         </template>
@@ -486,7 +486,7 @@ async function remove(category: Category): Promise<void> {
         </template>
       </p>
 
-      <p class="mt-2 text-sm text-slate-600" role="status" aria-live="polite" data-testid="window-match-count">
+      <p class="mt-2 text-sm text-muted" role="status" aria-live="polite" data-testid="window-match-count">
         <template v-if="windowMatchState === 'empty'">
           Enter a from and a to date to preview transactions the windows would claim.
         </template>
@@ -501,20 +501,20 @@ async function remove(category: Category): Promise<void> {
         </template>
       </p>
 
-      <p v-if="formError" class="mt-3 text-sm text-red-700">{{ formError }}</p>
+      <p v-if="formError" class="mt-3 text-sm text-failure">{{ formError }}</p>
 
       <div class="mt-3 flex flex-wrap gap-2">
         <button
           type="submit"
           :disabled="saving"
-          class="min-h-11 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          class="min-h-11 rounded-sheet bg-ink px-3 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
         >
           {{ editingId === null ? 'Add category' : 'Save changes' }}
         </button>
         <button
           v-if="editingId !== null"
           type="button"
-          class="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
+          class="min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           @click="cancelEdit"
         >
           Cancel
@@ -522,19 +522,19 @@ async function remove(category: Category): Promise<void> {
       </div>
     </form>
 
-    <p v-if="error" class="mt-6 text-slate-600">
+    <p v-if="error" class="mt-6 text-muted">
       The categories could not be loaded. They are not shown, and this is not an empty result.
     </p>
 
-    <p v-else-if="pending" class="mt-6 text-slate-600">Loading categories…</p>
+    <p v-else-if="pending" class="mt-6 text-muted">Loading categories…</p>
 
-    <p v-else-if="categories.length === 0" class="mt-6 text-slate-600">
+    <p v-else-if="categories.length === 0" class="mt-6 text-muted">
       There are no categories to show.
     </p>
 
     <div v-else class="mt-6">
-      <p v-if="listError" class="mb-3 text-sm text-red-700">{{ listError }}</p>
-      <p id="categories-scroll-help" class="mb-2 text-xs text-slate-500 sm:hidden">
+      <p v-if="listError" class="mb-3 text-sm text-failure">{{ listError }}</p>
+      <p id="categories-scroll-help" class="mb-2 text-xs text-muted sm:hidden">
         Scroll horizontally to view all category columns and actions.
       </p>
       <div
@@ -543,48 +543,48 @@ async function remove(category: Category): Promise<void> {
         aria-describedby="categories-scroll-help"
         tabindex="0"
         data-testid="categories-scroll"
-        class="max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+        class="max-w-full overflow-x-auto rounded-sheet border border-rule-strong bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
       >
       <table class="w-max border-collapse text-left text-sm">
         <thead>
-          <tr class="border-b border-slate-200">
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Name</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Expression count</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Window count</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Analysis</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Type</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-slate-700">Actions</th>
+          <tr class="border-b border-rule-strong">
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Name</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Expression count</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Window count</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Analysis</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Type</th>
+            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="category in sortedCategories"
             :key="category.id"
-            class="border-b border-slate-100 odd:bg-white even:bg-slate-50"
+            class="border-b border-rule"
           >
-            <td class="px-3 py-2 align-middle text-slate-900">{{ category.name }}</td>
-            <td class="px-3 py-2 align-middle text-slate-900">{{ category.patterns.length }}</td>
-            <td class="px-3 py-2 align-middle text-slate-900" data-testid="category-window-count">
+            <td class="px-3 py-2 align-middle text-ink">{{ category.name }}</td>
+            <td class="px-3 py-2 align-middle text-ink">{{ category.patterns.length }}</td>
+            <td class="px-3 py-2 align-middle text-ink" data-testid="category-window-count">
               {{ category.windows.length }}
             </td>
-            <td class="px-3 py-2 align-middle text-slate-900" data-testid="category-hidden-state">
+            <td class="px-3 py-2 align-middle text-ink" data-testid="category-hidden-state">
               {{ category.hidden ? 'Hidden' : 'Visible' }}
             </td>
-            <td class="px-3 py-2 align-middle text-slate-900" data-testid="category-expense-type">
+            <td class="px-3 py-2 align-middle text-ink" data-testid="category-expense-type">
               {{ expenseTypeLabel(category.expenseType) }}
             </td>
             <td class="px-3 py-2 align-middle">
               <div class="flex gap-2">
                 <button
                   type="button"
-                  class="min-h-11 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                  class="min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                   @click="startEdit(category)"
                 >
                   Edit
                 </button>
                 <button
                   type="button"
-                  class="min-h-11 rounded-md border border-red-300 px-3 text-xs font-medium text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  class="min-h-11 rounded-sheet border border-failure/60 bg-surface px-3 text-xs font-medium text-failure hover:border-failure focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-failure"
                   @click="remove(category)"
                 >
                   Delete

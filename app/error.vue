@@ -11,20 +11,20 @@ const isMissing = computed(() => props.error.status === 404);
 const heading = computed(() => (isMissing.value ? 'This page does not exist' : 'Something went wrong'));
 const detail = computed(() =>
   isMissing.value
-    ? 'The application has one page so far, and this is not it.'
-    : 'The request could not be completed.',
+    ? 'The address may be mistyped, or the page may have moved. Use the navigation to reach any screen.'
+    : 'The request could not be completed. Try again, or go back to the start.',
 );
 </script>
 
 <template>
   <NuxtLayout name="default">
     <div>
-      <p class="text-sm font-semibold text-slate-500">{{ error.status }}</p>
-      <h1 class="mt-1 text-2xl font-bold text-slate-900">{{ heading }}</h1>
-      <p class="mt-2 text-slate-600">{{ detail }}</p>
+      <p class="font-mono text-sm font-semibold text-muted">{{ error.status }}</p>
+      <h1 class="mt-1 font-display text-2xl font-semibold text-ink sm:text-3xl">{{ heading }}</h1>
+      <p class="mt-2 max-w-2xl text-muted">{{ detail }}</p>
       <button
         type="button"
-        class="mt-6 min-h-11 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+        class="mt-6 min-h-11 rounded-sheet bg-ink px-3 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         @click="clearError({ redirect: '/' })"
       >
         Back to the start

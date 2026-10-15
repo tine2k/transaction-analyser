@@ -510,7 +510,7 @@ describe('transaction pattern shortcut', () => {
 
     const status = wrapper.get('[data-testid="pattern-shortcut-status"]');
     expect(status.text()).toContain('Could not add to Groceries');
-    expect(status.classes()).toContain('text-red-700');
+    expect(status.classes()).toContain('text-failure');
     expect(wrapper.get('[data-testid="pattern-shortcut-text"]').text()).toBe('Uncategorised purchase');
   });
 
@@ -768,7 +768,7 @@ describe('manual category assignment', () => {
     expect((select.element as HTMLSelectElement).value).toBe('');
     const status = wrapper.get('[data-testid="pattern-shortcut-status"]');
     expect(status.text()).toContain('Could not assign the category');
-    expect(status.classes()).toContain('text-red-700');
+    expect(status.classes()).toContain('text-failure');
   });
 
   it('disables the control while its assignment is in flight and refreshes once it settles', async () => {
@@ -885,6 +885,6 @@ describe('manual category assignment', () => {
     expect(wrapper.get('[data-testid="bulk-assignment-bar"]').text()).toContain('2 transactions selected');
     const status = wrapper.get('[data-testid="pattern-shortcut-status"]');
     expect(status.text()).toContain('Could not assign the selected transactions');
-    expect(status.classes()).toContain('text-red-700');
+    expect(status.classes()).toContain('text-failure');
   });
 });

@@ -118,7 +118,7 @@ describe('monthly category totals page', () => {
       .toBe(true);
 
     const linked = populatedCells[0]?.find('[data-testid="category-total-link"]');
-    expect(linked?.classes()).toContain('hover:bg-slate-200');
+    expect(linked?.classes()).toContain('hover:bg-paper');
     expect(linked?.classes()).toContain('transition-colors');
     expect(blankCells.every((cell) => cell.classes().every((name) => !name.startsWith('hover:')))).toBe(true);
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);

@@ -79,17 +79,17 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-slate-900">Monthly average</h1>
-    <p class="mt-2 text-sm text-slate-600">
+    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">Monthly average</h1>
+    <p class="mt-2 max-w-2xl text-sm text-muted">
       Average absolute transaction spend per category over a recent window of calendar months.
     </p>
 
-    <p v-if="error" class="mt-4 text-slate-600">
+    <p v-if="error" class="mt-4 text-muted">
       Monthly category averages could not be loaded.
     </p>
-    <p v-else-if="pending" class="mt-4 text-slate-600">Loading monthly category averages…</p>
+    <p v-else-if="pending" class="mt-4 text-muted">Loading monthly category averages…</p>
     <template v-else-if="transactions">
-      <label class="mt-4 inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-slate-700">
+      <label class="mt-4 inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
         Months to average
         <input
           :value="monthCount"
@@ -97,16 +97,16 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
           min="1"
           step="1"
           data-testid="month-count-input"
-          class="min-h-11 w-24 rounded border border-slate-300 px-2 py-1 text-slate-900 focus:border-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          class="min-h-11 w-24 rounded-sheet border border-rule-strong px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           @input="onMonthCountInput"
         >
       </label>
 
-      <p class="mt-2 text-sm text-slate-600" data-testid="applied-window">
+      <p class="mt-2 text-sm text-muted" data-testid="applied-window">
         Averaging over the last {{ appliedMonthCount }} months.
       </p>
 
-      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-700" data-testid="expense-type-filter">
+      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted" data-testid="expense-type-filter">
         <legend class="sr-only">Expense type filter</legend>
         <label class="inline-flex min-h-11 items-center gap-2">
           <input
@@ -115,7 +115,7 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
             name="expense-type"
             value="all"
             data-testid="expense-type-all"
-            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
           All
         </label>
@@ -126,7 +126,7 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
             name="expense-type"
             value="recurring"
             data-testid="expense-type-recurring"
-            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
           Recurring
         </label>
@@ -137,30 +137,30 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
             name="expense-type"
             value="one-time"
             data-testid="expense-type-one-time"
-            class="size-5 min-h-11 border-slate-300 text-slate-700 focus:ring-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
           One-time
         </label>
       </fieldset>
 
       <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
-        <label class="inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-slate-700">
+        <label class="inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
           Sort by
           <select
             v-model="sortColumn"
             data-testid="monthly-average-sort-column"
-            class="min-h-11 max-w-full rounded border border-slate-300 px-2 py-1 text-slate-900 focus:border-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="min-h-11 max-w-full rounded-sheet border border-rule-strong px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
             <option value="amount">Average amount</option>
             <option value="category">Category</option>
           </select>
         </label>
-        <label class="inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-slate-700">
+        <label class="inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
           Order
           <select
             v-model="sortDirection"
             data-testid="monthly-average-sort-direction"
-            class="min-h-11 max-w-full rounded border border-slate-300 px-2 py-1 text-slate-900 focus:border-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            class="min-h-11 max-w-full rounded-sheet border border-rule-strong px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
             <option value="asc">Ascending</option>
             <option value="desc">Descending</option>
@@ -170,7 +170,7 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
 
       <ul
         v-if="sortedAverages.length > 0"
-        class="mt-6 max-w-xl divide-y divide-slate-100 rounded-md border border-slate-200 bg-white"
+        class="mt-6 max-w-xl divide-y divide-rule rounded-sheet border border-rule-strong bg-surface"
         aria-label="Category monthly averages"
         data-testid="monthly-average-list"
       >
@@ -181,14 +181,14 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
           data-testid="category-average"
           :data-category-key="average.key"
         >
-          <span class="min-w-0 max-w-full break-words text-slate-700">{{ average.name }}</span>
-          <span class="max-w-full break-words tabular-nums font-medium text-slate-900 sm:shrink-0" data-testid="category-average-amount">
+          <span class="min-w-0 max-w-full break-words text-muted">{{ average.name }}</span>
+          <span class="max-w-full break-words tabular-nums font-medium text-ink sm:shrink-0" data-testid="category-average-amount">
             {{ formatEuroAmount(average.amount) }}
           </span>
         </li>
       </ul>
 
-      <p v-else class="mt-4 text-sm text-slate-600" data-testid="no-data">
+      <p v-else class="mt-4 text-sm text-muted" data-testid="no-data">
         No category data for these months.
       </p>
     </template>

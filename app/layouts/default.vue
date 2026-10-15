@@ -34,16 +34,16 @@ watch(() => route.path, () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-900">
-    <header class="border-b border-slate-200 bg-white">
+  <div class="min-h-screen text-ink">
+    <header class="border-b border-rule-strong bg-surface">
       <div class="w-full px-4 py-4 sm:py-6">
         <div class="flex items-center justify-between gap-4">
-          <p class="text-xs font-semibold tracking-widest text-slate-500 uppercase">
+          <p class="font-display text-xl font-semibold text-ink">
             Transaction Analyser
           </p>
           <button
             type="button"
-            class="inline-flex size-11 items-center justify-center rounded-md border border-slate-300 text-sm font-medium text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:hidden"
+            class="inline-flex size-11 items-center justify-center rounded-sheet border border-rule-strong bg-surface text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:hidden"
             data-testid="mobile-navigation-toggle"
             aria-controls="screen-navigation"
             :aria-expanded="mobileNavOpen"
@@ -64,11 +64,11 @@ watch(() => route.path, () => {
             :key="screen.to"
             :to="screen.to"
             :aria-current="isCurrent(screen.to) ? 'page' : undefined"
-            class="inline-flex min-h-11 items-center rounded py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:min-h-0"
+            class="inline-flex min-h-11 items-center border-b-2 py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:min-h-0"
             :class="
               isCurrent(screen.to)
-                ? 'text-slate-900 underline underline-offset-4'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'border-ink text-ink'
+                : 'border-transparent text-muted hover:text-ink'
             "
             @click="mobileNavOpen = false"
           >

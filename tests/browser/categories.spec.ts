@@ -32,7 +32,7 @@ async function interceptApi(page: Page): Promise<void> {
   });
 }
 
-test('the category table takes only the space it needs and stripes its rows', async ({ page }) => {
+test('the category table takes only the space it needs and rules its rows', async ({ page }) => {
   await interceptApi(page);
   await page.goto('/categories', { waitUntil: 'networkidle' });
   const region = page.getByRole('region', { name: 'Category table' });
@@ -42,13 +42,17 @@ test('the category table takes only the space it needs and stripes its rows', as
   const regionWidth = await region.evaluate((element) => element.getBoundingClientRect().width);
   expect(tableWidth).toBeLessThan(regionWidth);
 
-  const colors = await page.locator('tbody tr').evaluateAll((rows) =>
-    rows.map((row) => getComputedStyle(row).backgroundColor),
+  const rows = await page.locator('tbody tr').evaluateAll((elements) =>
+    elements.map((row) => ({
+      background: getComputedStyle(row).backgroundColor,
+      borderBottomWidth: getComputedStyle(row).borderBottomWidth,
+      borderBottomColor: getComputedStyle(row).borderBottomColor,
+    })),
   );
-  expect(colors.length).toBeGreaterThan(2);
-  expect(colors[0]).not.toBe(colors[1]);
-  expect(colors[1]).not.toBe(colors[2]);
-  expect(colors[0]).toBe(colors[2]);
+  expect(rows.length).toBeGreaterThan(2);
+  expect(new Set(rows.map((row) => row.background)).size).toBe(1);
+  expect(rows.every((row) => row.borderBottomWidth === '1px')).toBe(true);
+  expect(new Set(rows.map((row) => row.borderBottomColor)).size).toBe(1);
 });
 
 test('the category table centers cell values and row actions on one vertical axis', async ({ page }) => {

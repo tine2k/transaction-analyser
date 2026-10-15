@@ -37,21 +37,21 @@ function apply(): void {
 <template>
   <div
     data-testid="bulk-assignment-bar"
-    class="border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(15,23,42,0.08)]"
+    class="border-t border-rule-strong bg-surface px-4 py-3 shadow-[0_-2px_8px_rgba(32,36,43,0.08)]"
   >
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-      <p class="min-w-0 flex-1 text-sm text-slate-700" data-testid="bulk-assignment-count">
-        <span class="font-medium text-slate-900">{{ count }}</span>
+      <p class="min-w-0 flex-1 text-sm text-muted" data-testid="bulk-assignment-count">
+        <span class="font-medium text-ink">{{ count }}</span>
         transaction{{ count === 1 ? '' : 's' }} selected
       </p>
 
-      <label class="flex min-w-0 items-center gap-2 text-sm text-slate-700">
+      <label class="flex min-w-0 items-center gap-2 text-sm text-muted">
         <span class="sr-only">Category for the selected transactions</span>
         <select
           v-model="chosen"
           data-testid="bulk-assignment-category"
           :disabled="disabled === true"
-          class="min-h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:w-auto"
+          class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-auto"
         >
           <option value="">Choose a category</option>
           <option :value="uncategorisedValue">Uncategorised</option>
@@ -65,7 +65,7 @@ function apply(): void {
         type="button"
         data-testid="bulk-assignment-apply"
         :disabled="disabled === true || chosen === ''"
-        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-sheet bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
         @click="apply"
       >
         Apply
@@ -75,7 +75,7 @@ function apply(): void {
         type="button"
         data-testid="bulk-assignment-clear"
         :disabled="disabled === true"
-        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-sheet border border-rule-strong bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
         @click="emit('clear')"
       >
         Clear selection

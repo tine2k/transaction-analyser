@@ -66,10 +66,10 @@ describe('pattern shortcut bar', () => {
   it('reports a status and keeps it distinct from an error', async () => {
     const info = await mountBar({ text: null, status: 'Added to Groceries' });
     expect(info.get('[data-testid="pattern-shortcut-status"]').text()).toBe('Added to Groceries');
-    expect(info.get('[data-testid="pattern-shortcut-status"]').classes()).not.toContain('text-red-700');
+    expect(info.get('[data-testid="pattern-shortcut-status"]').classes()).not.toContain('text-failure');
 
     const failure = await mountBar({ text: null, status: 'Could not add to Travel', statusKind: 'error' });
-    expect(failure.get('[data-testid="pattern-shortcut-status"]').classes()).toContain('text-red-700');
+    expect(failure.get('[data-testid="pattern-shortcut-status"]').classes()).toContain('text-failure');
   });
 
   it('renders nothing when there is neither a selection nor a status', async () => {

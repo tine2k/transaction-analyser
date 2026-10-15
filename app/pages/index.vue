@@ -642,22 +642,22 @@ onBeforeUnmount(() => {
 
 <template>
   <div :class="{ 'pb-28': bottomBarsVisible === 1, 'pb-56': bottomBarsVisible === 2 }">
-    <h1 class="text-2xl font-bold text-slate-900">Transactions</h1>
+    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">Transactions</h1>
 
-    <p v-if="error" class="mt-4 text-slate-600">
+    <p v-if="error" class="mt-4 text-muted">
       The transactions could not be loaded. They are not shown, and this is not an empty result.
     </p>
 
-    <p v-else-if="pending" class="mt-4 text-slate-600">Loading transactions…</p>
+    <p v-else-if="pending" class="mt-4 text-muted">Loading transactions…</p>
 
     <template v-else-if="transactions">
       <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
-        <label class="grid w-full gap-1 text-sm font-medium text-slate-700 sm:w-auto">
+        <label class="grid w-full gap-1 text-sm font-medium text-muted sm:w-auto">
           Category
           <select
             v-model="categoryFilter"
             data-testid="category-filter"
-            class="min-h-11 w-full max-w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:w-auto"
+            class="min-h-11 w-full max-w-full rounded-sheet border border-rule-strong bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-auto"
           >
             <option value="all">All categories ({{ transactions.length }})</option>
             <option value="uncategorised">Uncategorised ({{ uncategorisedTransactions.length }})</option>
@@ -666,12 +666,12 @@ onBeforeUnmount(() => {
             </option>
           </select>
         </label>
-        <label class="grid w-full gap-1 text-sm font-medium text-slate-700 sm:w-auto">
+        <label class="grid w-full gap-1 text-sm font-medium text-muted sm:w-auto">
           Period
           <select
             v-model="periodFilter"
             data-testid="period-filter"
-            class="min-h-11 w-full max-w-full rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:w-auto"
+            class="min-h-11 w-full max-w-full rounded-sheet border border-rule-strong bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-auto"
           >
             <option value="all">All periods</option>
             <optgroup v-if="periods.years.length > 0" label="Years">
@@ -688,21 +688,22 @@ onBeforeUnmount(() => {
         </label>
       </div>
 
-      <p class="mt-4 text-sm font-semibold text-slate-900" data-testid="visible-total">
-        Sum of displayed transactions: <span class="tabular-nums">{{ formatEuroAmount(visibleTotal) }}</span>
-        (<span data-testid="visible-count">{{ visibleTransactions.length }} transaction{{ visibleTransactions.length === 1 ? '' : 's' }}</span>)
+      <p class="mt-4 text-sm text-muted" data-testid="visible-total">
+        Sum of displayed transactions:
+        <span class="text-xl font-semibold tabular-nums text-ink">{{ formatEuroAmount(visibleTotal) }}</span>
+        (<span class="tabular-nums" data-testid="visible-count">{{ visibleTransactions.length }} transaction{{ visibleTransactions.length === 1 ? '' : 's' }}</span>)
       </p>
 
-      <p v-if="transactions.length === 0" class="mt-4 text-slate-600">
+      <p v-if="transactions.length === 0" class="mt-4 text-muted">
         There are no transactions to show.
       </p>
 
-      <p v-else-if="visibleTransactions.length === 0" class="mt-4 text-slate-600">
+      <p v-else-if="visibleTransactions.length === 0" class="mt-4 text-muted">
         There are no transactions matching the selected filters.
       </p>
 
       <div v-else class="mt-4">
-        <p id="transactions-scroll-help" class="mb-2 text-xs text-slate-500 sm:hidden">
+        <p id="transactions-scroll-help" class="mb-2 text-xs text-muted sm:hidden">
           Scroll horizontally to view all transaction columns.
         </p>
         <div
@@ -712,31 +713,31 @@ onBeforeUnmount(() => {
           aria-describedby="transactions-scroll-help"
           tabindex="0"
           data-testid="transactions-scroll"
-          class="max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+          class="max-w-full overflow-x-auto rounded-sheet border border-rule-strong bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         >
         <table class="w-max min-w-full border-collapse text-left text-sm">
           <thead>
-            <tr class="border-b border-slate-200">
-              <th scope="col" class="px-3 py-2 font-semibold text-slate-700">
+            <tr class="border-b border-rule-strong">
+              <th scope="col" class="px-3 py-2 font-semibold text-ink">
                 <label class="flex min-h-11 items-center justify-center">
                   <input
                     type="checkbox"
                     data-testid="select-all-visible"
                     :checked="allVisibleSelected"
                     :indeterminate="someVisibleSelected && !allVisibleSelected"
-                    class="size-5 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+                    class="size-5 rounded-sheet border-rule-strong text-ink focus:ring-ink"
                     @change="toggleAllVisible"
                   >
                   <span class="sr-only">Select all shown transactions</span>
                 </label>
               </th>
-              <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Booking date</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Value date</th>
-              <th scope="col" class="px-3 py-2 text-right font-semibold text-slate-700">Amount</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Purpose</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Counterparty</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Account</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-slate-700">Category</th>
+              <th scope="col" class="px-3 py-2 font-semibold text-ink">Booking date</th>
+              <th scope="col" class="px-3 py-2 font-semibold text-ink">Value date</th>
+              <th scope="col" class="px-3 py-2 text-right font-semibold text-ink">Amount</th>
+              <th scope="col" class="px-3 py-2 font-semibold text-ink">Purpose</th>
+              <th scope="col" class="px-3 py-2 font-semibold text-ink">Counterparty</th>
+              <th scope="col" class="px-3 py-2 font-semibold text-ink">Account</th>
+              <th scope="col" class="px-3 py-2 font-semibold text-ink">Category</th>
             </tr>
           </thead>
           <tbody>
@@ -745,7 +746,7 @@ onBeforeUnmount(() => {
               :key="transaction.id"
               :data-transaction-id="transaction.id"
               :aria-busy="markers.has(transaction.id) ? 'true' : undefined"
-              class="border-b border-slate-100"
+              class="border-b border-rule"
             >
               <td class="px-3 py-2">
                 <label class="flex min-h-11 items-center justify-center">
@@ -753,41 +754,41 @@ onBeforeUnmount(() => {
                     type="checkbox"
                     data-testid="row-select"
                     :checked="selectedIds.has(transaction.id)"
-                    class="size-5 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+                    class="size-5 rounded-sheet border-rule-strong text-ink focus:ring-ink"
                     @change="toggleSelected(transaction.id)"
                   >
                   <span class="sr-only">Select {{ transaction.purpose }}</span>
                 </label>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-slate-900">
+              <td class="px-3 py-2 whitespace-nowrap tabular-nums text-ink">
                 <time :datetime="transaction.bookingDate">{{ transaction.bookingDate }}</time>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-slate-900">
+              <td class="px-3 py-2 whitespace-nowrap tabular-nums text-ink">
                 <time :datetime="transaction.valueDate">{{ transaction.valueDate }}</time>
               </td>
-              <td class="px-3 py-2 text-right tabular-nums text-slate-900">{{ transaction.amount }}</td>
-              <td class="px-3 py-2 text-slate-900">{{ transaction.purpose }}</td>
-              <td class="px-3 py-2 text-slate-900">{{ transaction.counterpartyName }}</td>
-              <td class="px-3 py-2 text-slate-900">
+              <td class="px-3 py-2 text-right font-medium tabular-nums text-ink">{{ transaction.amount }}</td>
+              <td class="px-3 py-2 text-ink">{{ transaction.purpose }}</td>
+              <td class="px-3 py-2 text-ink">{{ transaction.counterpartyName }}</td>
+              <td class="px-3 py-2 text-ink">
                 <template v-if="transaction.counterpartyAccount !== null">
                   {{ transaction.counterpartyAccount }}
                 </template>
                 <template v-else>
-                  <span aria-hidden="true" class="text-slate-400">—</span>
+                  <span aria-hidden="true" class="text-muted">—</span>
                   <span class="sr-only">No counterparty account</span>
                 </template>
               </td>
-              <td class="px-3 py-2 text-slate-900">
+              <td class="px-3 py-2 text-ink">
                 <span
                   v-if="markers.has(transaction.id)"
                   aria-hidden="true"
                   data-testid="row-updating"
-                  class="mr-1 inline-block size-2 rounded-full bg-slate-400 align-middle"
+                  class="mr-1 inline-block size-2 rounded-full bg-muted align-middle"
                 ></span>
                 <span
                   v-if="transaction.categoryAssignment === 'manual'"
                   data-testid="manual-assignment-marker"
-                  class="mr-1 inline-flex text-slate-500 align-middle"
+                  class="mr-1 inline-flex text-muted align-middle"
                 >
                   <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor" class="size-3.5">
                     <path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 3.3-4.5 8.5-4.5 8.5S3.5 9.3 3.5 6A4.5 4.5 0 0 1 8 1.5Zm0 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" />
@@ -799,7 +800,7 @@ onBeforeUnmount(() => {
                   :value="transaction.category?.id ?? ''"
                   :disabled="rowInFlight(transaction.id)"
                   :aria-label="`Category for ${transaction.purpose}`"
-                  class="min-h-11 max-w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                  class="min-h-11 max-w-full rounded-sheet border border-rule-strong bg-surface px-2 py-1 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                   @change="chooseRowCategory(transaction, $event)"
                 >
                   <option value="">Uncategorised</option>

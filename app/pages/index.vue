@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { formatEuroAmount, sumSignedAmountStrings } from '../utils/category-spending';
+import {
+  compareDecimalStrings,
+  formatEuroAmount,
+  sumSignedAmountStrings,
+} from '../utils/category-spending';
 
 // The index route reads stored transactions from the read-only GET
 // /api/transactions endpoint. Category and booking-period filters are derived
@@ -21,6 +25,10 @@ import { formatEuroAmount, sumSignedAmountStrings } from '../utils/category-spen
 // read reflects the result, and the table's own loading state is never used for
 // a refresh.
 //
+// Column headers sort the filtered rows, and the active column and direction are
+// carried in the route query. A route without a sort keeps the endpoint's order,
+// and equal values keep their relative endpoint order.
+//
 // The page also offers manual category assignment. Every row's category cell
 // hosts a select that pins the row to a chosen category or clears the pin by
 // choosing Uncategorised; a selection column with a select-all control backs the
@@ -30,6 +38,7 @@ import { formatEuroAmount, sumSignedAmountStrings } from '../utils/category-spen
 // bars render in one bottom stack so they never overlap.
 //
 // See openspec/changes/add-transactions-table/specs/transaction-table/spec.md,
+// openspec/changes/add-transaction-table-sorting/specs/transaction-table/spec.md,
 // openspec/changes/disable-server-side-rendering/specs/frontend-shell/spec.md,
 // openspec/changes/add-transaction-pattern-shortcut/specs/transaction-pattern-shortcut/spec.md,
 // and openspec/changes/add-manual-category-assignment/specs/manual-category-assignment/spec.md
@@ -46,6 +55,31 @@ type Transaction = {
   categoryAssignment: 'manual' | 'automatic';
   category: Category | null;
 };
+
+const SORTABLE_COLUMNS = [
+  'bookingDate',
+  'valueDate',
+  'amount',
+  'purpose',
+  'counterpartyName',
+  'counterpartyAccount',
+  'category',
+] as const;
+
+type SortColumn = (typeof SORTABLE_COLUMNS)[number];
+type SortDirection = 'asc' | 'desc';
+type TransactionSort = { column: SortColumn; direction: SortDirection };
+type SortableColumn = { column: SortColumn; label: string; align: 'left' | 'right' };
+
+const sortableColumns: SortableColumn[] = [
+  { column: 'bookingDate', label: 'Booking date', align: 'left' },
+  { column: 'valueDate', label: 'Value date', align: 'left' },
+  { column: 'amount', label: 'Amount', align: 'right' },
+  { column: 'purpose', label: 'Purpose', align: 'left' },
+  { column: 'counterpartyName', label: 'Counterparty', align: 'left' },
+  { column: 'counterpartyAccount', label: 'Account', align: 'left' },
+  { column: 'category', label: 'Category', align: 'left' },
+];
 
 // A category as the management surface returns it. The shortcut only offers the
 // name and marks the hidden flag; the full shape is kept so an append response
@@ -69,6 +103,24 @@ const route = router.currentRoute;
 
 function queryString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
+}
+
+function isSortColumn(value: string): value is SortColumn {
+  return (SORTABLE_COLUMNS as readonly string[]).includes(value);
+}
+
+// The route carries the active sort as a column and a direction. An unknown
+// column means no sort, while a recognized column without a valid direction
+// sorts ascending.
+function sortFromQuery(): TransactionSort | null {
+  const column = queryString(route.value.query.sort);
+  if (column === undefined || !isSortColumn(column)) {
+    return null;
+  }
+  return {
+    column,
+    direction: queryString(route.value.query.direction) === 'desc' ? 'desc' : 'asc',
+  };
 }
 
 function isMonthKey(value: string): boolean {
@@ -153,6 +205,7 @@ function periodFromQuery(): string {
 
 const selectedCategory = ref('uncategorised');
 const selectedPeriod = ref('all');
+const activeSort = ref<TransactionSort | null>(null);
 
 const categoryFilter = computed({
   get: () => selectedCategory.value,
@@ -170,13 +223,27 @@ const periodFilter = computed({
   },
 });
 
+// The local sort is authoritative until the router reflects it, so a filter
+// change made right after a header activation does not drop the new sort.
+function queryWithActiveSort() {
+  const query = { ...route.value.query };
+  if (activeSort.value === null) {
+    delete query.sort;
+    delete query.direction;
+  } else {
+    query.sort = activeSort.value.column;
+    query.direction = activeSort.value.direction;
+  }
+  return query;
+}
+
 function setCategoryQuery(value: string): void {
-  const query = { ...route.value.query, category: value };
+  const query = { ...queryWithActiveSort(), category: value };
   void router.replace({ path: '/', query });
 }
 
 function setPeriodQuery(value: string): void {
-  const query = { ...route.value.query };
+  const query = queryWithActiveSort();
   delete query.month;
   delete query.year;
   if (isYearKey(value)) {
@@ -187,17 +254,49 @@ function setPeriodQuery(value: string): void {
   void router.replace({ path: '/', query });
 }
 
+function setSortQuery(sort: TransactionSort): void {
+  void router.replace({
+    path: '/',
+    query: {
+      ...route.value.query,
+      sort: sort.column,
+      direction: sort.direction,
+    },
+  });
+}
+
+// A different column starts ascending; the active column alternates. The route
+// query is updated alongside the local state so the sorted view is linkable.
+function activateSort(column: SortColumn): void {
+  const current = activeSort.value;
+  const next: TransactionSort = current?.column === column
+    ? { column, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+    : { column, direction: 'asc' };
+  activeSort.value = next;
+  setSortQuery(next);
+}
+
+function ariaSortFor(column: SortColumn): 'ascending' | 'descending' | 'none' {
+  if (activeSort.value?.column !== column) {
+    return 'none';
+  }
+  return activeSort.value.direction === 'asc' ? 'ascending' : 'descending';
+}
+
 watch(
   () => [
     route.value.query.category,
     route.value.query.month,
     route.value.query.year,
+    route.value.query.sort,
+    route.value.query.direction,
     categories.value,
     periods.value,
   ],
   () => {
     selectedCategory.value = categoryFromQuery();
     selectedPeriod.value = periodFromQuery();
+    activeSort.value = sortFromQuery();
   },
   { immediate: true },
 );
@@ -224,6 +323,70 @@ const visibleTransactions = computed(() =>
     return categoryMatches && matchesPeriod(transaction.bookingDate, periodFilter.value);
   }),
 );
+
+// Sorting is a presentation concern layered on the filtered rows. The endpoint's
+// response index is kept so rows that compare equal keep their relative order,
+// and so a route without a sort keeps the endpoint's order untouched.
+const endpointOrder = computed(() => {
+  const order = new Map<string, number>();
+  (transactions.value ?? []).forEach((transaction, index) => {
+    order.set(transaction.id, index);
+  });
+  return order;
+});
+
+function sortValue(transaction: Transaction, column: SortColumn): string | null {
+  switch (column) {
+    case 'bookingDate': return transaction.bookingDate;
+    case 'valueDate': return transaction.valueDate;
+    case 'amount': return transaction.amount;
+    case 'purpose': return transaction.purpose;
+    case 'counterpartyName': return transaction.counterpartyName;
+    case 'counterpartyAccount': return transaction.counterpartyAccount;
+    case 'category': return transaction.category?.name ?? null;
+  }
+}
+
+function compareSortValues(left: string, right: string, column: SortColumn): number {
+  if (column === 'amount') {
+    return compareDecimalStrings(left, right);
+  }
+  if (column === 'bookingDate' || column === 'valueDate') {
+    return left < right ? -1 : left > right ? 1 : 0;
+  }
+  return left.localeCompare(right, undefined, { sensitivity: 'base' });
+}
+
+const sortedVisibleTransactions = computed(() => {
+  const sort = activeSort.value;
+  const rows = visibleTransactions.value;
+  if (sort === null) {
+    return rows;
+  }
+
+  const order = endpointOrder.value;
+  const endpointIndex = (transaction: Transaction): number => order.get(transaction.id) ?? 0;
+
+  return [...rows].sort((left, right) => {
+    const leftValue = sortValue(left, sort.column);
+    const rightValue = sortValue(right, sort.column);
+
+    // An absent account or category sorts last in both directions; the
+    // direction only applies to rows that both carry a value.
+    if (leftValue === null || rightValue === null) {
+      if (leftValue === null && rightValue === null) {
+        return endpointIndex(left) - endpointIndex(right);
+      }
+      return leftValue === null ? 1 : -1;
+    }
+
+    const comparison = compareSortValues(leftValue, rightValue, sort.column);
+    if (comparison !== 0) {
+      return sort.direction === 'asc' ? comparison : -comparison;
+    }
+    return endpointIndex(left) - endpointIndex(right);
+  });
+});
 
 const visibleTotal = computed(() =>
   sumSignedAmountStrings(visibleTransactions.value.map(({ amount }) => amount)),
@@ -731,18 +894,35 @@ onBeforeUnmount(() => {
                   <span class="sr-only">Select all shown transactions</span>
                 </label>
               </th>
-              <th scope="col" class="px-3 py-2 font-semibold text-ink">Booking date</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-ink">Value date</th>
-              <th scope="col" class="px-3 py-2 text-right font-semibold text-ink">Amount</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-ink">Purpose</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-ink">Counterparty</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-ink">Account</th>
-              <th scope="col" class="px-3 py-2 font-semibold text-ink">Category</th>
+              <th
+                v-for="column in sortableColumns"
+                :key="column.column"
+                scope="col"
+                :aria-sort="ariaSortFor(column.column)"
+                class="px-3 py-2 font-semibold text-ink"
+              >
+                <button
+                  type="button"
+                  :data-testid="`sort-${column.column}`"
+                  :class="[
+                    'flex min-h-11 w-full items-center gap-1 rounded-sheet font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
+                    column.align === 'right' ? 'justify-end' : 'justify-start',
+                  ]"
+                  @click="activateSort(column.column)"
+                >
+                  <span>{{ column.label }}</span>
+                  <span
+                    v-if="activeSort?.column === column.column"
+                    aria-hidden="true"
+                    class="text-muted"
+                  >{{ activeSort.direction === 'asc' ? '↑' : '↓' }}</span>
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="transaction in visibleTransactions"
+              v-for="transaction in sortedVisibleTransactions"
               :key="transaction.id"
               :data-transaction-id="transaction.id"
               :aria-busy="markers.has(transaction.id) ? 'true' : undefined"

@@ -62,6 +62,36 @@ const storedCategories = [
   { id: '3', name: 'Internal', patterns: ['internal'], hidden: true, windows: [] },
 ];
 
+// Sorting exercises values the filter fixture does not carry: distinct booking
+// and value dates, mixed-case text, equal comparisons, and a missing account
+// alongside a missing category. The array order is the endpoint order.
+const sortingTransactions: TestTransaction[] = [
+  {
+    id: 'a', bookingDate: '2026-01-03', valueDate: '2026-01-01', amount: '-2.00',
+    purpose: 'beta', counterpartyName: 'Zeta', counterpartyAccount: 'AT2',
+    categoryAssignment: 'automatic',
+    category: { id: '1', name: 'alpha', hidden: false },
+  },
+  {
+    id: 'b', bookingDate: '2026-01-01', valueDate: '2026-01-03', amount: '10.00',
+    purpose: 'Alpha', counterpartyName: 'alpha', counterpartyAccount: null,
+    categoryAssignment: 'automatic',
+    category: null,
+  },
+  {
+    id: 'c', bookingDate: '2026-01-02', valueDate: '2026-01-02', amount: '-10.00',
+    purpose: 'alpha', counterpartyName: 'Beta', counterpartyAccount: 'AT1',
+    categoryAssignment: 'automatic',
+    category: { id: '2', name: 'Beta', hidden: false },
+  },
+  {
+    id: 'd', bookingDate: '2026-01-04', valueDate: '2026-01-04', amount: '2.00',
+    purpose: 'Gamma', counterpartyName: 'beta', counterpartyAccount: 'AT1',
+    categoryAssignment: 'automatic',
+    category: { id: '1', name: 'alpha', hidden: false },
+  },
+];
+
 function transactionsResponse(data: TestTransaction[]) {
   return { data: ref(data), error: ref(null), pending: ref(false) };
 }
@@ -340,6 +370,214 @@ describe('transaction list filters', () => {
       .toBe('2026-02');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['2']);
+  });
+});
+
+describe('transaction sorting', () => {
+  beforeEach(() => {
+    mocks.useFetch.mockReset();
+    mocks.fetch.mockReset();
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(transactions) : categoriesResponse());
+  });
+
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) {
+      wrapper.unmount();
+    }
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function useSortingTransactions(): void {
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions'
+        ? transactionsResponse(sortingTransactions)
+        : categoriesResponse());
+  }
+
+  function shownIds(wrapper: Awaited<ReturnType<typeof mountTransactions>>): string[] {
+    return wrapper.findAll('tbody tr')
+      .map((row) => row.attributes('data-transaction-id') ?? '');
+  }
+
+  function headerCell(
+    wrapper: Awaited<ReturnType<typeof mountTransactions>>,
+    column: string,
+  ): HTMLElement {
+    return wrapper.get(`[data-testid="sort-${column}"]`).element.closest('th') as HTMLElement;
+  }
+
+  it('initializes a descending sort from the query and marks the header', async () => {
+    useSortingTransactions();
+    const wrapper = await mountTransactions({ route: '/?category=all&sort=amount&direction=desc' });
+
+    expect(shownIds(wrapper)).toEqual(['b', 'd', 'a', 'c']);
+    expect(headerCell(wrapper, 'amount').getAttribute('aria-sort')).toBe('descending');
+  });
+
+  it('falls back to the endpoint order for an unknown column', async () => {
+    useSortingTransactions();
+    const wrapper = await mountTransactions({ route: '/?category=all&sort=unknown&direction=desc' });
+
+    expect(shownIds(wrapper)).toEqual(['a', 'b', 'c', 'd']);
+    for (const column of ['bookingDate', 'valueDate', 'amount', 'purpose', 'counterpartyName', 'counterpartyAccount', 'category']) {
+      expect(headerCell(wrapper, column).getAttribute('aria-sort')).toBe('none');
+    }
+  });
+
+  it('defaults a recognized column with a missing or invalid direction to ascending', async () => {
+    useSortingTransactions();
+    const missing = await mountTransactions({ route: '/?category=all&sort=amount' });
+    expect(shownIds(missing)).toEqual(['c', 'a', 'd', 'b']);
+    expect(headerCell(missing, 'amount').getAttribute('aria-sort')).toBe('ascending');
+
+    const invalid = await mountTransactions({ route: '/?category=all&sort=amount&direction=sideways' });
+    expect(shownIds(invalid)).toEqual(['c', 'a', 'd', 'b']);
+    expect(headerCell(invalid, 'amount').getAttribute('aria-sort')).toBe('ascending');
+  });
+
+  it('sorts amounts by signed numeric value instead of text', async () => {
+    useSortingTransactions();
+    const wrapper = await mountTransactions({ route: '/?category=all&sort=amount&direction=asc' });
+
+    expect(shownIds(wrapper)).toEqual(['c', 'a', 'd', 'b']);
+  });
+
+  it('sorts booking and value dates independently and chronologically', async () => {
+    useSortingTransactions();
+    const booking = await mountTransactions({ route: '/?category=all&sort=bookingDate&direction=asc' });
+    expect(shownIds(booking)).toEqual(['b', 'c', 'a', 'd']);
+
+    const value = await mountTransactions({ route: '/?category=all&sort=valueDate&direction=asc' });
+    expect(shownIds(value)).toEqual(['a', 'c', 'b', 'd']);
+  });
+
+  it('sorts text without case sensitivity', async () => {
+    useSortingTransactions();
+    const purpose = await mountTransactions({ route: '/?category=all&sort=purpose&direction=asc' });
+    expect(shownIds(purpose)).toEqual(['b', 'c', 'a', 'd']);
+
+    const counterparty = await mountTransactions({ route: '/?category=all&sort=counterpartyName&direction=asc' });
+    expect(shownIds(counterparty)).toEqual(['b', 'c', 'd', 'a']);
+  });
+
+  it('sorts rows without an account or category last in both directions', async () => {
+    useSortingTransactions();
+    const accountAscending = await mountTransactions({ route: '/?category=all&sort=counterpartyAccount&direction=asc' });
+    expect(shownIds(accountAscending)).toEqual(['c', 'd', 'a', 'b']);
+
+    const accountDescending = await mountTransactions({ route: '/?category=all&sort=counterpartyAccount&direction=desc' });
+    expect(shownIds(accountDescending)).toEqual(['a', 'c', 'd', 'b']);
+
+    const categoryAscending = await mountTransactions({ route: '/?category=all&sort=category&direction=asc' });
+    expect(shownIds(categoryAscending)).toEqual(['a', 'd', 'c', 'b']);
+
+    const categoryDescending = await mountTransactions({ route: '/?category=all&sort=category&direction=desc' });
+    expect(shownIds(categoryDescending)).toEqual(['c', 'a', 'd', 'b']);
+  });
+
+  it('keeps the endpoint order for rows that compare equal', async () => {
+    useSortingTransactions();
+    const wrapper = await mountTransactions({ route: '/?category=all&sort=purpose&direction=asc' });
+
+    expect(shownIds(wrapper)).toEqual(['b', 'c', 'a', 'd']);
+  });
+
+  it('starts a new column ascending and toggles the active column', async () => {
+    useSortingTransactions();
+    const wrapper = await mountTransactions({ route: '/?category=all' });
+
+    await wrapper.get('[data-testid="sort-amount"]').trigger('click');
+    expect(shownIds(wrapper)).toEqual(['c', 'a', 'd', 'b']);
+    expect(headerCell(wrapper, 'amount').getAttribute('aria-sort')).toBe('ascending');
+
+    await wrapper.get('[data-testid="sort-amount"]').trigger('click');
+    expect(shownIds(wrapper)).toEqual(['b', 'd', 'a', 'c']);
+    expect(headerCell(wrapper, 'amount').getAttribute('aria-sort')).toBe('descending');
+
+    await wrapper.get('[data-testid="sort-purpose"]').trigger('click');
+    expect(shownIds(wrapper)).toEqual(['b', 'c', 'a', 'd']);
+    expect(headerCell(wrapper, 'purpose').getAttribute('aria-sort')).toBe('ascending');
+    expect(headerCell(wrapper, 'amount').getAttribute('aria-sort')).toBe('none');
+    expect(mocks.useFetch).toHaveBeenCalledTimes(2);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it('renders a button in every value header and leaves the selection header unsorted', async () => {
+    useSortingTransactions();
+    const wrapper = await mountTransactions({ route: '/?category=all' });
+    const headers = wrapper.findAll('thead th');
+
+    expect(headers).toHaveLength(8);
+    expect(headers[0]?.attributes('aria-sort')).toBeUndefined();
+    expect(headers[0]?.find('[data-testid="select-all-visible"]').exists()).toBe(true);
+    expect(wrapper.findAll('thead th button')).toHaveLength(7);
+    for (const button of wrapper.findAll('thead th button')) {
+      expect(button.attributes('type')).toBe('button');
+      expect(button.classes()).toContain('min-h-11');
+    }
+    for (const column of ['bookingDate', 'valueDate', 'amount', 'purpose', 'counterpartyName', 'counterpartyAccount', 'category']) {
+      expect(headerCell(wrapper, column).getAttribute('aria-sort')).toBe('none');
+    }
+  });
+
+  it('updates the route query and preserves the existing filters', async () => {
+    useSortingTransactions();
+    const wrapper = await mountTransactions({ route: '/?category=all&month=2026-01' });
+    const replace = vi.spyOn(wrapper.vm.$router, 'replace');
+
+    await wrapper.get('[data-testid="sort-purpose"]').trigger('click');
+
+    expect(replace).toHaveBeenCalledWith({
+      path: '/',
+      query: {
+        category: 'all',
+        month: '2026-01',
+        sort: 'purpose',
+        direction: 'asc',
+      },
+    });
+  });
+
+  it('keeps the sort when a filter changes and leaves the summary unchanged', async () => {
+    useSortingTransactions();
+    const wrapper = await mountTransactions({ route: '/?category=all&sort=amount&direction=asc' });
+    const totalBefore = wrapper.get('[data-testid="visible-total"]').text();
+    const countBefore = wrapper.get('[data-testid="visible-count"]').text();
+    const replace = vi.spyOn(wrapper.vm.$router, 'replace');
+
+    expect(shownIds(wrapper)).toEqual(['c', 'a', 'd', 'b']);
+
+    await wrapper.get('[data-testid="sort-purpose"]').trigger('click');
+    expect(shownIds(wrapper)).toEqual(['b', 'c', 'a', 'd']);
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toBe(totalBefore);
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe(countBefore);
+
+    await wrapper.get('[data-testid="category-filter"]').setValue('2');
+    await flushPromises();
+
+    expect(shownIds(wrapper)).toEqual(['c']);
+    expect(headerCell(wrapper, 'purpose').getAttribute('aria-sort')).toBe('ascending');
+    const lastCall = replace.mock.calls.at(-1)?.[0] as { query: Record<string, string> };
+    expect(lastCall.query).toEqual({
+      category: '2',
+      sort: 'purpose',
+      direction: 'asc',
+    });
+    expect(mocks.useFetch).toHaveBeenCalledTimes(2);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps row selection attached to the transaction after sorting', async () => {
+    useSortingTransactions();
+    const wrapper = await mountTransactions({ route: '/?category=all&sort=amount&direction=asc' });
+
+    expect(shownIds(wrapper)).toEqual(['c', 'a', 'd', 'b']);
+    await wrapper.get('[data-transaction-id="c"] [data-testid="row-select"]').setValue(true);
+
+    expect(wrapper.get('[data-testid="bulk-assignment-bar"]').text()).toContain('1 transaction selected');
   });
 });
 

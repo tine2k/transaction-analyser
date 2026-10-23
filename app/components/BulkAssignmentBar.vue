@@ -9,6 +9,8 @@
 // because a bulk misfire affects every selected transaction at once.
 //
 // See openspec/changes/add-manual-category-assignment/specs/manual-category-assignment/spec.md
+import { IconCheck, IconX } from '@tabler/icons-vue';
+
 type BarCategory = { id: string; name: string; hidden: boolean };
 
 const props = defineProps<{
@@ -65,9 +67,10 @@ function apply(): void {
         type="button"
         data-testid="bulk-assignment-apply"
         :disabled="disabled === true || chosen === ''"
-        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-sheet bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
+        class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-sheet bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
         @click="apply"
       >
+        <AppIcon :icon="IconCheck" />
         Apply
       </button>
 
@@ -75,9 +78,10 @@ function apply(): void {
         type="button"
         data-testid="bulk-assignment-clear"
         :disabled="disabled === true"
-        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-sheet border border-rule-strong bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
+        class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-sheet border border-rule-strong bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
         @click="emit('clear')"
       >
+        <AppIcon :icon="IconX" />
         Clear selection
       </button>
     </div>

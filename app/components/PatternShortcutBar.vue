@@ -6,6 +6,8 @@
 // and performs no request of its own.
 //
 // See openspec/changes/add-transaction-pattern-shortcut/specs/transaction-pattern-shortcut/spec.md
+import { IconPlus } from '@tabler/icons-vue';
+
 type BarCategory = { id: string; name: string; hidden: boolean };
 
 defineProps<{
@@ -51,6 +53,7 @@ function choose(event: Event): void {
 
       <div v-if="text !== null" class="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <p class="min-w-0 flex-1 truncate text-sm text-muted">
+          <AppIcon :icon="IconPlus" class="mr-2 align-middle" />
           Add "<span class="font-medium text-ink" data-testid="pattern-shortcut-text">{{ text }}</span>" to:
         </p>
 

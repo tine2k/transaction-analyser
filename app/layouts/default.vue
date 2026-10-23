@@ -6,6 +6,17 @@
 //
 // See openspec/changes/add-category-management/specs/category-management-screen/spec.md
 // and openspec/changes/add-category-management/specs/frontend-shell/spec.md
+import {
+  IconCalendarStats,
+  IconChartHistogram,
+  IconChartPie,
+  IconDownload,
+  IconList,
+  IconMenu2,
+  IconTags,
+  IconX,
+} from '@tabler/icons-vue';
+
 useHead({
   htmlAttrs: { lang: 'en' },
   title: 'Transaction Analyser',
@@ -16,12 +27,12 @@ const route = useRoute();
 const mobileNavOpen = ref(false);
 
 const screens = [
-  { to: '/', label: 'Transactions' },
-  { to: '/categories', label: 'Categories' },
-  { to: '/analytics', label: 'Analytics' },
-  { to: '/monthly-totals', label: 'Monthly totals' },
-  { to: '/monthly-average', label: 'Monthly average' },
-  { to: '/imports', label: 'Imports' },
+  { to: '/', label: 'Transactions', icon: IconList },
+  { to: '/categories', label: 'Categories', icon: IconTags },
+  { to: '/analytics', label: 'Analytics', icon: IconChartPie },
+  { to: '/monthly-totals', label: 'Monthly totals', icon: IconCalendarStats },
+  { to: '/monthly-average', label: 'Monthly average', icon: IconChartHistogram },
+  { to: '/imports', label: 'Imports', icon: IconDownload },
 ] as const;
 
 function isCurrent(to: string): boolean {
@@ -50,7 +61,7 @@ watch(() => route.path, () => {
             :aria-label="mobileNavOpen ? 'Close screen navigation' : 'Open screen navigation'"
             @click="mobileNavOpen = !mobileNavOpen"
           >
-            <span aria-hidden="true">{{ mobileNavOpen ? 'Close' : 'Menu' }}</span>
+            <AppIcon :icon="mobileNavOpen ? IconX : IconMenu2" />
           </button>
         </div>
         <nav
@@ -64,7 +75,7 @@ watch(() => route.path, () => {
             :key="screen.to"
             :to="screen.to"
             :aria-current="isCurrent(screen.to) ? 'page' : undefined"
-            class="inline-flex min-h-11 items-center border-b-2 py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:min-h-0"
+            class="inline-flex min-h-11 items-center gap-2 border-b-2 py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:min-h-0"
             :class="
               isCurrent(screen.to)
                 ? 'border-ink text-ink'
@@ -72,6 +83,7 @@ watch(() => route.path, () => {
             "
             @click="mobileNavOpen = false"
           >
+            <AppIcon :icon="screen.icon" />
             {{ screen.label }}
           </NuxtLink>
         </nav>

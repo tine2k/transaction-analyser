@@ -23,6 +23,8 @@
 // See openspec/changes/add-easybank-sync-button/specs/easybank-sync/spec.md
 // and openspec/changes/match-counterparty-and-recategorise/specs/category-recategorisation/spec.md
 // and openspec/changes/add-pushover-test-button/specs/import-notification/spec.md
+import { IconRefresh, IconSend, IconSparkles } from '@tabler/icons-vue';
+
 type ImportRun = {
   id: string;
   startedAt: string;
@@ -174,11 +176,12 @@ function outcomeLabel(run: ImportRun): string {
       <div class="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="inline-flex min-h-11 items-center rounded-sheet bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
+          class="inline-flex min-h-11 items-center gap-2 rounded-sheet bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
           data-testid="sync-button"
           :disabled="syncing"
           @click="startSync"
         >
+          <AppIcon :icon="IconRefresh" />
           {{ syncing ? 'Syncing…' : 'Sync now' }}
         </button>
         <p
@@ -193,11 +196,12 @@ function outcomeLabel(run: ImportRun): string {
       <div class="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="inline-flex min-h-11 items-center rounded-sheet border border-rule-strong bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
+          class="inline-flex min-h-11 items-center gap-2 rounded-sheet border border-rule-strong bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
           data-testid="recategorise-button"
           :disabled="recategorising"
           @click="recategorise"
         >
+          <AppIcon :icon="IconSparkles" />
           {{ recategorising ? 'Re-categorising…' : 'Re-categorise all' }}
         </button>
         <p
@@ -212,11 +216,12 @@ function outcomeLabel(run: ImportRun): string {
       <div class="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="inline-flex min-h-11 items-center rounded-sheet border border-rule-strong bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
+          class="inline-flex min-h-11 items-center gap-2 rounded-sheet border border-rule-strong bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
           data-testid="test-notification-button"
           :disabled="testing"
           @click="testNotification"
         >
+          <AppIcon :icon="IconSend" />
           {{ testing ? 'Sending…' : 'Send test notification' }}
         </button>
         <p

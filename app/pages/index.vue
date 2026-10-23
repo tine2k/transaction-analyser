@@ -4,6 +4,7 @@ import {
   formatEuroAmount,
   sumSignedAmountStrings,
 } from '../utils/category-spending';
+import { IconMapPin } from '@tabler/icons-vue';
 
 // The index route reads stored transactions from the read-only GET
 // /api/transactions endpoint. Category and booking-period filters are derived
@@ -970,9 +971,7 @@ onBeforeUnmount(() => {
                   data-testid="manual-assignment-marker"
                   class="mr-1 inline-flex text-muted align-middle"
                 >
-                  <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor" class="size-3.5">
-                    <path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 3.3-4.5 8.5-4.5 8.5S3.5 9.3 3.5 6A4.5 4.5 0 0 1 8 1.5Zm0 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" />
-                  </svg>
+                  <AppIcon :icon="IconMapPin" :size="14" />
                   <span class="sr-only">Manually assigned</span>
                 </span>
                 <select

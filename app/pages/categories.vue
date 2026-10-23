@@ -17,6 +17,8 @@
 // See openspec/changes/allow-multiple-category-expressions/specs/category-management-screen/spec.md
 // and openspec/changes/add-category-date-windows/specs/category-management-screen/spec.md
 // and openspec/changes/add-category-expense-type/specs/category-management-screen/spec.md
+import { IconCheck, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-vue';
+
 type CategoryWindow = { from: string; to: string };
 type CategoryExpenseType = 'recurring' | 'one-time';
 type Category = {
@@ -355,17 +357,19 @@ async function remove(category: Category): Promise<void> {
           <button
             type="button"
             :disabled="patterns.length === 1"
-            class="min-h-11 shrink-0 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
+            class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
             @click="removePattern(index)"
           >
+            <AppIcon :icon="IconX" />
             Remove
           </button>
         </div>
         <button
           type="button"
-          class="mt-2 min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          class="mt-2 inline-flex min-h-11 items-center gap-2 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           @click="addPattern"
         >
+          <AppIcon :icon="IconPlus" />
           Add expression
         </button>
       </fieldset>
@@ -402,18 +406,20 @@ async function remove(category: Category): Promise<void> {
           <button
             type="button"
             data-testid="remove-window"
-            class="min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             @click="removeWindow(index)"
           >
+            <AppIcon :icon="IconX" />
             Remove
           </button>
         </div>
         <button
           type="button"
           data-testid="add-window"
-          class="mt-2 min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          class="mt-2 inline-flex min-h-11 items-center gap-2 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           @click="addWindow"
         >
+          <AppIcon :icon="IconPlus" />
           Add window
         </button>
       </fieldset>
@@ -507,16 +513,18 @@ async function remove(category: Category): Promise<void> {
         <button
           type="submit"
           :disabled="saving"
-          class="min-h-11 rounded-sheet bg-ink px-3 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
+          class="inline-flex min-h-11 items-center gap-2 rounded-sheet bg-ink px-3 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
         >
+          <AppIcon :icon="editingId === null ? IconPlus : IconCheck" />
           {{ editingId === null ? 'Add category' : 'Save changes' }}
         </button>
         <button
           v-if="editingId !== null"
           type="button"
-          class="min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          class="inline-flex min-h-11 items-center gap-2 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           @click="cancelEdit"
         >
+          <AppIcon :icon="IconX" />
           Cancel
         </button>
       </div>
@@ -577,16 +585,18 @@ async function remove(category: Category): Promise<void> {
               <div class="flex gap-2">
                 <button
                   type="button"
-                  class="min-h-11 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  class="inline-flex min-h-11 items-center justify-center gap-2 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                   @click="startEdit(category)"
                 >
+                  <AppIcon :icon="IconPencil" />
                   Edit
                 </button>
                 <button
                   type="button"
-                  class="min-h-11 rounded-sheet border border-failure/60 bg-surface px-3 text-xs font-medium text-failure hover:border-failure focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-failure"
+                  class="inline-flex min-h-11 items-center justify-center gap-2 rounded-sheet border border-failure/60 bg-surface px-3 text-xs font-medium text-failure hover:border-failure focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-failure"
                   @click="remove(category)"
                 >
+                  <AppIcon :icon="IconTrash" />
                   Delete
                 </button>
               </div>

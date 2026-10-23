@@ -168,6 +168,22 @@ describe('imports page', () => {
     expect(wrapper.find('[data-testid="import-run"]').exists()).toBe(false);
   });
 
+  it('keeps each action label and carries one decorative icon per button', async () => {
+    mocks.useFetch.mockReturnValue(response(runs));
+
+    const wrapper = await mountSuspended(Imports);
+
+    for (const [testId, label] of [
+      ['sync-button', 'Sync now'],
+      ['recategorise-button', 'Re-categorise all'],
+      ['test-notification-button', 'Send test notification'],
+    ] as const) {
+      const button = wrapper.get(`[data-testid="${testId}"]`);
+      expect(button.text()).toBe(label);
+      expect(button.findAll('svg[aria-hidden="true"]')).toHaveLength(1);
+    }
+  });
+
   it('posts to the sync endpoint, waits for the answer, and refreshes the log', async () => {
     const log = response(runs);
     mocks.useFetch.mockReturnValue(log);

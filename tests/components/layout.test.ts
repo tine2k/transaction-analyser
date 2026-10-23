@@ -21,6 +21,8 @@ describe('default layout navigation', () => {
       ['Monthly average', '/monthly-average'],
       ['Imports', '/imports'],
     ]);
+    expect(links.every((link) => link.findAll('svg[aria-hidden="true"]').length === 1)).toBe(true);
+    expect(links.every((link) => link.get('svg').attributes('stroke-width') === '1.5')).toBe(true);
     expect(links[0]?.attributes('aria-current')).toBe('page');
     await transactions.unmount();
 
@@ -53,10 +55,13 @@ describe('default layout navigation', () => {
 
     expect(toggle.attributes('aria-controls')).toBe('screen-navigation');
     expect(toggle.attributes('aria-expanded')).toBe('false');
+    expect(toggle.attributes('aria-label')).toBe('Open screen navigation');
+    expect(toggle.findAll('svg[aria-hidden="true"]')).toHaveLength(1);
     expect(wrapper.findAll('#screen-navigation a')).toHaveLength(6);
 
     await toggle.trigger('click');
     expect(toggle.attributes('aria-expanded')).toBe('true');
+    expect(toggle.attributes('aria-label')).toBe('Close screen navigation');
 
     await wrapper.get('#screen-navigation a[href="/categories"]').trigger('click');
     expect(toggle.attributes('aria-expanded')).toBe('false');

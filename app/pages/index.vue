@@ -51,13 +51,14 @@ import {
 //
 // The table is presented as a growing prefix of the view. The first rows are
 // rendered before the rest are constructed, so a large list becomes readable
-// while it is still being built. Each later batch is appended after the rows
+// while it is still being built. Later batches are built only as the reader
+// scrolls near the end of the presented rows; each is appended after the rows
 // already on screen and never reorders or replaces them. A change of view — the
 // category filter, the period filter, the applied search, or the sort —
-// abandons the pending batches and starts again from the first one, while the
-// refresh that follows an assignment only extends the presentation to rows the
-// response introduced, because resetting there would blank a table that is
-// already complete.
+// abandons the presented rows and starts again from the first batch, while the
+// refresh that follows an assignment keeps the presented rows and re-arms the
+// observation, because resetting there would blank a table that is already
+// complete.
 //
 // The sum, the count, the select-all state, and the row selection all describe
 // the whole view, never the prefix that has been presented so far.
@@ -502,83 +503,124 @@ const sortedVisibleTransactions = computed(() => {
 });
 
 // The table presents a growing prefix of the sorted view rather than building
-// all of it in one block. The first batch is small so the table becomes readable
-// within a frame or two; later batches are larger, which keeps the number of
-// yield points — and the layout passes they cost — down. These counts are a
-// starting point taken from the measurement in design.md, not a derived value.
+// all of it. The first batch is small so the table becomes readable within a
+// frame or two. Further batches are built only when the reader scrolls near the
+// end of the rows already presented: the observation element after the table
+// reports that approach, and each later batch is appended after the rows already
+// on screen without reordering or replacing them. The preload margin is one
+// viewport height, so a batch is ready before the reader reaches the end. The
+// batch sizes are starting points taken from the measurement in the archived
+// responsiveness design, not derived values.
 const FIRST_BATCH_ROWS = 50;
 const NEXT_BATCH_ROWS = 250;
 
 const presentedCount = ref(FIRST_BATCH_ROWS);
 const presentationGeneration = ref(0);
-let batchHandle:
-  | { kind: 'frame'; id: number }
-  | { kind: 'timer'; id: ReturnType<typeof setTimeout> }
-  | null = null;
+const batchSentinel = ref<HTMLElement | null>(null);
+let batchObserver: IntersectionObserver | null = null;
 
 const presentedTransactions = computed(() =>
   sortedVisibleTransactions.value.slice(0, presentedCount.value));
 
-function cancelBatch(): void {
-  if (batchHandle === null) {
-    return;
-  }
-  if (batchHandle.kind === 'frame') {
-    cancelAnimationFrame(batchHandle.id);
-  } else {
-    clearTimeout(batchHandle.id);
-  }
-  batchHandle = null;
+function canObserveProximity(): boolean {
+  return typeof IntersectionObserver === 'function';
 }
 
-// A frame is the point at which the previous batch has been painted, so it is
-// preferred. A hidden document receives no frames, and an environment without
-// them still has to finish, so both fall back to a timer.
-function canWaitForFrame(): boolean {
-  return typeof requestAnimationFrame === 'function'
-    && (typeof document === 'undefined' || document.visibilityState !== 'hidden');
+function hasMoreRows(): boolean {
+  return presentedCount.value < sortedVisibleTransactions.value.length;
 }
 
-function scheduleBatch(generation: number): void {
-  if (batchHandle !== null || presentedCount.value >= sortedVisibleTransactions.value.length) {
-    return;
-  }
-  if (canWaitForFrame()) {
-    batchHandle = { kind: 'frame', id: requestAnimationFrame(() => runBatch(generation)) };
-  } else {
-    batchHandle = { kind: 'timer', id: setTimeout(() => runBatch(generation), 16) };
-  }
-}
-
-function runBatch(generation: number): void {
-  batchHandle = null;
-  if (generation !== presentationGeneration.value) {
-    return;
-  }
+function appendBatch(): void {
   presentedCount.value = Math.min(
     sortedVisibleTransactions.value.length,
     presentedCount.value + NEXT_BATCH_ROWS,
   );
-  scheduleBatch(generation);
 }
 
-// A view change abandons every pending batch and starts the new view from its
-// first batch, so a row from the previous view can never be appended to it.
+// An environment without the observer cannot report the reader's approach, so
+// every matching row is presented at once. That is the previous behaviour, kept
+// as a correctness fallback rather than leaving the tail unreachable.
+function presentAllRows(): void {
+  presentedCount.value = sortedVisibleTransactions.value.length;
+}
+
+// rootMargin accepts pixels or percentages, not viewport units, so the
+// one-viewport preload distance is resolved to pixels when the observer is
+// created.
+function batchRootMargin(): string {
+  return `0px 0px ${window.innerHeight}px 0px`;
+}
+
+function ensureBatchObserver(): void {
+  if (batchObserver !== null || !canObserveProximity()) {
+    return;
+  }
+  batchObserver = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      extendPresentation();
+    }
+  }, { rootMargin: batchRootMargin() });
+}
+
+// Starting to observe a target reports its current state. Re-observing the
+// sentinel after a batch therefore re-checks the new position: if the appended
+// rows did not push it out of the preload margin yet, the next batch follows;
+// otherwise the observer waits for the reader to scroll again.
+function watchBatchPosition(): void {
+  const generation = presentationGeneration.value;
+  void nextTick(() => {
+    if (generation !== presentationGeneration.value) {
+      return;
+    }
+    const sentinel = batchSentinel.value;
+    if (sentinel === null) {
+      return;
+    }
+    ensureBatchObserver();
+    if (batchObserver === null) {
+      return;
+    }
+    batchObserver.unobserve(sentinel);
+    batchObserver.observe(sentinel);
+  });
+}
+
+function extendPresentation(): void {
+  if (!hasMoreRows()) {
+    return;
+  }
+  appendBatch();
+  watchBatchPosition();
+}
+
+// A view change abandons the previous view's remaining rows and starts the new
+// view from its first batch, so a row from the previous view can never be
+// appended to it. The generation guard also discards a position check queued by
+// the superseded view.
 function restartPresentation(): void {
   presentationGeneration.value += 1;
-  cancelBatch();
+  batchObserver?.disconnect();
   presentedCount.value = FIRST_BATCH_ROWS;
-  scheduleBatch(presentationGeneration.value);
+  if (!canObserveProximity()) {
+    presentAllRows();
+    return;
+  }
+  watchBatchPosition();
 }
 
 // New or refreshed data is not a view change: the rows already on screen stay,
-// and a longer view is extended by the next batch.
+// and the observation is re-armed so a reader already near the end sees the
+// rows the response introduced. A reader at the start is not extended.
 function continuePresentation(): void {
   const total = sortedVisibleTransactions.value.length;
   if (presentedCount.value > total) {
     presentedCount.value = total;
   }
-  scheduleBatch(presentationGeneration.value);
+  if (!canObserveProximity()) {
+    presentAllRows();
+    return;
+  }
+  watchBatchPosition();
 }
 
 watch(
@@ -1050,7 +1092,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('selectionchange', handleSelectionChange);
   document.removeEventListener('keydown', handleKeydown);
   presentationGeneration.value += 1;
-  cancelBatch();
+  batchObserver?.disconnect();
+  batchObserver = null;
   previewGeneration += 1;
   refreshGeneration += 1;
   if (previewTimer !== null) {
@@ -1304,6 +1347,12 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
         </div>
+        <div
+          ref="batchSentinel"
+          aria-hidden="true"
+          data-testid="transactions-batch-sentinel"
+          class="h-px w-full"
+        ></div>
       </div>
     </template>
 

@@ -102,17 +102,87 @@ function categoriesResponse() {
 
 const mountedWrappers: Array<{ unmount: () => void }> = [];
 
+// happy-dom's IntersectionObserver is a no-op, so the tests drive the batch
+// trigger through a controllable implementation. Mounting the page registers
+// one observer; emitting an intersection stands for the reader approaching the
+// end of the presented rows.
+class ControlledIntersectionObserver {
+  static instances: ControlledIntersectionObserver[] = [];
+
+  readonly root = null;
+  readonly rootMargin: string;
+  readonly thresholds: number[] = [];
+  readonly elements = new Set<Element>();
+  #callback: IntersectionObserverCallback;
+
+  constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+    this.#callback = callback;
+    this.rootMargin = options?.rootMargin ?? '';
+    ControlledIntersectionObserver.instances.push(this);
+  }
+
+  observe(element: Element): void {
+    this.elements.add(element);
+  }
+
+  unobserve(element: Element): void {
+    this.elements.delete(element);
+  }
+
+  disconnect(): void {
+    this.elements.clear();
+  }
+
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+
+  emit(isIntersecting: boolean): void {
+    this.#callback(
+      [{ isIntersecting } as IntersectionObserverEntry],
+      this as unknown as IntersectionObserver,
+    );
+  }
+}
+
 // The table derives its default period from the browser's current year, so the
 // tests freeze the clock instead of relying on a year that will expire.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
+  ControlledIntersectionObserver.instances.length = 0;
+  vi.stubGlobal('IntersectionObserver', ControlledIntersectionObserver);
 });
 
 async function mountTransactions(options?: { route?: string; attachTo?: Element }) {
   const wrapper = await mountSuspended(Transactions, options);
   mountedWrappers.push(wrapper);
   return wrapper;
+}
+
+// Emit one observation of the sentinel, which is what the browser does when the
+// reader approaches the presented rows. The flush lets the page register its
+// observer and render the batch before the next call.
+async function approachBatchEnd(intersecting = true): Promise<void> {
+  await flushPromises();
+  const observer = ControlledIntersectionObserver.instances.at(-1);
+  if (observer === undefined) {
+    throw new Error('the page did not observe the batch sentinel');
+  }
+  observer.emit(intersecting);
+  await flushPromises();
+}
+
+// Keep approaching the end until the presented rows reach the expected count,
+// mirroring a reader who keeps scrolling.
+async function revealRows(
+  wrapper: Awaited<ReturnType<typeof mountTransactions>>,
+  expected: number,
+): Promise<void> {
+  for (let attempt = 0; attempt < 100 && wrapper.findAll('tbody tr').length < expected; attempt += 1) {
+    await approachBatchEnd();
+  }
+  expect(wrapper.findAll('tbody tr')).toHaveLength(expected);
 }
 
 let getSelection: ReturnType<typeof vi.spyOn>;
@@ -1619,7 +1689,7 @@ describe('transaction search', () => {
 
 
 // A view large enough to need more than one batch. Categories alternate so a
-// category filter can narrow the view while the rows are still arriving.
+// category filter can narrow the view while the reader is partway through it.
 function repeatedTransactions(count: number): TestTransaction[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `r${index + 1}`,
@@ -1634,20 +1704,6 @@ function repeatedTransactions(count: number): TestTransaction[] {
       ? { id: '1', name: 'Groceries', hidden: false }
       : { id: '2', name: 'Travel', hidden: false },
   }));
-}
-
-async function waitForRowCount(
-  wrapper: Awaited<ReturnType<typeof mountTransactions>>,
-  expected: number,
-): Promise<void> {
-  for (let attempt = 0; attempt < 250; attempt += 1) {
-    if (wrapper.findAll('tbody tr').length === expected) {
-      return;
-    }
-    await wait(20);
-    await flushPromises();
-  }
-  throw new Error(`the table did not reach ${expected} rows`);
 }
 
 describe('progressive presentation', () => {
@@ -1665,18 +1721,25 @@ describe('progressive presentation', () => {
     vi.restoreAllMocks();
   });
 
-  it('presents a large view before every row is constructed and then completes it', async () => {
+  it('presents the first batch and appends the next only when the reader approaches the end', async () => {
     const data = repeatedTransactions(1000);
     mocks.useFetch.mockImplementation((url: unknown) =>
       url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
 
     const wrapper = await mountTransactions();
+    await flushPromises();
 
-    const presented = wrapper.findAll('tbody tr').length;
-    expect(presented).toBeGreaterThan(0);
-    expect(presented).toBeLessThan(1000);
+    expect(wrapper.findAll('tbody tr')).toHaveLength(50);
 
-    await waitForRowCount(wrapper, 1000);
+    await approachBatchEnd();
+    expect(wrapper.findAll('tbody tr')).toHaveLength(300);
+
+    await approachBatchEnd(false);
+    expect(wrapper.findAll('tbody tr')).toHaveLength(300);
+
+    await revealRows(wrapper, 1000);
+
+    await approachBatchEnd();
     expect(wrapper.findAll('tbody tr')).toHaveLength(1000);
   });
 
@@ -1686,32 +1749,60 @@ describe('progressive presentation', () => {
       url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
 
     const wrapper = await mountTransactions();
+    await flushPromises();
 
-    expect(wrapper.findAll('tbody tr').length).toBeLessThan(1000);
+    expect(wrapper.findAll('tbody tr')).toHaveLength(50);
     expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1000 transactions');
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-1000.00'));
 
-    await waitForRowCount(wrapper, 1000);
+    await revealRows(wrapper, 1000);
 
     expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1000 transactions');
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-1000.00'));
   });
 
-  it('settles on the new view when a filter changes while rows are still arriving', async () => {
+  it('restarts the new view at its first batch when a filter changes partway through', async () => {
     const data = repeatedTransactions(1000);
     mocks.useFetch.mockImplementation((url: unknown) =>
       url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
 
     const wrapper = await mountTransactions();
-    expect(wrapper.findAll('tbody tr').length).toBeLessThan(1000);
+    await flushPromises();
+    await approachBatchEnd();
+    expect(wrapper.findAll('tbody tr')).toHaveLength(300);
 
     await wrapper.get('[data-testid="category-filter"]').setValue('1');
     await flushPromises();
 
-    await waitForRowCount(wrapper, 500);
+    expect(wrapper.findAll('tbody tr')).toHaveLength(50);
+
+    await revealRows(wrapper, 500);
 
     const ids = wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id'));
     expect(ids).toEqual(Array.from({ length: 500 }, (_, index) => `r${index * 2 + 1}`));
+  });
+
+  it('does not present rows a refresh introduced while the reader is away from the end', async () => {
+    const data = repeatedTransactions(1000);
+    const refreshed = repeatedTransactions(1500);
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+    mocks.fetch.mockImplementation((url: string) => Promise.resolve(
+      url === '/api/transactions' ? refreshed : { updated: 1 },
+    ));
+
+    const wrapper = await mountTransactions();
+    await flushPromises();
+    expect(wrapper.findAll('tbody tr')).toHaveLength(50);
+
+    await wrapper.get('[data-transaction-id="r1"] [data-testid="row-category-select"]').setValue('2');
+    await flushPromises();
+    await wait(350);
+    await flushPromises();
+
+    expect(wrapper.findAll('tbody tr')).toHaveLength(50);
+
+    await revealRows(wrapper, 1500);
   });
 
   it('keeps the rows an assignment did not change in place', async () => {

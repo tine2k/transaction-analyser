@@ -1617,3 +1617,154 @@ describe('transaction search', () => {
   });
 });
 
+
+// A view large enough to need more than one batch. Categories alternate so a
+// category filter can narrow the view while the rows are still arriving.
+function repeatedTransactions(count: number): TestTransaction[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `r${index + 1}`,
+    bookingDate: '2026-02-10',
+    valueDate: '2026-02-10',
+    amount: '-1.00',
+    purpose: `Repeated ${index + 1}`,
+    counterpartyName: 'Shop',
+    counterpartyAccount: null,
+    categoryAssignment: 'automatic' as const,
+    category: index % 2 === 0
+      ? { id: '1', name: 'Groceries', hidden: false }
+      : { id: '2', name: 'Travel', hidden: false },
+  }));
+}
+
+async function waitForRowCount(
+  wrapper: Awaited<ReturnType<typeof mountTransactions>>,
+  expected: number,
+): Promise<void> {
+  for (let attempt = 0; attempt < 250; attempt += 1) {
+    if (wrapper.findAll('tbody tr').length === expected) {
+      return;
+    }
+    await wait(20);
+    await flushPromises();
+  }
+  throw new Error(`the table did not reach ${expected} rows`);
+}
+
+describe('progressive presentation', () => {
+  beforeEach(() => {
+    mocks.useFetch.mockReset();
+    mocks.fetch.mockReset();
+  });
+
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) {
+      wrapper.unmount();
+    }
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('presents a large view before every row is constructed and then completes it', async () => {
+    const data = repeatedTransactions(1000);
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+
+    const wrapper = await mountTransactions();
+
+    const presented = wrapper.findAll('tbody tr').length;
+    expect(presented).toBeGreaterThan(0);
+    expect(presented).toBeLessThan(1000);
+
+    await waitForRowCount(wrapper, 1000);
+    expect(wrapper.findAll('tbody tr')).toHaveLength(1000);
+  });
+
+  it('summarises the whole view before the remaining rows arrive', async () => {
+    const data = repeatedTransactions(1000);
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+
+    const wrapper = await mountTransactions();
+
+    expect(wrapper.findAll('tbody tr').length).toBeLessThan(1000);
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1000 transactions');
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-1000.00'));
+
+    await waitForRowCount(wrapper, 1000);
+
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1000 transactions');
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-1000.00'));
+  });
+
+  it('settles on the new view when a filter changes while rows are still arriving', async () => {
+    const data = repeatedTransactions(1000);
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+
+    const wrapper = await mountTransactions();
+    expect(wrapper.findAll('tbody tr').length).toBeLessThan(1000);
+
+    await wrapper.get('[data-testid="category-filter"]').setValue('1');
+    await flushPromises();
+
+    await waitForRowCount(wrapper, 500);
+
+    const ids = wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id'));
+    expect(ids).toEqual(Array.from({ length: 500 }, (_, index) => `r${index * 2 + 1}`));
+  });
+
+  it('keeps the rows an assignment did not change in place', async () => {
+    const refreshed = transactions.map((transaction) => transaction.id === '1'
+      ? {
+        ...transaction,
+        categoryAssignment: 'manual' as const,
+        category: { id: '2', name: 'Travel', hidden: false },
+      }
+      : { ...transaction, category: transaction.category === null ? null : { ...transaction.category } });
+
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(transactions) : categoriesResponse());
+    mocks.fetch.mockImplementation((url: string) => Promise.resolve(
+      url === '/api/transactions' ? refreshed : { updated: 1 },
+    ));
+
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+
+    const untouched = wrapper.get('[data-transaction-id="3"]').element;
+
+    await wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]').setValue('2');
+    await flushPromises();
+    await wait(350);
+    await flushPromises();
+
+    expect(wrapper.get('[data-transaction-id="3"]').element).toBe(untouched);
+    expect(wrapper.find('[data-transaction-id="3"] [data-testid="manual-assignment-marker"]').exists()).toBe(false);
+    expect((wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]').element as HTMLSelectElement).value)
+      .toBe('2');
+    expect(wrapper.get('[data-transaction-id="1"] [data-testid="manual-assignment-marker"]').exists()).toBe(true);
+  });
+
+  it('offers a newly stored category in every row', async () => {
+    const stored = ref([...storedCategories]);
+    mocks.useFetch.mockImplementation((url: unknown) => {
+      if (url === '/api/transactions') {
+        return transactionsResponse(transactions);
+      }
+      return { data: stored, error: ref(null), pending: ref(false) };
+    });
+
+    const wrapper = await mountTransactions();
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+
+    stored.value = [...stored.value, { id: '4', name: 'Fuel', patterns: [], hidden: false, windows: [] }];
+    await flushPromises();
+
+    const options = wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]')
+      .findAll('option').map((option) => option.text());
+    expect(options).toContain('Fuel');
+  });
+});

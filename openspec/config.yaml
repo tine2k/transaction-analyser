@@ -30,3 +30,7 @@ schema: spec-driven
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - "Mirror this change's tasks.md into the OpenCode todo list: before starting, seed the todo list with every unchecked task, using the task's numeric id and text as the item content. Update item status as you work and mark an item completed only when you flip its checkbox to [x]. tasks.md remains the source of truth; the todo list is a live copy of it."

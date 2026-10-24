@@ -1,12 +1,12 @@
 // The transaction import path, shared by the manual CSV importer, the manual
 // Easybank sync command, and the nightly sync task. It reads a CSV source, checks
-// the header, validates every row, classifies each row against what the table
-// already holds, and writes only the surplus inside one transaction, so a repeated
-// import of the same rows changes nothing and a statement that legitimately holds
-// a transaction twice still produces two rows. Each newly written row is evaluated
-// against the stored categories in the same transaction, so it lands with the
-// category the matching rule selects rather than waiting for the next category
-// change.
+// the header, validates every row, resolves the one person the run writes into,
+// classifies each row against what the table already holds for that person, and
+// writes only the surplus inside one transaction, so a repeated import of the same
+// rows changes nothing and a statement that legitimately holds a transaction twice
+// still produces two rows. Each newly written row is evaluated against the stored
+// categories in the same transaction, so it lands with the category the matching
+// rule selects rather than waiting for the next category change.
 //
 // It is deliberately framework-free: it takes a `pg` client or pool and a source,
 // and imports nothing from Nuxt or the application. The command-line importer and
@@ -58,6 +58,10 @@ export type ImportRow = {
   counterpartyName: string;
   counterpartyAccount: string | null;
 };
+
+// The owner an import writes into. The identity is the stored reference; the name
+// is the current display name, reported back to the caller.
+export type Person = { id: string; name: string };
 
 export type RowError = { line: number; reason: string };
 
@@ -336,11 +340,13 @@ export function validateRecords(records: CsvRecord[]): {
   return { rows, errors, dataRowCount };
 }
 
-// A row's identity for deduplication: the six stored values the file states. Two
-// rows with the same identity describe the same transaction, so the file's count
-// over the table's count is the number to write.
-export function fingerprint(row: ImportRow): string {
+// A row's identity for deduplication: the six stored values the file states and
+// the person the run writes into. Two rows with the same identity describe the
+// same transaction for that person, so the file's count over the person's stored
+// count is the number to write. The same row for another person is not a duplicate.
+export function fingerprint(row: ImportRow, personId: string): string {
   return JSON.stringify([
+    personId,
     row.bookingDate,
     row.valueDate,
     row.amount,
@@ -376,17 +382,18 @@ export function planWrites(
 const STORED_COUNT_SQL = `
   SELECT count(*)::int AS count
   FROM transactions
-  WHERE booking_date = $1
-    AND value_date = $2
-    AND amount = $3::numeric
-    AND purpose = $4
-    AND counterparty_name = $5
-    AND counterparty_account IS NOT DISTINCT FROM $6
+  WHERE person_id = $1
+    AND booking_date = $2
+    AND value_date = $3
+    AND amount = $4::numeric
+    AND purpose = $5
+    AND counterparty_name = $6
+    AND counterparty_account IS NOT DISTINCT FROM $7
 `;
 
 const INSERT_SQL =
-  'INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account) ' +
-  'VALUES ($1, $2, $3, $4, $5, $6) RETURNING id';
+  'INSERT INTO transactions (person_id, booking_date, value_date, amount, purpose, counterparty_name, counterparty_account) ' +
+  'VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id';
 
 // The write transaction takes a share lock on the categories table before it
 // inserts, so a category create, edit, or delete cannot interleave with the
@@ -406,8 +413,9 @@ const ASSIGN_IMPORTED_ROWS = `
   RETURNING t.category_id
 `;
 
-async function countStored(database: Database, row: ImportRow): Promise<number> {
+async function countStored(database: Database, row: ImportRow, personId: string): Promise<number> {
   const result = await database.query(STORED_COUNT_SQL, [
+    personId,
     row.bookingDate,
     row.valueDate,
     row.amount,
@@ -458,11 +466,12 @@ async function withTransaction<T>(
 async function classifyRows(
   database: Database,
   rows: ImportRow[],
+  personId: string,
 ): Promise<{ newRows: ImportRow[]; alreadyStored: number }> {
   const fileCounts = new Map<string, number>();
   const representative = new Map<string, ImportRow>();
   for (const row of rows) {
-    const key = fingerprint(row);
+    const key = fingerprint(row, personId);
     fileCounts.set(key, (fileCounts.get(key) ?? 0) + 1);
     if (!representative.has(key)) {
       representative.set(key, row);
@@ -471,7 +480,7 @@ async function classifyRows(
 
   const storedCounts = new Map<string, number>();
   for (const [key, row] of representative) {
-    storedCounts.set(key, await countStored(database, row));
+    storedCounts.set(key, await countStored(database, row, personId));
   }
 
   const allocation = planWrites(fileCounts, storedCounts);
@@ -488,17 +497,43 @@ async function classifyRows(
   return { newRows, alreadyStored: allocation.alreadyStored };
 }
 
+// Resolves the person an import writes into. The name is trimmed and looked up
+// ignoring letter case, and the person has to exist: an import never creates one,
+// because a typo would otherwise become a person. The failure is raised before any
+// row is written.
+export async function resolvePerson(database: Database, name: string): Promise<Person> {
+  const trimmed = name.trim();
+  if (trimmed === '') {
+    throw new ImportFailure(
+      'a person is required: name the person the statement belongs to. Nothing was written.',
+    );
+  }
+
+  const result = await database.query('SELECT id, name FROM people WHERE lower(name) = lower($1)', [
+    trimmed,
+  ]);
+  const found = result.rows[0] as { id: string; name: string } | undefined;
+  if (found === undefined) {
+    throw new ImportFailure(
+      `no person named "${trimmed}" exists. Create the person first; an import never creates one. ` +
+        'Nothing was written.',
+    );
+  }
+  return { id: String(found.id), name: found.name };
+}
+
 // Classifies already-validated rows against the table and, unless non-writing,
 // writes the surplus and assigns the categories those new rows receive inside one
 // transaction, so a failure leaves no row of the run behind and no category
 // assigned by it. The CSV import and the Easybank sync both go through here, which
 // is what keeps their dedupe, their assignment, and their run records identical.
+// The person is part of the row's identity and is written on every new row.
 export async function importRows(
   database: Database,
   rows: ImportRow[],
-  options: { dryRun: boolean },
+  options: { dryRun: boolean; person: Person },
 ): Promise<ImportPlan> {
-  const { newRows, alreadyStored } = await classifyRows(database, rows);
+  const { newRows, alreadyStored } = await classifyRows(database, rows, options.person.id);
   const rowsWritten = options.dryRun ? 0 : newRows.length;
   let rowsCategorised = 0;
 
@@ -508,6 +543,7 @@ export async function importRows(
       const writtenIds: string[] = [];
       for (const row of newRows) {
         const inserted = await client.query(INSERT_SQL, [
+          options.person.id,
           row.bookingDate,
           row.valueDate,
           row.amount,
@@ -536,11 +572,11 @@ export async function importRows(
 // Reads, validates, classifies, and (unless non-writing) writes one CSV source.
 // The whole file is validated before the write transaction opens, and the surplus
 // rows are written inside that one transaction, so a failure leaves no row of the
-// run behind.
+// run behind. The person has already been resolved by the caller.
 export async function importCsv(
   database: Database,
   source: CsvSource,
-  options: { dryRun: boolean },
+  options: { dryRun: boolean; person: Person },
 ): Promise<ImportPlan> {
   const { text, label } = await readSource(source);
   const records = await parseCsvText(text);
@@ -560,18 +596,30 @@ export async function importCsv(
 }
 
 // Inserts a run record when an import starts and returns its identity. The record
-// reads as in progress until it is finished.
+// reads as in progress until it is finished. The person is recorded when it has
+// been resolved; a run that never resolved one carries null.
 export async function startImportRun(
   database: Database,
-  options: { source: ImportSourceKind; nonWriting: boolean },
+  options: { source: ImportSourceKind; nonWriting: boolean; personId?: string | null },
 ): Promise<string> {
   const result = await database.query(
-    `INSERT INTO import_runs (started_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written, rows_categorised)
-     VALUES (now(), $1, $2, 'in_progress', 0, 0, 0, 0)
+    `INSERT INTO import_runs (started_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written, rows_categorised, person_id)
+     VALUES (now(), $1, $2, 'in_progress', 0, 0, 0, 0, $3)
      RETURNING id`,
-    [options.source, options.nonWriting],
+    [options.source, options.nonWriting, options.personId ?? null],
   );
   return String((result.rows[0] as { id: string }).id);
+}
+
+// Records the person on a run that has started but whose person was resolved
+// after the record was inserted. A run that cannot resolve a person keeps a null
+// person rather than being retroactively assigned one.
+export async function setImportRunPerson(
+  database: Database,
+  id: string,
+  personId: string,
+): Promise<void> {
+  await database.query('UPDATE import_runs SET person_id = $2 WHERE id = $1', [id, personId]);
 }
 
 // Updates a run record with its finish time, outcome, counts, and failure reason.

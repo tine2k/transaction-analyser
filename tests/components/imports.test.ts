@@ -15,6 +15,7 @@ type Run = {
   startedAt: string;
   finishedAt: string | null;
   source: string;
+  person: { id: string; name: string } | null;
   nonWriting: boolean;
   outcome: string;
   rowsRead: number;
@@ -49,6 +50,7 @@ const runs: Run[] = [
     startedAt: '2026-10-06T03:00:00Z',
     finishedAt: '2026-10-06T03:00:05Z',
     source: 'scheduled',
+    person: { id: '1', name: 'Default' },
     nonWriting: false,
     outcome: 'success',
     rowsRead: 12,
@@ -62,6 +64,7 @@ const runs: Run[] = [
     startedAt: '2026-10-05T18:00:00Z',
     finishedAt: '2026-10-05T18:00:02Z',
     source: 'manual',
+    person: null,
     nonWriting: true,
     outcome: 'success',
     rowsRead: 5,
@@ -75,6 +78,7 @@ const runs: Run[] = [
     startedAt: '2026-10-05T17:00:00Z',
     finishedAt: '2026-10-05T17:00:01Z',
     source: 'scheduled',
+    person: { id: '2', name: 'Anna' },
     nonWriting: false,
     outcome: 'failed',
     rowsRead: 0,
@@ -90,6 +94,7 @@ const uiRun: Run = {
   startedAt: '2026-10-06T09:00:00Z',
   finishedAt: '2026-10-06T09:00:03Z',
   source: 'ui',
+  person: { id: '1', name: 'Default' },
   nonWriting: true,
   outcome: 'success',
   rowsRead: 7,
@@ -124,6 +129,8 @@ describe('imports page', () => {
       .toEqual(['3', '0', '0']);
     expect(rows.map((row) => row.find('[data-testid="import-run-categorised"]').text()))
       .toEqual(['2', '0', '0']);
+    expect(rows.map((row) => row.find('[data-testid="import-run-person"]').text()))
+      .toEqual(['Default', 'Not recorded', 'Anna']);
     expect(rows[0]?.text()).toContain('2026-10-06 03:00:00 UTC');
     expect(rows[0]?.text()).toContain('Scheduled sync');
     expect(rows[1]?.text()).toContain('Manual import');

@@ -56,7 +56,7 @@ async function resetFixtures(): Promise<void> {
   if (database === undefined) {
     throw new Error('test database is not initialized');
   }
-  await database.query('TRUNCATE TABLE transactions, categories, import_runs RESTART IDENTITY CASCADE');
+  await database.query('TRUNCATE TABLE transactions, categories, import_runs, people RESTART IDENTITY CASCADE');
   await database.query(fixtures);
 }
 
@@ -126,6 +126,7 @@ describe('API integration', () => {
         purpose: 'Internal transfer',
         counterpartyName: 'Own account',
         counterpartyAccount: null,
+        person: { id: '1', name: 'Default' },
         categoryAssignment: 'automatic',
         category: { id: '3', name: 'Internal', hidden: true, expenseType: null },
       },
@@ -137,6 +138,7 @@ describe('API integration', () => {
         purpose: 'Rail ticket',
         counterpartyName: 'Transit',
         counterpartyAccount: 'DE00000000000000000000',
+        person: { id: '1', name: 'Default' },
         categoryAssignment: 'automatic',
         category: { id: '2', name: 'Transport', hidden: false, expenseType: null },
       },
@@ -148,6 +150,7 @@ describe('API integration', () => {
         purpose: 'REWE Market',
         counterpartyName: 'REWE',
         counterpartyAccount: null,
+        person: { id: '1', name: 'Default' },
         categoryAssignment: 'automatic',
         category: { id: '1', name: 'Groceries', hidden: false, expenseType: null },
       },
@@ -159,6 +162,7 @@ describe('API integration', () => {
         purpose: 'Bookshop',
         counterpartyName: 'Books',
         counterpartyAccount: null,
+        person: { id: '1', name: 'Default' },
         categoryAssignment: 'automatic',
         category: null,
       },
@@ -684,6 +688,7 @@ describe('API integration', () => {
         rowsWritten: 0,
         rowsCategorised: 4,
         error: null,
+        person: null,
       },
     ]);
   });
@@ -702,6 +707,138 @@ describe('API integration', () => {
 
     const after = await database.query('SELECT * FROM import_runs ORDER BY id');
     expect(after.rows).toEqual(before.rows);
+  });
+
+  it('lists every person with its transaction count, including a zero count', async () => {
+    const response = await request('/api/people');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      { id: '2', name: 'Anna', transactionCount: 0 },
+      { id: '1', name: 'Default', transactionCount: 4 },
+    ]);
+  });
+
+  it('creates a person with a zero count and changes no transaction', async () => {
+    const before = await storedRows();
+
+    const response = await request('/api/people', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: '  Zoe  ' }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ id: '3', name: 'Zoe', transactionCount: 0 });
+    expect(await storedRows()).toEqual(before);
+  });
+
+  it('refuses an empty name and a duplicate ignoring case', async () => {
+    const empty = await request('/api/people', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: '   ' }),
+    });
+    expect(empty.status).toBe(400);
+
+    const duplicate = await request('/api/people', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'anna' }),
+    });
+    expect(duplicate.status).toBe(409);
+
+    const listed = await request('/api/people').then((result) => result.json());
+    expect(listed).toHaveLength(2);
+  });
+
+  it('renames in place and every referencing transaction reads the new name', async () => {
+    const renamed = await request('/api/people/1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: '  Household  ' }),
+    });
+
+    expect(renamed.status).toBe(200);
+    expect(await renamed.json()).toEqual({ id: '1', name: 'Household', transactionCount: 4 });
+
+    const transactions = await request('/api/transactions').then((result) => result.json()) as Array<{
+      person: Record<string, unknown>;
+    }>;
+    expect(transactions).toHaveLength(4);
+    for (const transaction of transactions) {
+      expect(transaction.person).toEqual({ id: '1', name: 'Household' });
+    }
+  });
+
+  it('allows a person to change its own display case', async () => {
+    const renamed = await request('/api/people/2', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'ANNA' }),
+    });
+
+    expect(renamed.status).toBe(200);
+    expect(await renamed.json()).toEqual({ id: '2', name: 'ANNA', transactionCount: 0 });
+  });
+
+  it('refuses a duplicate rename and an unknown identity', async () => {
+    const duplicate = await request('/api/people/2', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'default' }),
+    });
+    expect(duplicate.status).toBe(409);
+
+    const unknown = await request('/api/people/999', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Ghost' }),
+    });
+    expect(unknown.status).toBe(404);
+
+    const listed = await request('/api/people').then((result) => result.json());
+    expect(listed).toEqual([
+      { id: '2', name: 'Anna', transactionCount: 0 },
+      { id: '1', name: 'Default', transactionCount: 4 },
+    ]);
+  });
+
+  it('removes no person when a delete is requested', async () => {
+    const response = await request('/api/people/2', { method: 'DELETE' });
+    // There is no delete endpoint; the request must not remove or change a person.
+    expect(response.status).not.toBe(204);
+
+    const listed = await request('/api/people').then((result) => result.json());
+    expect(listed).toEqual([
+      { id: '2', name: 'Anna', transactionCount: 0 },
+      { id: '1', name: 'Default', transactionCount: 4 },
+    ]);
+  });
+
+  it('returns the person on an import run, null for a legacy run, and follows a rename', async () => {
+    if (database === undefined) {
+      throw new Error('test database is not initialized');
+    }
+    await database.query(`
+      INSERT INTO import_runs (started_at, finished_at, source, non_writing, outcome, rows_read, rows_already_stored, rows_written, error, person_id)
+      VALUES
+        ('2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', 'manual', false, 'success', 1, 0, 1, NULL, NULL),
+        ('2026-01-02T00:00:00Z', '2026-01-02T00:01:00Z', 'manual', false, 'success', 1, 0, 1, NULL, 1)
+    `);
+
+    const runs = () => request('/api/imports').then((result) => result.json())
+      .then((entries: Array<{ person: unknown }>) => entries.map((entry) => entry.person));
+
+    expect(await runs()).toEqual([{ id: '1', name: 'Default' }, null]);
+
+    await request('/api/people/1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Household' }),
+    });
+
+    expect(await runs()).toEqual([{ id: '1', name: 'Household' }, null]);
   });
 
   // The home-screen identity: iOS reads the touch icon rather than the manifest, and

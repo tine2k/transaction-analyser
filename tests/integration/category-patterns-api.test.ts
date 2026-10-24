@@ -104,8 +104,8 @@ async function insertTransaction(purpose: string, counterpartyName = 'Test'): Pr
     throw new Error('test database is not initialized');
   }
   await database.query(
-    `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account)
-     VALUES ('2026-03-01', '2026-03-01', -1.00, $1, $2, NULL)`,
+    `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, person_id)
+     VALUES ('2026-03-01', '2026-03-01', -1.00, $1, $2, NULL, (SELECT id FROM people WHERE name = 'Default'))`,
     [purpose, counterpartyName],
   );
 }
@@ -180,8 +180,8 @@ describe('category pattern append API integration', () => {
       throw new Error('test database is not initialized');
     }
     await database.query(
-      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id)
-       VALUES ('2026-03-01', '2026-03-01', -2.00, 'Bookshop Special', 'Books', NULL, 2)`,
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id, person_id)
+       VALUES ('2026-03-01', '2026-03-01', -2.00, 'Bookshop Special', 'Books', NULL, 2, (SELECT id FROM people WHERE name = 'Default'))`,
     );
     await insertTransaction('Zzz special vendor');
 
@@ -204,8 +204,8 @@ describe('category pattern append API integration', () => {
       throw new Error('test database is not initialized');
     }
     await database.query(
-      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account)
-       VALUES ('2026-04-15', '2026-04-15', -3.00, 'Window special', 'Test', NULL)`,
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, person_id)
+       VALUES ('2026-04-15', '2026-04-15', -3.00, 'Window special', 'Test', NULL, (SELECT id FROM people WHERE name = 'Default'))`,
     );
 
     const windowCategory = await post('/api/categories', {

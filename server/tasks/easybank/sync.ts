@@ -9,7 +9,7 @@
 //
 // See openspec/changes/add-easybank-sync/specs/easybank-sync/spec.md
 // and openspec/changes/add-easybank-sync-button/specs/easybank-sync/spec.md
-import { defaultWindow, syncEasybank, syncSourceFromPayload } from '../../../shared/easybank-sync';
+import { defaultWindow, personFromEnv, syncEasybank, syncSourceFromPayload } from '../../../shared/easybank-sync';
 import { notificationConfigFromEnv } from '../../../shared/import-notification';
 
 export default defineTask({
@@ -23,6 +23,7 @@ export default defineTask({
     const result = await syncEasybank(useDatabase(), {
       user: process.env['EASYBANK_USER'] ?? null,
       pin: process.env['EASYBANK_PIN'] ?? null,
+      person: personFromEnv(process.env),
       from: window.from,
       to: window.to,
       dryRun: process.env['EASYBANK_SYNC_WRITE'] !== 'true',

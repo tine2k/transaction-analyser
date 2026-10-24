@@ -8,16 +8,19 @@ import {
   createMonthlyCategoryChartData,
   createYearlyCategoryChartData,
   filterTransactionsByExpenseType,
+  filterTransactionsByPerson,
   formatEuroAmount,
   getCategoryMonthlyAverages,
   getLastCalendarMonths,
   getLastTwelveCalendarMonths,
   getMonthlyCategorySpendingTotals,
+  getPersonChoices,
   getYearlyCategorySpendingTotals,
   groupTransactionsByAvailableMonth,
   groupTransactionsByAvailableYear,
   groupTransactionsByMonth,
   isZeroAmountString,
+  resolvePersonChoice,
   sumAbsoluteAmountStrings,
   sumSignedAmountStrings,
   type CategorySpendingTransaction,
@@ -44,12 +47,12 @@ describe('decimal-safe category totals', () => {
 
   it('sorts category totals numerically in descending order with name-based ties', () => {
     const transactions: CategorySpendingTransaction[] = [
-      { bookingDate: '2026-09-01', amount: '2.000', category: { id: '1', name: 'Two', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-01', amount: '9007199254740993.02', category: { id: '2', name: 'Large lower', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-01', amount: '5.0', category: { id: '3', name: 'Zulu', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-01', amount: '9007199254740993.1', category: { id: '4', name: 'Largest', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-01', amount: '5.00', category: { id: '5', name: 'Alpha', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-01', amount: '10.00', category: { id: '6', name: 'Ten', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '2.000', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Two', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '9007199254740993.02', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Large lower', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '5.0', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Zulu', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '9007199254740993.1', person: { id: '1', name: 'Default' }, category: { id: '4', name: 'Largest', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '5.00', person: { id: '1', name: 'Default' }, category: { id: '5', name: 'Alpha', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '10.00', person: { id: '1', name: 'Default' }, category: { id: '6', name: 'Ten', hidden: false, expenseType: null } },
     ];
     const [month] = getMonthlyCategorySpendingTotals(
       groupTransactionsByMonth(transactions, '2026-09-28'),
@@ -67,8 +70,8 @@ describe('decimal-safe category totals', () => {
 
   it('produces exact category totals and euro labels', () => {
     const transactions: CategorySpendingTransaction[] = [
-      { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '4.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ];
     const [month] = getMonthlyCategorySpendingTotals(
       groupTransactionsByMonth(transactions, '2026-09-28'),
@@ -190,10 +193,10 @@ describe('calendar-month transaction buckets', () => {
 
   it('assigns eligible bookings to their month and excludes dates outside the range', () => {
     const monthlyGroups = groupTransactionsByMonth([
-      { bookingDate: '2025-09-30', amount: '-1.00', category: { id: '1', name: 'Too old', hidden: false, expenseType: null } },
-      { bookingDate: '2025-10-01', amount: '-2.00', category: { id: '2', name: 'Earliest', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-28', amount: '-3.00', category: { id: '3', name: 'Today', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-29', amount: '-4.00', category: { id: '4', name: 'Future', hidden: false, expenseType: null } },
+      { bookingDate: '2025-09-30', amount: '-1.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Too old', hidden: false, expenseType: null } },
+      { bookingDate: '2025-10-01', amount: '-2.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Earliest', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-28', amount: '-3.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Today', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-29', amount: '-4.00', person: { id: '1', name: 'Default' }, category: { id: '4', name: 'Future', hidden: false, expenseType: null } },
     ], '2026-09-28');
 
     expect(monthlyGroups).toHaveLength(12);
@@ -204,10 +207,10 @@ describe('calendar-month transaction buckets', () => {
 
   it('groups every represented booking month newest-first without adding empty months', () => {
     const months = groupTransactionsByAvailableMonth([
-      { bookingDate: '2020-01-31', amount: '-1.00', category: { id: '1', name: 'Old', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-03', amount: '-2.00', category: { id: '2', name: 'Recent', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-29', amount: '3.00', category: { id: '2', name: 'Recent', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-4.00', category: null },
+      { bookingDate: '2020-01-31', amount: '-1.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Old', hidden: false, expenseType: null } },
+      { bookingDate: '2026-08-03', amount: '-2.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Recent', hidden: false, expenseType: null } },
+      { bookingDate: '2026-08-29', amount: '3.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Recent', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-4.00', person: { id: '1', name: 'Default' }, category: null },
     ]);
 
     expect(months.map(({ key, label }) => [key, label])).toEqual([
@@ -221,9 +224,9 @@ describe('calendar-month transaction buckets', () => {
 
   it('drops hidden-category transactions from month groups while keeping visible and uncategorised ones', () => {
     const groups = groupTransactionsByMonth([
-      { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-99.00', category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '-3.25', category: null },
+      { bookingDate: '2026-09-01', amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-99.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: '2026-09-03', amount: '-3.25', person: { id: '1', name: 'Default' }, category: null },
     ], '2026-09-28');
     const totals = getMonthlyCategorySpendingTotals(groups);
 
@@ -235,9 +238,9 @@ describe('calendar-month transaction buckets', () => {
 
   it('drops hidden-category transactions from the available-month matrix while keeping visible ones', () => {
     const matrix = createMonthlyCategoryMatrixData(groupTransactionsByAvailableMonth([
-      { bookingDate: '2026-09-01', amount: '-7.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-9.00', category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
-      { bookingDate: '2026-08-01', amount: '-5.00', category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '-7.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-9.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: '2026-08-01', amount: '-5.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
     ]));
 
     expect(matrix.categories).toEqual([{ key: 'category:1', name: 'Groceries' }]);
@@ -247,11 +250,11 @@ describe('calendar-month transaction buckets', () => {
 
   it('keeps exact absolute category totals separate by month, including uncategorised amounts', () => {
     const transactions: CategorySpendingTransaction[] = [
-      { bookingDate: '2026-09-01', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '-0.01', category: null },
-      { bookingDate: '2026-08-01', amount: '9007199254740993.01', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-02', amount: '-0.01', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '4.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-03', amount: '-0.01', person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: '2026-08-01', amount: '9007199254740993.01', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-08-02', amount: '-0.01', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ];
     const totals = getMonthlyCategorySpendingTotals(
       groupTransactionsByMonth(transactions, '2026-09-28'),
@@ -268,13 +271,13 @@ describe('calendar-month transaction buckets', () => {
 
   it('builds a zero-filled category-by-month matrix with stable category columns and exact amounts', () => {
     const matrix = createMonthlyCategoryMatrixData(groupTransactionsByAvailableMonth([
-      { bookingDate: '2026-09-01', amount: '9007199254740993.01', category: { id: '10', name: 'Alpha', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-0.002', category: { id: '10', name: 'Alpha', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '-12.50', category: { id: '2', name: 'alpha', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-04', amount: '-3.25', category: null },
-      { bookingDate: '2026-08-01', amount: '4.00', category: { id: '2', name: 'alpha', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-02', amount: '-8.00', category: { id: '3', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2018-03-17', amount: '5.00', category: { id: '3', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '9007199254740993.01', person: { id: '1', name: 'Default' }, category: { id: '10', name: 'Alpha', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-0.002', person: { id: '1', name: 'Default' }, category: { id: '10', name: 'Alpha', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-03', amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'alpha', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-04', amount: '-3.25', person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: '2026-08-01', amount: '4.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'alpha', hidden: false, expenseType: null } },
+      { bookingDate: '2026-08-02', amount: '-8.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2018-03-17', amount: '5.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Groceries', hidden: false, expenseType: null } },
     ]));
 
     expect(matrix.categories).toEqual([
@@ -307,7 +310,7 @@ describe('calendar-month transaction buckets', () => {
   it('creates twelve chart datasets and retains empty months without fake slices', () => {
     const months = getMonthlyCategorySpendingTotals(
       groupTransactionsByMonth([
-        { bookingDate: '2026-09-02', amount: '-5.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+        { bookingDate: '2026-09-02', amount: '-5.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
       ], '2026-09-28'),
     );
     const charts = createMonthlyCategoryChartData(months);
@@ -324,9 +327,9 @@ describe('calendar-month transaction buckets', () => {
 describe('available-year transaction buckets', () => {
   it('groups every represented booking year newest-first with calendar-year bounds and no empty years', () => {
     const years = groupTransactionsByAvailableYear([
-      { bookingDate: '2020-01-31', amount: '-1.00', category: { id: '1', name: 'Old', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-03', amount: '-2.00', category: { id: '2', name: 'Recent', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-4.00', category: null },
+      { bookingDate: '2020-01-31', amount: '-1.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Old', hidden: false, expenseType: null } },
+      { bookingDate: '2026-08-03', amount: '-2.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Recent', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-4.00', person: { id: '1', name: 'Default' }, category: null },
     ]);
 
     expect(years.map(({ key, label }) => [key, label])).toEqual([
@@ -341,9 +344,9 @@ describe('available-year transaction buckets', () => {
 
   it('drops hidden-category transactions and years represented only by them', () => {
     const years = groupTransactionsByAvailableYear([
-      { bookingDate: '2023-05-01', amount: '-9.00', category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
-      { bookingDate: '2026-09-01', amount: '-7.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-9.00', category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: '2023-05-01', amount: '-9.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: '2026-09-01', amount: '-7.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-9.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
     ]);
 
     expect(years.map(({ key }) => key)).toEqual(['2026']);
@@ -352,7 +355,7 @@ describe('available-year transaction buckets', () => {
         key: 'category:1',
         name: 'Groceries',
         transactions: [
-          { bookingDate: '2026-09-01', amount: '-7.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+          { bookingDate: '2026-09-01', amount: '-7.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
         ],
       },
     ]);
@@ -361,16 +364,16 @@ describe('available-year transaction buckets', () => {
   it('returns no years for empty input or input whose categories are all hidden', () => {
     expect(groupTransactionsByAvailableYear([])).toEqual([]);
     expect(groupTransactionsByAvailableYear([
-      { bookingDate: '2024-01-01', amount: '-1.00', category: { id: '1', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: '2024-01-01', amount: '-1.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Internal', hidden: true, expenseType: null } },
     ])).toEqual([]);
   });
 
   it('sums absolute category totals across a whole year and builds year chart data', () => {
     const years = getYearlyCategorySpendingTotals(groupTransactionsByAvailableYear([
-      { bookingDate: '2026-03-01', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-11-01', amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-03-02', amount: '-8.25', category: null },
-      { bookingDate: '2025-11-01', amount: '-8.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-03-01', amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-11-01', amount: '4.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-03-02', amount: '-8.25', person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: '2025-11-01', amount: '-8.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ]));
     const charts = createYearlyCategoryChartData(years);
 
@@ -402,11 +405,11 @@ describe('monthly category averages', () => {
 
   it('averages absolute in-window amounts over the configured months, counting empty months as zero', () => {
     const averages = getCategoryMonthlyAverages([
-      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-01', amount: '-12.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-20', amount: '3.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2020-01-15', amount: '-100.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-2.00', category: null },
+      { bookingDate: '2026-09-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-08-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-20', amount: '3.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2020-01-15', amount: '-100.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-2.00', person: { id: '1', name: 'Default' }, category: null },
     ], '2026-09-28', 12);
 
     expect(averages).toEqual([
@@ -417,9 +420,9 @@ describe('monthly category averages', () => {
 
   it('excludes hidden categories from the averages while leaving visible categories unchanged', () => {
     const averages = getCategoryMonthlyAverages([
-      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-120.00', category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '-2.00', category: null },
+      { bookingDate: '2026-09-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-120.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: '2026-09-03', amount: '-2.00', person: { id: '1', name: 'Default' }, category: null },
     ], '2026-09-28', 12);
 
     expect(averages).toEqual([
@@ -430,9 +433,9 @@ describe('monthly category averages', () => {
 
   it('excludes transactions outside the window and future dates in the current month', () => {
     const averages = getCategoryMonthlyAverages([
-      { bookingDate: '2025-09-30', amount: '-100.00', category: { id: '1', name: 'Too old', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-29', amount: '-100.00', category: { id: '2', name: 'Future', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-28', amount: '-6.00', category: { id: '3', name: 'Today', hidden: false, expenseType: null } },
+      { bookingDate: '2025-09-30', amount: '-100.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Too old', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-29', amount: '-100.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Future', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-28', amount: '-6.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Today', hidden: false, expenseType: null } },
     ], '2026-09-28', 12);
 
     expect(averages).toEqual([
@@ -442,10 +445,10 @@ describe('monthly category averages', () => {
 
   it('orders categories by name case-insensitively with identity tie-breaks and uncategorised last', () => {
     const averages = getCategoryMonthlyAverages([
-      { bookingDate: '2026-09-01', amount: '-12.00', category: { id: '10', name: 'alpha', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-12.00', category: { id: '2', name: 'Alpha', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '-12.00', category: { id: '3', name: 'Zulu', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-04', amount: '-12.00', category: null },
+      { bookingDate: '2026-09-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '10', name: 'alpha', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Alpha', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-03', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Zulu', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-04', amount: '-12.00', person: { id: '1', name: 'Default' }, category: null },
     ], '2026-09-28', 12);
 
     expect(averages.map(({ key }) => key)).toEqual([
@@ -456,10 +459,10 @@ describe('monthly category averages', () => {
 
 describe('expense-type selection', () => {
   const transactions: CategorySpendingTransaction[] = [
-    { bookingDate: '2026-09-01', amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: 'recurring' } },
-    { bookingDate: '2026-09-02', amount: '-20.00', category: { id: '2', name: 'New car', hidden: false, expenseType: 'one-time' } },
-    { bookingDate: '2026-09-03', amount: '-30.00', category: { id: '3', name: 'Internal', hidden: true, expenseType: null } },
-    { bookingDate: '2026-09-04', amount: '-40.00', category: null },
+    { bookingDate: '2026-09-01', amount: '-10.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: 'recurring' } },
+    { bookingDate: '2026-09-02', amount: '-20.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'New car', hidden: false, expenseType: 'one-time' } },
+    { bookingDate: '2026-09-03', amount: '-30.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Internal', hidden: true, expenseType: null } },
+    { bookingDate: '2026-09-04', amount: '-40.00', person: { id: '1', name: 'Default' }, category: null },
   ];
 
   it('returns the input unchanged for the all choice', () => {

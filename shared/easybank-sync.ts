@@ -8,11 +8,30 @@
 //
 // See openspec/changes/add-easybank-sync/specs/easybank-sync/spec.md
 // and openspec/changes/add-import-notification/specs/import-notification/spec.md
-import { ImportFailure, finishImportRun, importRows, redact, startImportRun } from './transactions-import.ts';
-import type { Database, ImportPlan, ImportRow, ImportSourceKind } from './transactions-import.ts';
+import {
+  ImportFailure,
+  finishImportRun,
+  importRows,
+  redact,
+  resolvePerson,
+  setImportRunPerson,
+  startImportRun,
+} from './transactions-import.ts';
+import type { Database, ImportPlan, ImportRow, ImportSourceKind, Person } from './transactions-import.ts';
 import { notifyImport } from './import-notification.ts';
 import type { ImportNotificationConfig } from './import-notification.ts';
 import { retrieveGiroTransactions } from './easybank.ts';
+
+// The person a sync imports into when EASYBANK_PERSON is absent or empty. The
+// migration seeds this person, so an unconfigured sync has a target.
+export const DEFAULT_PERSON = 'Default';
+
+// The configured person's name. An absent or empty variable means `Default`; the
+// name is trimmed here and resolved against the stored people by syncEasybank.
+export function personFromEnv(env: Record<string, string | undefined>): string {
+  const value = env['EASYBANK_PERSON']?.trim() ?? '';
+  return value === '' ? DEFAULT_PERSON : value;
+}
 
 // The value date below which the sync imports nothing. The history already held
 // ends on 2026-09-20, and the CSV export and the HTML mapping describe a transfer
@@ -28,6 +47,7 @@ export function applyValueDateFloor(rows: ImportRow[]): ImportRow[] {
 export type EasybankSyncOptions = {
   user: string | null;
   pin: string | null;
+  person: string;
   from: string;
   to: string;
   dryRun: boolean;
@@ -39,7 +59,7 @@ export type EasybankSyncOptions = {
 
 export type EasybankSyncResult =
   | { status: 'unconfigured' }
-  | { status: 'success'; runId: string; plan: ImportPlan }
+  | { status: 'success'; runId: string; plan: ImportPlan; person: Person }
   | { status: 'failed'; runId: string; error: string };
 
 export function toIsoDate(date: Date): string {
@@ -77,8 +97,15 @@ export async function syncEasybank(
   }
 
   const runId = await startImportRun(database, { source: options.source, nonWriting: options.dryRun });
+  const configuredPerson =
+    typeof options.person === 'string' && options.person.trim() !== '' ? options.person : DEFAULT_PERSON;
 
   try {
+    // The person is resolved before the bank is read or any row is written. A run
+    // that cannot resolve one is recorded as failed and carries no person.
+    const person = await resolvePerson(database, configuredPerson);
+    await setImportRunPerson(database, runId, person.id);
+
     const retrieved = await retrieveGiroTransactions({
       user: options.user,
       pin: options.pin,
@@ -88,7 +115,7 @@ export async function syncEasybank(
       fetchImpl: options.fetchImpl,
     });
     const rows = applyValueDateFloor(retrieved);
-    const plan = await importRows(database, rows, { dryRun: options.dryRun });
+    const plan = await importRows(database, rows, { dryRun: options.dryRun, person });
     await finishImportRun(database, runId, {
       outcome: 'success',
       rowsRead: plan.rowsRead,
@@ -106,7 +133,7 @@ export async function syncEasybank(
       console.error(`import notification failed: ${notification.reason}`);
     }
 
-    return { status: 'success', runId, plan };
+    return { status: 'success', runId, plan, person };
   } catch (error) {
     const reason = redact(error instanceof Error ? error.message : String(error));
     const rowsRead = error instanceof ImportFailure ? error.rowsRead : 0;

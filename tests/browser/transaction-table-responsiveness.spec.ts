@@ -30,6 +30,7 @@ function transactions(count: number) {
     purpose: `Transaction ${index + 1}`,
     counterpartyName: 'Shop',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
     categoryAssignment: 'automatic',
     category: categories[index % categories.length],
   }));

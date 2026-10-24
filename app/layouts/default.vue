@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // The one layout every route renders in. Beyond the shared document metadata and the
 // page frame it now carries the menu bar through which the screens are reached: the
-// transactions screen and the category management screen. The link for the screen
-// currently shown is marked as the current one.
+// transactions screen, the category management screen, the people management screen,
+// the analysis screens, and the imports screen. The link for the screen currently
+// shown is marked as the current one.
 //
 // See openspec/changes/add-category-management/specs/category-management-screen/spec.md
-// and openspec/changes/add-category-management/specs/frontend-shell/spec.md
+// and openspec/changes/add-people/specs/category-management-screen/spec.md
 import {
   IconCalendarStats,
   IconChartHistogram,
@@ -14,6 +15,7 @@ import {
   IconList,
   IconMenu2,
   IconTags,
+  IconUsers,
   IconX,
 } from '@tabler/icons-vue';
 
@@ -23,6 +25,7 @@ const mobileNavOpen = ref(false);
 const screens = [
   { to: '/', label: 'Transactions', icon: IconList },
   { to: '/categories', label: 'Categories', icon: IconTags },
+  { to: '/people', label: 'People', icon: IconUsers },
   { to: '/analytics', label: 'Analytics', icon: IconChartPie },
   { to: '/monthly-totals', label: 'Monthly totals', icon: IconCalendarStats },
   { to: '/monthly-average', label: 'Monthly average', icon: IconChartHistogram },

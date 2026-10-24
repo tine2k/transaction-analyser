@@ -20,6 +20,7 @@ const transactions = [
     purpose: 'Groceries',
     counterpartyName: 'Market',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
     categoryAssignment: 'automatic',
     category: { id: '1', name: 'Groceries', hidden: false },
   },
@@ -31,6 +32,7 @@ const transactions = [
     purpose: 'Travel',
     counterpartyName: 'Rail',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
     categoryAssignment: 'automatic',
     category: { id: '2', name: 'Travel', hidden: false },
   },
@@ -42,6 +44,7 @@ const transactions = [
     purpose: 'alpha',
     counterpartyName: 'Shop',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
     categoryAssignment: 'automatic',
     category: { id: '1', name: 'Groceries', hidden: false },
   },
@@ -53,6 +56,7 @@ const transactions = [
     purpose: 'Zeta',
     counterpartyName: 'Bank',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
     categoryAssignment: 'automatic',
     category: null,
   },
@@ -89,7 +93,7 @@ test('sorting a header updates the row order, the announced direction, and the U
   await interceptApi(page);
   await page.goto('/?category=all', { waitUntil: 'networkidle' });
 
-  await expect(page.locator('thead th[aria-sort]')).toHaveCount(7);
+  await expect(page.locator('thead th[aria-sort]')).toHaveCount(8);
   expect(await shownIds(page)).toEqual(['1', '2', '3', '4']);
 
   await page.getByTestId('sort-amount').click();

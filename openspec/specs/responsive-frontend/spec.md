@@ -12,7 +12,7 @@ The system SHALL render the shared frame, its navigation, and each existing scre
 
 #### Scenario: The screens fit a narrow phone viewport
 
-- **WHEN** each of the five routes is rendered at a 320 CSS-pixel viewport width
+- **WHEN** each of the seven routes is rendered at a 320 CSS-pixel viewport width
 - **THEN** the page itself has no horizontal overflow, the route content remains available, and the user can reach every control
 
 #### Scenario: The frame and content adapt across device sizes
@@ -27,7 +27,7 @@ The system SHALL render the shared frame, its navigation, and each existing scre
 
 ### Requirement: All application destinations remain reachable from mobile navigation
 
-The shared navigation SHALL keep links to all five existing routes available on narrow and wide viewports. On narrow viewports it SHALL use a compact disclosure control rather than allowing the link row to overflow. The control SHALL expose its expanded state to assistive technology, support keyboard activation, and keep the current route distinguishable. Activating a destination SHALL navigate to the same route as the corresponding wide-screen link.
+The shared navigation SHALL keep links to all seven existing routes available on narrow and wide viewports. On narrow viewports it SHALL use a compact disclosure control rather than allowing the link row to overflow. The control SHALL expose its expanded state to assistive technology, support keyboard activation, and keep the current route distinguishable. Activating a destination SHALL navigate to the same route as the corresponding wide-screen link.
 
 #### Scenario: The mobile navigation is initially collapsed
 
@@ -37,7 +37,7 @@ The shared navigation SHALL keep links to all five existing routes available on 
 #### Scenario: The mobile navigation opens and closes accessibly
 
 - **WHEN** the navigation control is activated by pointer or keyboard
-- **THEN** it exposes all five route links, reports the expanded state, and can be activated again to collapse the links
+- **THEN** it exposes all seven route links, reports the expanded state, and can be activated again to collapse the links
 
 #### Scenario: A mobile route link reaches the selected screen
 
@@ -47,16 +47,21 @@ The shared navigation SHALL keep links to all five existing routes available on 
 #### Scenario: Wide-screen navigation remains directly available
 
 - **WHEN** a route is rendered at a wide viewport
-- **THEN** all five route links are directly visible and the current route remains distinguishable
+- **THEN** all seven route links are directly visible and the current route remains distinguishable
 
 ### Requirement: Screen controls and visualizations reflow for mobile use
 
-The system SHALL adapt each screen's filters, category forms, action groups, summary lists, and analytics panels to narrow widths without hiding existing information or changing their behavior. Controls SHALL fit their available space, remain operable without precision pointer input, and retain readable labels. Buttons, navigation links, and form controls SHALL provide a touch hit area at least 44 CSS pixels high, and standalone icon or disclosure controls SHALL provide a hit area at least 44 CSS pixels in both dimensions. Analytics panels SHALL stack at narrow widths and their charts SHALL resize to the panel; category names and exact totals SHALL remain available in the existing textual totals list. At wider widths, panels and control groups MAY use additional columns when space permits.
+The system SHALL adapt each screen's filters, category forms, people forms, action groups, summary lists, and analytics panels to narrow widths without hiding existing information or changing their behavior. Controls SHALL fit their available space, remain operable without precision pointer input, and retain readable labels. Buttons, navigation links, and form controls SHALL provide a touch hit area at least 44 CSS pixels high, and standalone icon or disclosure controls SHALL provide a hit area at least 44 CSS pixels in both dimensions. Analytics panels SHALL stack at narrow widths and their charts SHALL resize to the panel; category names and exact totals SHALL remain available in the existing textual totals list. At wider widths, panels and control groups MAY use additional columns when space permits.
 
 #### Scenario: Transaction filters fit a phone viewport
 
 - **WHEN** the transactions route is shown at a 320 CSS-pixel viewport width
-- **THEN** its category and month filters reflow within the page, with their labels and selections available and no page-level horizontal overflow
+- **THEN** its person, category, and period filters reflow within the page, with their labels and selections available and no page-level horizontal overflow
+
+#### Scenario: People controls fit a phone viewport
+
+- **WHEN** the people screen is shown at a 320 CSS-pixel viewport width
+- **THEN** its name form, create and rename controls, and person rows remain visible and operable without page-level horizontal scrolling
 
 #### Scenario: Category editing controls fit a phone viewport
 
@@ -75,12 +80,12 @@ The system SHALL adapt each screen's filters, category forms, action groups, sum
 
 ### Requirement: Wide tables scroll within their own region on narrow screens
 
-The system SHALL preserve the existing semantic table structure, all columns, rows, and cell values for transactions, categories, and monthly totals. When a table is wider than the viewport, its containing region SHALL provide horizontal scrolling without making the page itself wider. The scrollable region SHALL be reachable and operable by touch and keyboard, and it SHALL NOT change sorting, filtering, row order, or displayed values.
+The system SHALL preserve the existing semantic table structure, all columns, rows, and cell values for transactions, categories, people, and monthly totals. When a table is wider than the viewport, its containing region SHALL provide horizontal scrolling without making the page itself wider. The scrollable region SHALL be reachable and operable by touch and keyboard, and it SHALL NOT change sorting, filtering, row order, or displayed values.
 
 #### Scenario: The transactions table is browsable on a phone
 
 - **WHEN** the transactions table is wider than a phone viewport
-- **THEN** the user can scroll the table region horizontally to read every column while the page viewport remains within the screen width
+- **THEN** the user can scroll the table region horizontally to read every column, including the person column, while the page viewport remains within the screen width
 
 #### Scenario: The monthly comparison table retains its data
 
@@ -91,6 +96,11 @@ The system SHALL preserve the existing semantic table structure, all columns, ro
 
 - **WHEN** the category list is wider than a phone viewport
 - **THEN** all category columns and row actions remain present and reachable in the table's own scroll region without page-level horizontal overflow
+
+#### Scenario: The people table and actions remain available
+
+- **WHEN** the people list is wider than a phone viewport
+- **THEN** every person's name, transaction count, and rename control remains present and reachable in the table's own scroll region without page-level horizontal overflow
 
 #### Scenario: Table scrolling preserves the existing table contract
 

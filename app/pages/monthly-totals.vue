@@ -2,20 +2,56 @@
 import {
   createMonthlyCategoryMatrixData,
   filterTransactionsByExpenseType,
+  filterTransactionsByPerson,
   formatEuroAmount,
+  getPersonChoices,
   groupTransactionsByAvailableMonth,
   isZeroAmountString,
+  resolvePersonChoice,
   type CategorySpendingTransaction,
   type ExpenseTypeChoice,
 } from '../utils/category-spending';
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
+const router = useRouter();
+const route = router.currentRoute;
 const expenseType = ref<ExpenseTypeChoice>('all');
 
-// The expense-type choice is a selection over the already-fetched transactions, so
-// the table is rebuilt from them and no further request is made.
+// The person choices come from the returned transactions. The selection is
+// URL-backed and independent of the expense type; an absent or unknown person
+// means all people.
+const personChoices = computed(() => getPersonChoices(transactions.value ?? []));
+const selectedPerson = ref<string | null>(null);
+
+watch(
+  [() => route.value.query.person, personChoices],
+  () => {
+    selectedPerson.value = resolvePersonChoice(route.value.query.person, personChoices.value);
+  },
+  { immediate: true },
+);
+
+function onPersonChange(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  const next = value === 'all' ? null : value;
+  selectedPerson.value = next;
+  const query = { ...route.value.query };
+  if (next === null || !personChoices.value.some(({ id }) => id === next)) {
+    delete query.person;
+  } else {
+    query.person = next;
+  }
+  void router.replace({ path: route.value.path, query });
+}
+
+// The person selection scopes the already-fetched transactions before the
+// expense-type choice, so the table is rebuilt from them and no request is made.
+const personTransactions = computed(() =>
+  filterTransactionsByPerson(transactions.value ?? [], selectedPerson.value),
+);
+
 const selectedTransactions = computed(() =>
-  filterTransactionsByExpenseType(transactions.value ?? [], expenseType.value),
+  filterTransactionsByExpenseType(personTransactions.value, expenseType.value),
 );
 
 const matrix = computed(() => createMonthlyCategoryMatrixData(
@@ -37,7 +73,11 @@ function categoryFilterValue(key: string): string {
 function transactionLocation(month: string, categoryKey: string) {
   return {
     path: '/',
-    query: { month, category: categoryFilterValue(categoryKey) },
+    query: {
+      month,
+      category: categoryFilterValue(categoryKey),
+      ...(selectedPerson.value === null ? {} : { person: selectedPerson.value }),
+    },
   };
 }
 </script>
@@ -90,6 +130,21 @@ function transactionLocation(month: string, categoryKey: string) {
           One-time
         </label>
       </fieldset>
+
+      <label class="mt-4 inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
+        Person
+        <select
+          :value="selectedPerson ?? 'all'"
+          data-testid="person-filter"
+          class="min-h-11 max-w-full rounded-sheet border border-rule-strong bg-surface px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          @change="onPersonChange"
+        >
+          <option value="all">All people</option>
+          <option v-for="person in personChoices" :key="person.id" :value="person.id">
+            {{ person.name }}
+          </option>
+        </select>
+      </label>
 
       <p id="monthly-totals-scroll-help" class="mb-2 mt-6 text-xs text-muted sm:hidden">
         Scroll horizontally to view all category columns.

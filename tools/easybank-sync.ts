@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { describeError, redact } from '../shared/transactions-import.ts';
-import { defaultWindow, syncEasybank } from '../shared/easybank-sync.ts';
+import { defaultWindow, personFromEnv, syncEasybank } from '../shared/easybank-sync.ts';
 import { notificationConfigFromEnv } from '../shared/import-notification.ts';
 
 type Options = { from: string | null; to: string | null; dsn: string | null; write: boolean };
@@ -62,6 +62,8 @@ const USAGE = [
   '  --write               Write the new rows. Without it the run only reports.',
   '',
   'Credentials come from EASYBANK_USER and EASYBANK_PIN in the environment.',
+  'EASYBANK_PERSON names the person the rows are imported into; it defaults to',
+  'Default when unset or empty. The person must already exist.',
   'Pushover notifications use PUSHOVER_TOKEN and PUSHOVER_USER; without them',
   'no notification is sent and the sync is unaffected.',
 ].join('\n');
@@ -100,6 +102,7 @@ async function main(): Promise<number> {
     const result = await syncEasybank(client, {
       user,
       pin,
+      person: personFromEnv(process.env),
       from,
       to,
       dryRun: !options.write,
@@ -117,14 +120,15 @@ async function main(): Promise<number> {
     }
 
     const plan = result.plan;
+    const person = result.person.name;
     if (options.write) {
       console.log(
-        `Read ${plan.rowsRead} row${plan.rowsRead === 1 ? '' : 's'} for ${from}..${to}, ` +
+        `Read ${plan.rowsRead} row${plan.rowsRead === 1 ? '' : 's'} for ${from}..${to} into ${person}, ` +
           `skipped ${plan.rowsAlreadyStored} already stored, and wrote ${plan.rowsWritten}.`,
       );
     } else {
       console.log(
-        `Dry run: ${plan.rowsRead} row${plan.rowsRead === 1 ? '' : 's'} read for ${from}..${to}, ` +
+        `Dry run for ${person}: ${plan.rowsRead} row${plan.rowsRead === 1 ? '' : 's'} read for ${from}..${to}, ` +
           `${plan.rowsAlreadyStored} already stored, ${plan.newRows.length} would be written.`,
       );
     }

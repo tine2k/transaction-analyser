@@ -145,16 +145,23 @@ database_is_ready=$(psql --no-psqlrc --no-align --tuples-only \
   --command="SELECT
     to_regclass('public.transactions') IS NOT NULL
     AND to_regclass('public.categories') IS NOT NULL
+    AND to_regclass('public.people') IS NOT NULL
     AND (SELECT count(*) FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'transactions'
-        AND column_name IN ('id', 'booking_date', 'value_date', 'amount', 'purpose', 'counterparty_name', 'counterparty_account', 'category_id')) = 8
+        AND column_name IN ('id', 'booking_date', 'value_date', 'amount', 'purpose', 'counterparty_name', 'counterparty_account', 'category_id', 'person_id')) = 9
     AND (SELECT count(*) FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'categories'
         AND column_name IN ('id', 'name', 'patterns', 'hidden', 'windows')) = 5
+    AND (SELECT count(*) FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'people'
+        AND column_name IN ('id', 'name')) = 2
     AND (SELECT count(*) FROM categories
       WHERE name IN ('Groceries', 'Transport', 'Internal')) = 3
+    AND (SELECT count(*) FROM people
+      WHERE name IN ('Default', 'Anna')) = 2
     AND (SELECT count(*) FROM transactions
-      WHERE purpose IN ('REWE Market', 'Rail ticket', 'Internal transfer', 'Bookshop')) = 4")
+      WHERE purpose IN ('REWE Market', 'Rail ticket', 'Internal transfer', 'Bookshop')
+        AND person_id IS NOT NULL) = 4")
 if [[ "$database_is_ready" != "t" ]]; then
   echo "Disposable PostgreSQL database '$database_name' is missing the migrated schema or integration fixture rows." >&2
   exit 1

@@ -20,6 +20,7 @@ function options(overrides: Record<string, unknown> = {}) {
   return {
     user: 'user',
     pin: 'pin',
+    person: 'Default',
     from: '2026-07-01',
     to: '2026-10-31',
     dryRun: true,
@@ -162,8 +163,7 @@ describe('easybank sync against PostgreSQL and a fake bank', () => {
     expect((runs.rows[0] as { count: number }).count).toBe(0);
   });
 
-  it('excludes rows at or below the value-date floor before the shared import path', async () => {
-    const floorBank = await startFakeBank([
+  it('excludes rows at or below the value-date floor before the shared import path', async () => {    const floorBank = await startFakeBank([
       listPage(
         [
           listRow('21.09.2026', '20.09.2026', 'Alte Buchung<br>AT611904300234573201 Alt GmbH', '-1,00'),
@@ -188,6 +188,93 @@ describe('easybank sync against PostgreSQL and a fake bank', () => {
       expect(runs.rows).toEqual([{ rows_read: 1, rows_written: 1 }]);
     } finally {
       await floorBank.close();
+    }
+  });
+
+  it('imports into Default when no person is configured', async () => {
+    const result = await syncEasybank(connection(), options({ person: '', dryRun: false }));
+
+    expect(result.status).toBe('success');
+    if (result.status !== 'success') {
+      return;
+    }
+    expect(result.person).toEqual({ id: expect.any(String), name: 'Default' });
+    expect(result.plan).toMatchObject({ rowsRead: 2, rowsWritten: 2 });
+    const stored = await connection().query(`
+      SELECT DISTINCT p.name AS person
+      FROM transactions AS t
+      JOIN people AS p ON p.id = t.person_id
+    `);
+    expect(stored.rows).toEqual([{ person: 'Default' }]);
+    const runs = await connection().query(`
+      SELECT p.name AS person
+      FROM import_runs AS r
+      LEFT JOIN people AS p ON p.id = r.person_id
+    `);
+    expect(runs.rows).toEqual([{ person: 'Default' }]);
+  });
+
+  it('imports into a configured person ignoring case and whitespace', async () => {
+    const result = await syncEasybank(connection(), options({ person: '  aNNa  ', dryRun: false }));
+
+    expect(result.status).toBe('success');
+    if (result.status !== 'success') {
+      return;
+    }
+    expect(result.person.name).toBe('Anna');
+    const stored = await connection().query(`
+      SELECT DISTINCT p.name AS person
+      FROM transactions AS t
+      JOIN people AS p ON p.id = t.person_id
+    `);
+    expect(stored.rows).toEqual([{ person: 'Anna' }]);
+    const runs = await connection().query(`
+      SELECT p.name AS person
+      FROM import_runs AS r
+      LEFT JOIN people AS p ON p.id = r.person_id
+    `);
+    expect(runs.rows).toEqual([{ person: 'Anna' }]);
+  });
+
+  it('records a failed run with no person when the configured person does not exist', async () => {
+    const result = await syncEasybank(connection(), options({ person: 'Ghost', dryRun: false }));
+
+    expect(result.status).toBe('failed');
+    if (result.status !== 'failed') {
+      return;
+    }
+    expect(result.error).toMatch(/no person named "Ghost"/);
+    expect(await transactionCount()).toBe(0);
+    const runs = await connection().query(`
+      SELECT r.outcome, r.rows_written, p.name AS person
+      FROM import_runs AS r
+      LEFT JOIN people AS p ON p.id = r.person_id
+    `);
+    expect(runs.rows).toEqual([{ outcome: 'failed', rows_written: 0, person: null }]);
+    const created = await connection().query('SELECT count(*)::int AS count FROM people WHERE lower(name) = lower($1)', ['Ghost']);
+    expect(created.rows[0]).toEqual({ count: 0 });
+  });
+
+  it('fails loudly when Default has been renamed and no person is configured', async () => {
+    await connection().query("UPDATE people SET name = 'Someone Else' WHERE lower(name) = 'default'");
+
+    try {
+      const result = await syncEasybank(connection(), options({ person: '', dryRun: false }));
+
+      expect(result.status).toBe('failed');
+      if (result.status !== 'failed') {
+        return;
+      }
+      expect(result.error).toMatch(/no person named "Default"/);
+      expect(await transactionCount()).toBe(0);
+      const runs = await connection().query(`
+        SELECT r.outcome, p.name AS person
+        FROM import_runs AS r
+        LEFT JOIN people AS p ON p.id = r.person_id
+      `);
+      expect(runs.rows).toEqual([{ outcome: 'failed', person: null }]);
+    } finally {
+      await connection().query("UPDATE people SET name = 'Default' WHERE lower(name) = 'someone else'");
     }
   });
 });

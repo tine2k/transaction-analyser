@@ -8,9 +8,9 @@ Defines the core domain vocabulary of the transaction analyser: the `Transaction
 
 ### Requirement: Transaction aggregate
 
-The system SHALL recognise a `Transaction` as the single main aggregate of the domain. A `Transaction` SHALL be the sole unit that carries a booking date, a value date, an EUR amount, a purpose line, a counterparty, and a category. The system SHALL NOT require any other entity for a `Transaction` to be well-formed: a transaction with no category is as well-formed as a transaction with one.
+The system SHALL recognise a `Transaction` as the single main aggregate of the domain. A `Transaction` SHALL be the sole unit that carries a booking date, a value date, an EUR amount, a purpose line, a counterparty, a person, and a category. A transaction with no category is as well-formed as a transaction with one, while a transaction without a person is not well-formed.
 
-The seven data elements of a `Transaction` are:
+The eight data elements of a `Transaction` are:
 
 | Element | Type | Presence | Meaning |
 | --- | --- | --- | --- |
@@ -20,17 +20,23 @@ The seven data elements of a `Transaction` are:
 | Purpose line | Free text | Required | The human-readable description accompanying the transaction. |
 | Counterparty name | Free text | Required | The name of the other party to the transaction. |
 | Counterparty account | IBAN (text) | Optional | The other party's account identifier, when one exists. |
+| Person | Person reference | Required | The named owner whose transaction this is. |
 | Category | Category reference | Optional | The named group the transaction belongs to, when one has been assigned. |
 
 #### Scenario: A complete transaction is representable
 
-- **WHEN** a transaction is described with a booking date, a value date, an amount, a purpose line, a counterparty name, a counterparty account, and a category
-- **THEN** all seven data elements are held on that single transaction
+- **WHEN** a transaction is described with a booking date, a value date, an amount, a purpose line, a counterparty name, a counterparty account, a person, and a category
+- **THEN** all eight data elements are held on that single transaction
 
 #### Scenario: Transaction requires no other aggregate
 
-- **WHEN** a transaction is described with only its own six non-category data elements and no category
-- **THEN** the transaction is fully described without any additional entity, account aggregate, or counterparty record, and the absence of a category does not make it incomplete
+- **WHEN** a transaction is described with its required elements and a person, and with no category
+- **THEN** the transaction is fully described without a bank-account aggregate or a counterparty record, because the person is the only additional entity it references
+
+#### Scenario: A transaction without a person is incomplete
+
+- **WHEN** a transaction is described without a person
+- **THEN** the transaction is not well-formed, because the owner of the transaction is required
 
 #### Scenario: Counterparty account may be absent
 
@@ -40,7 +46,7 @@ The seven data elements of a `Transaction` are:
 #### Scenario: A transaction is a whole unit
 
 - **WHEN** a transaction is observed, retrieved, or otherwise handled
-- **THEN** it is handled as a single indivisible unit whose booking date, value date, amount, purpose line, counterparty, and category are read together as one thing, and are never split apart into separate representations of the same transaction
+- **THEN** it is handled as a single indivisible unit whose booking date, value date, amount, purpose line, counterparty, person, and category are read together as one thing, and are never split apart into separate representations of the same transaction
 
 ### Requirement: Dates are separate and day-precise
 
@@ -303,3 +309,26 @@ rather than requiring the whole text.
 - **WHEN** the regular expressions of two different categories both match a single counterparty name
 - **THEN** the transaction holds the matching category with the smallest identity
 
+### Requirement: A transaction's person is its owner, distinct from the counterparty
+
+The system SHALL hold a transaction's person as the named owner of that transaction and the counterparty as the other side. The person SHALL be a reference to a named entity with a stable identity; the transaction SHALL hold the reference, not a copy of the name. A person's name SHALL be changeable without changing the reference. The person SHALL NOT be an account, a login, a session, or a counterparty.
+
+#### Scenario: Owner and counterparty are different roles
+
+- **WHEN** a transaction is described with the person `Me` and the counterparty `ACME GmbH`
+- **THEN** `Me` identifies whose transaction it is and `ACME GmbH` identifies the other side, and neither value substitutes for the other
+
+#### Scenario: The person is held by reference
+
+- **WHEN** a transaction is read
+- **THEN** its person is obtained by following the stored reference to the named person, and the person's name is not copied onto the transaction
+
+#### Scenario: A renamed person is the same owner
+
+- **WHEN** a person referenced by a transaction is renamed
+- **THEN** the transaction still references that same person and reads the new name
+
+#### Scenario: A person is not an account or a login
+
+- **WHEN** a transaction's person is read
+- **THEN** the person identifies the owner of the expense and does not authenticate, authorise, or identify a bank account or a session

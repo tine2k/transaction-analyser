@@ -2,9 +2,10 @@
 // JSON array, ordered newest booking date first, with each transaction's
 // category resolved from the categories table by following its reference and
 // the assignment provenance — manual when the category was chosen by hand,
-// automatic when the matching rule set it. It runs a single SELECT and writes
-// nothing: no row is created, altered, or deleted, and no category's regular
-// expression is evaluated.
+// automatic when the matching rule set it. Each transaction's person is resolved
+// from the people table the same way, and is never null. It runs a single SELECT
+// and writes nothing: no row is created, altered, or deleted, and no category's
+// regular expression is evaluated.
 //
 // The two dates are formatted in SQL rather than passed through, because the
 // `pg` driver parses a `date` into a JavaScript Date, whose JSON form carries a
@@ -23,11 +24,14 @@ const SELECT_TRANSACTIONS = `
          t.counterparty_name,
          t.counterparty_account,
          t.category_locked,
+         p.id AS person_id,
+         p.name AS person_name,
          c.id AS category_id,
          c.name AS category_name,
          c.hidden AS category_hidden,
          c.expense_type AS category_expense_type
   FROM transactions AS t
+  JOIN people AS p ON p.id = t.person_id
   LEFT JOIN categories AS c ON c.id = t.category_id
   ORDER BY t.booking_date DESC, t.id DESC
 `;
@@ -43,6 +47,8 @@ type TransactionRow = {
   counterparty_name: string;
   counterparty_account: string | null;
   category_locked: boolean;
+  person_id: string;
+  person_name: string;
   category_id: string | null;
   category_name: string | null;
   category_hidden: boolean | null;
@@ -88,6 +94,7 @@ export default defineEventHandler(async () => {
     purpose: row.purpose,
     counterpartyName: row.counterparty_name,
     counterpartyAccount: row.counterparty_account,
+    person: { id: row.person_id, name: row.person_name },
     categoryAssignment: row.category_locked ? 'manual' : 'automatic',
     category:
       row.category_id === null

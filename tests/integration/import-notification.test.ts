@@ -2,7 +2,7 @@
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { syncEasybank } from '../../shared/easybank-sync';
-import { finishImportRun, importCsv, startImportRun } from '../../shared/transactions-import';
+import { finishImportRun, importCsv, resolvePerson, setImportRunPerson, startImportRun } from '../../shared/transactions-import';
 import { startFakeBank, type FakeBank } from '../helpers/fake-bank';
 import { startFakePushover, type FakePushover } from '../helpers/fake-pushover';
 
@@ -160,7 +160,9 @@ describe('import notification through the sync path', () => {
     const text =
       [HEADER, '25.09.2026;25.09.2026;;Shop;Purchase;;;-9,99;EUR'].join('\n') + '\n';
     const runId = await startImportRun(connection(), { source: 'manual', nonWriting: false });
-    const plan = await importCsv(connection(), { kind: 'text', text, label: 'test.csv' }, { dryRun: false });
+    const person = await resolvePerson(connection(), 'Default');
+    await setImportRunPerson(connection(), runId, person.id);
+    const plan = await importCsv(connection(), { kind: 'text', text, label: 'test.csv' }, { dryRun: false, person });
     await finishImportRun(connection(), runId, {
       outcome: 'success',
       rowsRead: plan.rowsRead,

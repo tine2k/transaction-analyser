@@ -11,6 +11,8 @@ mockNuxtImport('$fetch', () => mocks.fetch);
 import Transactions from '../../app/pages/index.vue';
 import { formatEuroAmount } from '../../app/utils/category-spending';
 
+type TestPerson = { id: string; name: string };
+
 type TestTransaction = {
   id: string;
   bookingDate: string;
@@ -19,9 +21,14 @@ type TestTransaction = {
   purpose: string;
   counterpartyName: string;
   counterpartyAccount: string | null;
+  person?: TestPerson;
   categoryAssignment: 'manual' | 'automatic';
   category: { id: string; name: string; hidden: boolean } | null;
 };
+
+// Every fixture describes one household member unless it states another, so the
+// person-specific tests can name a second person without repeating the default.
+const DEFAULT_PERSON: TestPerson = { id: '1', name: 'Default' };
 
 const transactions: TestTransaction[] = [
   {
@@ -92,8 +99,19 @@ const sortingTransactions: TestTransaction[] = [
   },
 ];
 
+function withPeople(data: TestTransaction[]): TestTransaction[] {
+  return data.map((transaction) => ({
+    ...transaction,
+    person: transaction.person ?? DEFAULT_PERSON,
+  }));
+}
+
 function transactionsResponse(data: TestTransaction[]) {
-  return { data: ref(data), error: ref(null), pending: ref(false) };
+  return {
+    data: ref(withPeople(data)),
+    error: ref(null),
+    pending: ref(false),
+  };
 }
 
 function categoriesResponse() {
@@ -647,7 +665,7 @@ describe('transaction sorting', () => {
     const wrapper = await mountTransactions({ route: '/?category=all&sort=unknown&direction=desc' });
 
     expect(shownIds(wrapper)).toEqual(['a', 'b', 'c', 'd']);
-    for (const column of ['bookingDate', 'valueDate', 'amount', 'purpose', 'counterpartyName', 'counterpartyAccount', 'category']) {
+    for (const column of ['bookingDate', 'valueDate', 'amount', 'purpose', 'counterpartyName', 'counterpartyAccount', 'person', 'category']) {
       expect(headerCell(wrapper, column).getAttribute('aria-sort')).toBe('none');
     }
   });
@@ -735,15 +753,15 @@ describe('transaction sorting', () => {
     const wrapper = await mountTransactions({ route: '/?category=all' });
     const headers = wrapper.findAll('thead th');
 
-    expect(headers).toHaveLength(8);
+    expect(headers).toHaveLength(9);
     expect(headers[0]?.attributes('aria-sort')).toBeUndefined();
     expect(headers[0]?.find('[data-testid="select-all-visible"]').exists()).toBe(true);
-    expect(wrapper.findAll('thead th button')).toHaveLength(7);
+    expect(wrapper.findAll('thead th button')).toHaveLength(8);
     for (const button of wrapper.findAll('thead th button')) {
       expect(button.attributes('type')).toBe('button');
       expect(button.classes()).toContain('min-h-11');
     }
-    for (const column of ['bookingDate', 'valueDate', 'amount', 'purpose', 'counterpartyName', 'counterpartyAccount', 'category']) {
+    for (const column of ['bookingDate', 'valueDate', 'amount', 'purpose', 'counterpartyName', 'counterpartyAccount', 'person', 'category']) {
       expect(headerCell(wrapper, column).getAttribute('aria-sort')).toBe('none');
     }
   });
@@ -918,7 +936,7 @@ describe('transaction pattern shortcut', () => {
         });
       }
       if (url === '/api/transactions') {
-        return Promise.resolve(transactions);
+        return Promise.resolve(withPeople(transactions));
       }
       return Promise.resolve({ count: 0 });
     });
@@ -945,7 +963,7 @@ describe('transaction pattern shortcut', () => {
           added: false,
         });
       }
-      return Promise.resolve(transactions);
+      return Promise.resolve(withPeople(transactions));
     });
     const wrapper = await mountTransactions();
 
@@ -988,7 +1006,7 @@ describe('transaction pattern shortcut', () => {
         return append.promise;
       }
       if (url === '/api/transactions') {
-        return Promise.resolve(refreshed);
+        return Promise.resolve(withPeople(refreshed));
       }
       return Promise.resolve({ count: 0 });
     });
@@ -1032,7 +1050,7 @@ describe('transaction pattern shortcut', () => {
       if (url === '/api/categories/2/patterns') {
         return second.promise;
       }
-      return Promise.resolve(transactions);
+      return Promise.resolve(withPeople(transactions));
     });
     const wrapper = await mountTransactions();
 
@@ -1074,7 +1092,7 @@ describe('transaction pattern shortcut', () => {
         });
       }
       if (url === '/api/transactions') {
-        return refreshes[refreshIndex++]?.promise ?? Promise.resolve(transactions);
+        return refreshes[refreshIndex++]?.promise ?? Promise.resolve(withPeople(transactions));
       }
       return Promise.resolve({ count: 0 });
     });
@@ -1105,12 +1123,12 @@ describe('transaction pattern shortcut', () => {
         ? { ...transaction, category: { id: '2', name: 'Travel', hidden: false } }
         : transaction);
 
-    refreshes[1]?.resolve(groceries);
+    refreshes[1]?.resolve(withPeople(groceries));
     await flushPromises();
     expect((wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]').element as HTMLSelectElement).value)
       .toBe('1');
 
-    refreshes[0]?.resolve(travel);
+    refreshes[0]?.resolve(withPeople(travel));
     await flushPromises();
     expect((wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]').element as HTMLSelectElement).value)
       .toBe('1');
@@ -1237,7 +1255,7 @@ describe('manual category assignment', () => {
   it('disables the control while its assignment is in flight and refreshes once it settles', async () => {
     const assignment = deferred<{ updated: number }>();
     mocks.fetch.mockImplementation((url: string) =>
-      url === '/api/transactions' ? Promise.resolve(transactions) : assignment.promise);
+      url === '/api/transactions' ? Promise.resolve(withPeople(transactions)) : assignment.promise);
     const wrapper = await mountTransactions();
 
     const select = wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]');
@@ -1308,7 +1326,7 @@ describe('manual category assignment', () => {
 
   it('applies one assignment to every selected row and clears the selection on success', async () => {
     mocks.fetch.mockImplementation((url: string) =>
-      url === '/api/transactions' ? Promise.resolve(transactions) : Promise.resolve({ updated: 2 }));
+      url === '/api/transactions' ? Promise.resolve(withPeople(transactions)) : Promise.resolve({ updated: 2 }));
     const wrapper = await mountTransactions();
     await wrapper.get('[data-testid="category-filter"]').setValue('all');
     await flushPromises();
@@ -1333,7 +1351,7 @@ describe('manual category assignment', () => {
   it('keeps the selection and reports when a bulk assignment fails', async () => {
     mocks.fetch.mockImplementation((url: string) =>
       url === '/api/transactions'
-        ? Promise.resolve(transactions)
+        ? Promise.resolve(withPeople(transactions))
         : Promise.reject({ data: { message: 'the request could not be completed' } }));
     const wrapper = await mountTransactions();
     await wrapper.get('[data-testid="category-filter"]').setValue('all');
@@ -1441,7 +1459,7 @@ describe('transaction search', () => {
     expect(categorySelect(wrapper).value).toBe('uncategorised');
     expect(periodSelect(wrapper).value).toBe('2026');
     expect(searchField(wrapper).attributes('type')).toBe('search');
-    expect(wrapper.get('label[for="transaction-search"]').text()).toBe('Search all transactions');
+    expect(wrapper.get('label[for="transaction-search"]').text()).toBe('Search transactions');
     expect(searchButton(wrapper).text()).toBe('Search');
     expect(searchButton(wrapper).attributes('type')).toBe('submit');
     expect(wrapper.find('[data-testid="filters-paused-note"]').exists()).toBe(false);
@@ -1644,7 +1662,7 @@ describe('transaction search', () => {
         return Promise.resolve({ updated: 1 });
       }
       if (url === '/api/transactions') {
-        return Promise.resolve(searchTransactions);
+        return Promise.resolve(withPeople(searchTransactions));
       }
       return Promise.reject(new Error('unexpected request'));
     });
@@ -1821,7 +1839,7 @@ describe('progressive presentation', () => {
     mocks.useFetch.mockImplementation((url: unknown) =>
       url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
     mocks.fetch.mockImplementation((url: string) => Promise.resolve(
-      url === '/api/transactions' ? refreshed : { updated: 1 },
+      url === '/api/transactions' ? withPeople(refreshed) : { updated: 1 },
     ));
 
     const wrapper = await mountTransactions();
@@ -1850,7 +1868,7 @@ describe('progressive presentation', () => {
     mocks.useFetch.mockImplementation((url: unknown) =>
       url === '/api/transactions' ? transactionsResponse(transactions) : categoriesResponse());
     mocks.fetch.mockImplementation((url: string) => Promise.resolve(
-      url === '/api/transactions' ? refreshed : { updated: 1 },
+      url === '/api/transactions' ? withPeople(refreshed) : { updated: 1 },
     ));
 
     const wrapper = await mountTransactions();
@@ -1890,5 +1908,162 @@ describe('progressive presentation', () => {
     const options = wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]')
       .findAll('option').map((option) => option.text());
     expect(options).toContain('Fuel');
+  });
+});
+
+const ANNA: TestPerson = { id: '2', name: 'Anna' };
+
+// Two people whose periods and categories differ, so the person filter can be
+// observed to scope every derivation rather than only the rows.
+const personTransactions: TestTransaction[] = [
+  {
+    id: 'a1', bookingDate: '2026-03-05', valueDate: '2026-03-05', amount: '-5.00',
+    purpose: 'Anna market', counterpartyName: 'Market', counterpartyAccount: null,
+    person: ANNA, categoryAssignment: 'automatic',
+    category: { id: '1', name: 'Groceries', hidden: false },
+  },
+  {
+    id: 'a2', bookingDate: '2025-12-05', valueDate: '2025-12-05', amount: '-7.00',
+    purpose: 'Anna rail', counterpartyName: 'Rail', counterpartyAccount: null,
+    person: ANNA, categoryAssignment: 'automatic',
+    category: { id: '2', name: 'Travel', hidden: false },
+  },
+  {
+    id: 'd1', bookingDate: '2026-03-06', valueDate: '2026-03-06', amount: '-9.00',
+    purpose: 'Default market', counterpartyName: 'Market', counterpartyAccount: null,
+    person: DEFAULT_PERSON, categoryAssignment: 'automatic',
+    category: { id: '1', name: 'Groceries', hidden: false },
+  },
+  {
+    id: 'd2', bookingDate: '2024-01-05', valueDate: '2024-01-05', amount: '-11.00',
+    purpose: 'Default old', counterpartyName: 'Shop', counterpartyAccount: null,
+    person: DEFAULT_PERSON, categoryAssignment: 'automatic',
+    category: { id: '3', name: 'Internal', hidden: false },
+  },
+];
+
+describe('the person filter', () => {
+  beforeEach(() => {
+    mocks.useFetch.mockReset();
+    mocks.fetch.mockReset();
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions'
+        ? transactionsResponse(personTransactions)
+        : categoriesResponse());
+  });
+
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) {
+      wrapper.unmount();
+    }
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function shownIds(wrapper: Awaited<ReturnType<typeof mountTransactions>>): string[] {
+    return wrapper.findAll('tbody tr')
+      .map((row) => row.attributes('data-transaction-id') ?? '');
+  }
+
+  function personSelect(wrapper: Awaited<ReturnType<typeof mountTransactions>>) {
+    return wrapper.get('[data-testid="person-filter"]').element as HTMLSelectElement;
+  }
+
+  function optionText(wrapper: Awaited<ReturnType<typeof mountTransactions>>, testId: string): string[] {
+    return wrapper.get(`[data-testid="${testId}"]`).findAll('option').map((option) => option.text());
+  }
+
+  async function settle(): Promise<void> {
+    await flushPromises();
+    await wait(20);
+    await flushPromises();
+  }
+
+  it('renders the person column and offers each represented person', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=all' });
+
+    expect(wrapper.get('[data-transaction-id="a1"] td:nth-child(8)').text()).toBe('Anna');
+    expect(wrapper.get('[data-transaction-id="d1"] td:nth-child(8)').text()).toBe('Default');
+    expect(optionText(wrapper, 'person-filter')).toEqual(['All people', 'Anna', 'Default']);
+  });
+
+  it('initializes from the query and scopes rows, choices, and counts to the person', async () => {
+    const wrapper = await mountTransactions({ route: '/?person=2&category=all' });
+
+    expect(personSelect(wrapper).value).toBe('2');
+    expect(shownIds(wrapper)).toEqual(['a1']);
+
+    await wrapper.get('[data-testid="period-filter"]').setValue('all');
+    await flushPromises();
+
+    expect(shownIds(wrapper)).toEqual(['a1', 'a2']);
+    expect(optionText(wrapper, 'category-filter')).toEqual([
+      'All categories (2)',
+      'Uncategorised (0)',
+      'Groceries',
+      'Travel',
+    ]);
+    const periodValues = wrapper.get('[data-testid="period-filter"]')
+      .findAll('option').map((option) => option.attributes('value'));
+    expect(periodValues).toEqual(['all', '2026', '2025', '2026-03', '2025-12']);
+  });
+
+  it('falls back to all people for an unknown person', async () => {
+    const wrapper = await mountTransactions({ route: '/?person=999&category=all' });
+
+    expect(personSelect(wrapper).value).toBe('all');
+    expect(shownIds(wrapper)).toEqual(['a1', 'd1']);
+  });
+
+  it('sorts by the person name and keeps equal values in endpoint order', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=all' });
+    await wrapper.get('[data-testid="period-filter"]').setValue('all');
+    await flushPromises();
+
+    await wrapper.get('[data-testid="sort-person"]').trigger('click');
+    await flushPromises();
+
+    expect(shownIds(wrapper)).toEqual(['a1', 'a2', 'd1', 'd2']);
+  });
+
+  it('searches only within the selected person', async () => {
+    const wrapper = await mountTransactions({ route: '/?person=2&category=all' });
+
+    await wrapper.get('[data-testid="transaction-search"]').setValue('market');
+    await wrapper.get('form').trigger('submit');
+    await settle();
+
+    expect(shownIds(wrapper)).toEqual(['a1']);
+    expect(wrapper.get('[data-testid="filters-paused-note"]').text()).toContain('person filter still applies');
+  });
+
+  it('clears the selection on a person change and keeps the other query values', async () => {
+    const wrapper = await mountTransactions({ route: '/?person=2&category=all&q=market' });
+    await wrapper.get('[data-testid="row-select"]').setValue(true);
+    expect(wrapper.find('[data-testid="bulk-assignment-bar"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="person-filter"]').setValue('all');
+    await settle();
+
+    expect(wrapper.find('[data-testid="bulk-assignment-bar"]').exists()).toBe(false);
+    const query = wrapper.vm.$router.currentRoute.value.query;
+    expect(query.person).toBeUndefined();
+    expect(query.category).toBe('all');
+    expect(query.q).toBe('market');
+  });
+
+  it('writes the person to the query and preserves it through sorting', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=all' });
+
+    await wrapper.get('[data-testid="person-filter"]').setValue('2');
+    await settle();
+    expect(wrapper.vm.$router.currentRoute.value.query.person).toBe('2');
+
+    await wrapper.get('[data-testid="sort-person"]').trigger('click');
+    await settle();
+    const query = wrapper.vm.$router.currentRoute.value.query;
+    expect(query.person).toBe('2');
+    expect(query.sort).toBe('person');
   });
 });

@@ -12,8 +12,10 @@ import {
 } from '../utils/transaction-search';
 
 // The index route reads stored transactions from the read-only GET
-// /api/transactions endpoint. Category and booking-period filters are derived
-// from that response and represented in the route query. The values are
+// /api/transactions endpoint. The person, category, and booking-period filters
+// are derived from that response and represented in the route query. The person
+// filter scopes the period choices and defaults, the category choices, defaults,
+// and counts, and the search; changing it clears the row selection. The values are
 // presented exactly as returned: amounts remain signed decimal strings, and
 // dates remain day-precise strings.
 //
@@ -35,11 +37,12 @@ import {
 // carried in the route query. A route without a sort keeps the endpoint's order,
 // and equal values keep their relative endpoint order.
 //
-// The all-transactions search matches the descriptive fields. The field holds a
-// draft that takes effect only when the form is submitted; a non-empty applied
-// search bypasses the category and period filters, which stay visible with their
-// values but are disabled until the search is cleared. The trimmed applied text
-// is carried in the route query as `q`.
+// The transactions search matches the descriptive fields within the selected
+// person. The field holds a draft that takes effect only when the form is
+// submitted; a non-empty applied search bypasses the category and period filters,
+// which stay visible with their values but are disabled until the search is
+// cleared, while the person filter remains active. The trimmed applied text is
+// carried in the route query as `q`.
 //
 // The page also offers manual category assignment. Every row's category cell
 // hosts a select that pins the row to a chosen category or clears the pin by
@@ -76,6 +79,7 @@ import {
 // openspec/changes/add-transaction-pattern-shortcut/specs/transaction-pattern-shortcut/spec.md,
 // and openspec/changes/add-manual-category-assignment/specs/manual-category-assignment/spec.md
 type Category = { id: string; name: string };
+type Person = { id: string; name: string };
 
 type Transaction = {
   id: string;
@@ -85,6 +89,7 @@ type Transaction = {
   purpose: string;
   counterpartyName: string;
   counterpartyAccount: string | null;
+  person: Person;
   categoryAssignment: 'manual' | 'automatic';
   category: Category | null;
 };
@@ -96,6 +101,7 @@ const SORTABLE_COLUMNS = [
   'purpose',
   'counterpartyName',
   'counterpartyAccount',
+  'person',
   'category',
 ] as const;
 
@@ -111,6 +117,7 @@ const sortableColumns: SortableColumn[] = [
   { column: 'purpose', label: 'Purpose', align: 'left' },
   { column: 'counterpartyName', label: 'Counterparty', align: 'left' },
   { column: 'counterpartyAccount', label: 'Account', align: 'left' },
+  { column: 'person', label: 'Person', align: 'left' },
   { column: 'category', label: 'Category', align: 'left' },
 ];
 
@@ -156,10 +163,21 @@ function sortFromQuery(): TransactionSort | null {
   };
 }
 
+// The person filter is client-side and URL-backed. An absent or unknown value
+// means all people, and the selection scopes every derivation below.
+const selectedPerson = ref('all');
+
+const scopedTransactions = computed(() => {
+  const rows = transactions.value ?? [];
+  if (selectedPerson.value === 'all') {
+    return rows;
+  }
+  return rows.filter((transaction) => transaction.person.id === selectedPerson.value);
+});
+
 function isMonthKey(value: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 }
-
 function monthLabel(key: string): string {
   return new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })
     .format(new Date(`${key}-01T00:00:00Z`));
@@ -167,10 +185,24 @@ function monthLabel(key: string): string {
 
 const categories = computed(() => {
   const byId = new Map<string, Category>();
-  for (const transaction of transactions.value ?? []) {
+  for (const transaction of scopedTransactions.value) {
     if (transaction.category !== null) {
       byId.set(transaction.category.id, transaction.category);
     }
+  }
+  return [...byId.values()].sort((left, right) =>
+    left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
+    || left.id.localeCompare(right.id, undefined, { numeric: true }),
+  );
+});
+
+// The person choices come from the returned transactions alone, so only people
+// the filter can actually show are offered. A person with no transaction is shown
+// on the People screen instead.
+const personOptions = computed(() => {
+  const byId = new Map<string, Person>();
+  for (const transaction of transactions.value ?? []) {
+    byId.set(transaction.person.id, transaction.person);
   }
   return [...byId.values()].sort((left, right) =>
     left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
@@ -190,7 +222,7 @@ function isYearKey(value: string): boolean {
 // months newest first under a months group.
 const periods = computed<PeriodGroups>(() => {
   const monthsByYear = new Map<string, Set<string>>();
-  for (const { bookingDate } of transactions.value ?? []) {
+  for (const { bookingDate } of scopedTransactions.value) {
     const year = bookingDate.slice(0, 4);
     const month = bookingDate.slice(0, 7);
     if (!isYearKey(year) || !isMonthKey(month)) {
@@ -260,7 +292,7 @@ function categoryFromQuery(): string {
     return requested;
   }
   const period = effectivePeriod();
-  return (transactions.value ?? []).some(
+  return scopedTransactions.value.some(
     (transaction) => transaction.category === null && matchesPeriod(transaction.bookingDate, period),
   )
     ? 'uncategorised'
@@ -292,6 +324,14 @@ const categoryFilter = computed({
   },
 });
 
+const personFilter = computed({
+  get: () => selectedPerson.value,
+  set(value: string) {
+    selectedPerson.value = value;
+    setPersonQuery(value);
+  },
+});
+
 const periodFilter = computed({
   get: () => selectedPeriod.value,
   set(value: string) {
@@ -316,6 +356,16 @@ function queryWithActiveSort() {
 
 function setCategoryQuery(value: string): void {
   const query = { ...queryWithActiveSort(), category: value };
+  void router.replace({ path: '/', query });
+}
+
+function setPersonQuery(value: string): void {
+  const query = { ...queryWithActiveSort() };
+  if (value === 'all') {
+    delete query.person;
+  } else {
+    query.person = value;
+  }
   void router.replace({ path: '/', query });
 }
 
@@ -393,15 +443,22 @@ function ariaSortFor(column: SortColumn): 'ascending' | 'descending' | 'none' {
 
 watch(
   () => [
+    route.value.query.person,
     route.value.query.category,
     route.value.query.month,
     route.value.query.year,
     route.value.query.sort,
     route.value.query.direction,
+    personOptions.value,
     categories.value,
     periods.value,
   ],
   () => {
+    const requestedPerson = queryString(route.value.query.person);
+    selectedPerson.value =
+      requestedPerson !== undefined && personOptions.value.some(({ id }) => id === requestedPerson)
+        ? requestedPerson
+        : 'all';
     selectedCategory.value = categoryFromQuery();
     const queryPeriod = queryString(route.value.query.month) ?? queryString(route.value.query.year);
     if (queryPeriod !== undefined || !allPeriodsSelected.value) {
@@ -413,23 +470,25 @@ watch(
 );
 
 const uncategorisedTransactions = computed(() =>
-  (transactions.value ?? []).filter((transaction) => transaction.category === null),
+  scopedTransactions.value.filter((transaction) => transaction.category === null),
 );
 
 // The descriptive text is normalised once per loaded response, so applying a
 // search only parses its terms and compares against already-normalised rows.
-const searchIndex = computed(() => createTransactionSearchIndex(transactions.value ?? []));
+const searchIndex = computed(() => createTransactionSearchIndex(scopedTransactions.value));
 
-// An applied search covers every returned transaction and overrides the
-// category and period filters; no applied search keeps the filtered view.
+// An applied search covers every returned transaction of the selected person and
+// overrides the category and period filters, never the person filter; no applied
+// search keeps the filtered view.
 const visibleTransactions = computed(() => {
+  const rows = scopedTransactions.value;
   if (appliedSearch.value !== '') {
     const terms = searchTerms(appliedSearch.value);
     const index = searchIndex.value;
-    return (transactions.value ?? []).filter((transaction) =>
+    return rows.filter((transaction) =>
       matchesTransactionSearchTerms(index.get(transaction.id) ?? '', terms));
   }
-  return (transactions.value ?? []).filter((transaction) => {
+  return rows.filter((transaction) => {
     const categoryMatches = categoryFilter.value === 'all'
       || (categoryFilter.value === 'uncategorised'
         ? transaction.category === null
@@ -457,6 +516,7 @@ function sortValue(transaction: Transaction, column: SortColumn): string | null 
     case 'purpose': return transaction.purpose;
     case 'counterpartyName': return transaction.counterpartyName;
     case 'counterpartyAccount': return transaction.counterpartyAccount;
+    case 'person': return transaction.person.name;
     case 'category': return transaction.category?.name ?? null;
   }
 }
@@ -625,6 +685,7 @@ function continuePresentation(): void {
 
 watch(
   [
+    personFilter,
     categoryFilter,
     periodFilter,
     appliedSearch,
@@ -688,6 +749,8 @@ function rowInFlight(transactionId: string): boolean {
 function rowMemo(transaction: Transaction): unknown[] {
   return [
     transaction,
+    transaction.person.id,
+    transaction.person.name,
     pickerCategories.value,
     markers.value.has(transaction.id),
     rowsInFlight.value.has(transaction.id),
@@ -744,7 +807,7 @@ function clearSelection(): void {
   selectedIds.value = new Set();
 }
 
-watch([categoryFilter, periodFilter, appliedSearch], () => {
+watch([personFilter, categoryFilter, periodFilter, appliedSearch], () => {
   clearSelection();
 });
 
@@ -1038,6 +1101,8 @@ function sameDisplayedTransaction(left: Transaction, right: Transaction): boolea
     && left.purpose === right.purpose
     && left.counterpartyName === right.counterpartyName
     && left.counterpartyAccount === right.counterpartyAccount
+    && left.person.id === right.person.id
+    && left.person.name === right.person.name
     && left.categoryAssignment === right.categoryAssignment
     && left.category?.id === right.category?.id
     && left.category?.name === right.category?.name;
@@ -1121,7 +1186,7 @@ onBeforeUnmount(() => {
     <template v-else-if="transactions">
       <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
         <div class="grid w-full gap-1 text-sm font-medium text-muted sm:w-auto">
-          <label for="transaction-search">Search all transactions</label>
+          <label for="transaction-search">Search transactions</label>
           <form class="flex min-w-0 items-center gap-2" @submit.prevent="applySearch">
             <input
               id="transaction-search"
@@ -1153,6 +1218,19 @@ onBeforeUnmount(() => {
           </form>
         </div>
         <label class="grid w-full gap-1 text-sm font-medium text-muted sm:w-auto">
+          Person
+          <select
+            v-model="personFilter"
+            data-testid="person-filter"
+            class="min-h-11 w-full max-w-full rounded-sheet border border-rule-strong bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-auto"
+          >
+            <option value="all">All people</option>
+            <option v-for="person in personOptions" :key="person.id" :value="person.id">
+              {{ person.name }}
+            </option>
+          </select>
+        </label>
+        <label class="grid w-full gap-1 text-sm font-medium text-muted sm:w-auto">
           Category
           <select
             v-model="categoryFilter"
@@ -1161,7 +1239,7 @@ onBeforeUnmount(() => {
             :aria-describedby="searchActive ? 'filters-paused-note' : undefined"
             class="min-h-11 w-full max-w-full rounded-sheet border border-rule-strong bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-60 sm:w-auto"
           >
-            <option value="all">All categories ({{ transactions.length }})</option>
+            <option value="all">All categories ({{ scopedTransactions.length }})</option>
             <option value="uncategorised">Uncategorised ({{ uncategorisedTransactions.length }})</option>
             <option v-for="category in categories" :key="category.id" :value="category.id">
               {{ category.name }}
@@ -1198,7 +1276,7 @@ onBeforeUnmount(() => {
         data-testid="filters-paused-note"
         class="mt-2 text-sm text-muted"
       >
-        Filters are paused while searching. Clear the search to use them again.
+        Filters are paused while searching. Category and period filtering is off, the person filter still applies. Clear the search to use them again.
       </p>
 
       <div class="mt-4" data-testid="visible-total">
@@ -1320,6 +1398,7 @@ onBeforeUnmount(() => {
                   <span class="sr-only">No counterparty account</span>
                 </template>
               </td>
+              <td class="px-3 py-2 text-ink">{{ transaction.person.name }}</td>
               <td class="px-3 py-2 text-ink">
                 <span
                   v-if="markers.has(transaction.id)"

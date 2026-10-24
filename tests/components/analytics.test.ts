@@ -62,8 +62,8 @@ describe('category spending page', () => {
   it('links category totals and routes named and uncategorised slice activations', async () => {
     const today = getLocalDateString(new Date());
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: today, amount: '-10.00', category: { id: '7', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: today, amount: '-2.00', category: null },
+      { bookingDate: today, amount: '-10.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '7', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-2.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -105,12 +105,12 @@ describe('category spending page', () => {
       throw new Error('expected twelve calendar month buckets');
     }
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: today, amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: today, amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: today, amount: '-3.25', category: null },
-      { bookingDate: today, amount: '-1234567.89', category: { id: '3', name: 'Rent', hidden: false, expenseType: null } },
-      { bookingDate: previousMonth.startDate, amount: '-2.00', category: { id: '2', name: 'Transport', hidden: false, expenseType: null } },
-      { bookingDate: previousMonth.startDate, amount: '-7.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-12.50', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '4.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-3.25', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: today, amount: '-1234567.89', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Rent', hidden: false, expenseType: null } },
+      { bookingDate: previousMonth.startDate, amount: '-2.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Transport', hidden: false, expenseType: null } },
+      { bookingDate: previousMonth.startDate, amount: '-7.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -171,9 +171,9 @@ describe('category spending page', () => {
       throw new Error('expected twelve calendar month buckets');
     }
     const transactions: CategorySpendingTransaction[] = [
-      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: today, amount: '-3.00', category: null },
-      { bookingDate: previousMonth.startDate, amount: '-5.00', category: null },
+      { bookingDate: today, amount: '-10.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-3.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: previousMonth.startDate, amount: '-5.00', person: { id: '1', name: 'Default' }, category: null },
     ];
     mocks.useFetch.mockReturnValue(response(transactions));
 
@@ -213,18 +213,18 @@ describe('category spending page', () => {
       ]);
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
     expect(transactions).toEqual([
-      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: today, amount: '-3.00', category: null },
-      { bookingDate: previousMonth.startDate, amount: '-5.00', category: null },
+      { bookingDate: today, amount: '-10.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-3.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: previousMonth.startDate, amount: '-5.00', person: { id: '1', name: 'Default' }, category: null },
     ]);
   });
 
   it('excludes a hidden category from every monthly chart while keeping other totals unchanged', async () => {
     const today = getLocalDateString(new Date());
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: today, amount: '-99.00', category: { id: '9', name: 'Internal', hidden: true, expenseType: null } },
-      { bookingDate: today, amount: '-2.00', category: null },
+      { bookingDate: today, amount: '-10.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-99.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '9', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: today, amount: '-2.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -248,7 +248,7 @@ describe('category spending page', () => {
     expect(loading.text()).toContain('Loading monthly category totals');
 
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2026-09-28', amount: '-12.50', category: { id: '1', name: 'Stale', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-28', amount: '-12.50', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Stale', hidden: false, expenseType: null } },
     ], { error: new Error('failed') }));
     const failed = await mountSuspended(Analytics);
     expect(failed.text()).toContain('Monthly category totals could not be loaded');
@@ -266,7 +266,7 @@ describe('category spending page', () => {
   it('defaults to the months view and switches to years without another request', async () => {
     const year = new Date().getFullYear() - 2;
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: `${year}-05-01`, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: `${year}-05-01`, amount: '-10.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -291,12 +291,12 @@ describe('category spending page', () => {
     const previousYear = currentYear - 1;
     const oldestYear = currentYear - 2;
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: `${oldestYear}-03-01`, amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: `${oldestYear}-11-01`, amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: `${oldestYear}-05-01`, amount: '-3.25', category: null },
-      { bookingDate: `${currentYear}-01-01`, amount: '-99.00', category: { id: '9', name: 'Internal', hidden: true, expenseType: null } },
-      { bookingDate: `${previousYear}-07-01`, amount: '-7.00', category: { id: '2', name: 'Travel', hidden: false, expenseType: null } },
-      { bookingDate: `${currentYear}-02-01`, amount: '-1.00', category: { id: '2', name: 'Travel', hidden: false, expenseType: null } },
+      { bookingDate: `${oldestYear}-03-01`, amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: `${oldestYear}-11-01`, amount: '4.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: `${oldestYear}-05-01`, amount: '-3.25', person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: `${currentYear}-01-01`, amount: '-99.00', person: { id: '1', name: 'Default' }, category: { id: '9', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: `${previousYear}-07-01`, amount: '-7.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Travel', hidden: false, expenseType: null } },
+      { bookingDate: `${currentYear}-02-01`, amount: '-1.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Travel', hidden: false, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -323,8 +323,8 @@ describe('category spending page', () => {
   it('links year headings and category totals to matching year transactions', async () => {
     const year = new Date().getFullYear() - 2;
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: `${year}-05-01`, amount: '-10.00', category: { id: '7', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: `${year}-05-02`, amount: '-2.00', category: null },
+      { bookingDate: `${year}-05-01`, amount: '-10.00', person: { id: '1', name: 'Default' }, category: { id: '7', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: `${year}-05-02`, amount: '-2.00', person: { id: '1', name: 'Default' }, category: null },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -369,9 +369,9 @@ describe('category spending page', () => {
     const today = getLocalDateString(new Date());
     const year = new Date().getFullYear() - 2;
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: `${year}-05-01`, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: `${year}-05-02`, amount: '-2.00', category: null },
-      { bookingDate: today, amount: '-5.00', category: null },
+      { bookingDate: `${year}-05-01`, amount: '-10.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: `${year}-05-02`, amount: '-2.00', person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: today, amount: '-5.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -395,7 +395,7 @@ describe('category spending page', () => {
 
   it('shows no year panels and an explanation when no year has eligible data', async () => {
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2024-05-01', amount: '-9.00', category: { id: '9', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: '2024-05-01', amount: '-9.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '9', name: 'Internal', hidden: true, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -408,7 +408,7 @@ describe('category spending page', () => {
   it('keeps each category color when switching between views', async () => {
     const today = getLocalDateString(new Date());
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-10.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -425,10 +425,10 @@ describe('category spending page', () => {
   it('filters both views by expense type without another request', async () => {
     const today = getLocalDateString(new Date());
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: 'recurring' } },
-      { bookingDate: today, amount: '-20.00', category: { id: '2', name: 'New car', hidden: false, expenseType: 'one-time' } },
-      { bookingDate: today, amount: '-30.00', category: { id: '3', name: 'Internal', hidden: false, expenseType: null } },
-      { bookingDate: today, amount: '-40.00', category: null },
+      { bookingDate: today, amount: '-10.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: 'recurring' } },
+      { bookingDate: today, amount: '-20.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '2', name: 'New car', hidden: false, expenseType: 'one-time' } },
+      { bookingDate: today, amount: '-30.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Internal', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-40.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -462,7 +462,7 @@ describe('category spending page', () => {
       throw new Error('expected twelve calendar month buckets');
     }
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: today, amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-10.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(Analytics);
@@ -471,5 +471,63 @@ describe('category spending page', () => {
     const currentPanel = wrapper.findAll('[data-testid="month-panel"]')[0];
     expect(currentPanel?.findAll('[data-testid="category-total"]')).toHaveLength(0);
     expect(currentPanel?.text()).toContain(`No category data for ${currentMonth.label}`);
+  });
+});
+
+describe('the analytics person filter', () => {
+  const anna = { id: '2', name: 'Anna' };
+  const defaultPerson = { id: '1', name: 'Default' };
+
+  beforeEach(() => {
+    mocks.useFetch.mockReset();
+  });
+
+  function withPeople() {
+    const today = getLocalDateString(new Date());
+    return response([
+      { bookingDate: today, amount: '-10.00', person: anna, category: { id: '7', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: today, amount: '-2.00', person: defaultPerson, category: null },
+    ]);
+  }
+
+  it('reads the person from the URL and scopes every panel', async () => {
+    mocks.useFetch.mockReturnValue(withPeople());
+
+    const wrapper = await mountSuspended(Analytics, { route: '/?person=2' });
+
+    expect((wrapper.get('[data-testid="person-filter"]').element as HTMLSelectElement).value).toBe('2');
+    expect(wrapper.findAll('[data-testid="category-total"]').map((item) => item.text()))
+      .toEqual([expect.stringContaining('Groceries')]);
+    expect(wrapper.text()).not.toContain('Uncategorised');
+
+    const monthLink = new URL(wrapper.get('[data-testid="month-link"]').attributes('href')!, 'http://localhost');
+    expect(monthLink.searchParams.get('person')).toBe('2');
+    const categoryLink = new URL(wrapper.get('[data-testid="category-transaction-link"]').attributes('href')!, 'http://localhost');
+    expect(categoryLink.searchParams.get('person')).toBe('2');
+    expect(categoryLink.searchParams.get('category')).toBe('7');
+
+    await wrapper.get('[data-testid="view-years"]').setValue(true);
+    await flushPromises();
+    const yearLink = new URL(wrapper.get('[data-testid="year-link"]').attributes('href')!, 'http://localhost');
+    expect(yearLink.searchParams.get('person')).toBe('2');
+
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to all people and omits the person from drill-down links', async () => {
+    mocks.useFetch.mockReturnValue(withPeople());
+
+    const wrapper = await mountSuspended(Analytics, { route: '/?person=999' });
+
+    expect((wrapper.get('[data-testid="person-filter"]').element as HTMLSelectElement).value).toBe('all');
+    expect(wrapper.text()).toContain('Uncategorised');
+    const monthLink = new URL(wrapper.get('[data-testid="month-link"]').attributes('href')!, 'http://localhost');
+    expect(monthLink.searchParams.has('person')).toBe(false);
+
+    await wrapper.get('[data-testid="person-filter"]').setValue('2');
+    await flushPromises();
+    expect((wrapper.get('[data-testid="person-filter"]').element as HTMLSelectElement).value).toBe('2');
+    expect(wrapper.text()).not.toContain('Uncategorised');
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -18,6 +18,8 @@ const transactions = [
     purpose: `A longer purpose description for ${category.name}`,
     counterpartyName: `Merchant ${index + 1}`,
     counterpartyAccount: `DE000000000000000${index + 1}`,
+    person: { id: String((index % 2) + 1), name: index % 2 === 0 ? 'Default' : 'Anna' },
+    categoryAssignment: 'automatic',
     category: { id: category.id, name: category.name, hidden: category.hidden },
   })),
   {
@@ -28,6 +30,8 @@ const transactions = [
     purpose: 'Uncategorised transaction',
     counterpartyName: 'Local shop',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
+    categoryAssignment: 'automatic',
     category: null,
   },
 ];
@@ -38,6 +42,7 @@ const importRuns = [
     startedAt: '2026-10-06T03:00:00Z',
     finishedAt: '2026-10-06T03:00:05Z',
     source: 'scheduled',
+    person: { id: '1', name: 'Default' },
     nonWriting: true,
     outcome: 'success',
     rowsRead: 12,
@@ -48,9 +53,15 @@ const importRuns = [
   },
 ];
 
+const people = [
+  { id: '1', name: 'Default', transactionCount: 4 },
+  { id: '2', name: 'Anna', transactionCount: 0 },
+];
+
 const routes = [
   { path: '/', heading: 'Transactions' },
   { path: '/categories', heading: 'Categories' },
+  { path: '/people', heading: 'People' },
   { path: '/analytics', heading: 'Category spending' },
   { path: '/monthly-totals', heading: 'Monthly totals' },
   { path: '/monthly-average', heading: 'Monthly average' },
@@ -76,6 +87,11 @@ async function interceptApi(page: Page): Promise<void> {
 
     if (pathname === '/api/imports') {
       await route.fulfill({ json: importRuns });
+      return;
+    }
+
+    if (pathname === '/api/people') {
+      await route.fulfill({ json: people });
       return;
     }
 
@@ -136,6 +152,11 @@ for (const viewport of viewports) {
         }
 
         if (viewport.width <= 390 && route.path === '/') {
+          await expect(page.getByTestId('person-filter')).toBeVisible();
+          await expect(page.getByTestId('category-filter')).toBeVisible();
+          await expect(page.getByTestId('period-filter')).toBeVisible();
+          await expect(page.locator('thead th', { hasText: 'Person' })).toHaveCount(1);
+
           const region = page.getByRole('region', { name: 'Transactions table' });
           await expect(region).toBeVisible();
           await region.focus();
@@ -144,8 +165,7 @@ for (const viewport of viewports) {
           await expectNoPageOverflow(page);
         }
 
-        if (viewport.width <= 390 && route.path === '/categories') {
-          await page.getByTestId('add-window').click();
+        if (viewport.width <= 390 && route.path === '/categories') {          await page.getByTestId('add-window').click();
           await expect(page.getByTestId('window-from')).toBeVisible();
           await expectPhoneControlsToBeTouchSized(page);
 
@@ -153,6 +173,16 @@ for (const viewport of viewports) {
           await expect(region).toBeVisible();
           await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
             .toBe(true);
+          await expectNoPageOverflow(page);
+        }
+
+        if (viewport.width <= 390 && route.path === '/people') {
+          await expect(page.getByTestId('person-row')).toHaveCount(2);
+          await expect(page.getByTestId('person-name-input')).toBeVisible();
+          await expectPhoneControlsToBeTouchSized(page);
+
+          const region = page.getByRole('region', { name: 'People table' });
+          await expect(region).toBeVisible();
           await expectNoPageOverflow(page);
         }
 
@@ -188,7 +218,7 @@ for (const viewport of viewports) {
         await expect(toggle).toHaveAttribute('aria-expanded', 'false');
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        await expect(page.locator('#screen-navigation a')).toHaveCount(6);
+        await expect(page.locator('#screen-navigation a')).toHaveCount(7);
         await expectPhoneControlsToBeTouchSized(page);
         await page.getByRole('link', { name: 'Categories' }).click();
         await expect(page).toHaveURL(/\/categories$/);
@@ -201,7 +231,7 @@ for (const viewport of viewports) {
         await interceptApi(page);
         await page.goto('/');
         const links = page.locator('#screen-navigation a');
-        await expect(links).toHaveCount(6);
+        await expect(links).toHaveCount(7);
         await expect(links.first()).toBeVisible();
         await expect(links.last()).toBeVisible();
       });

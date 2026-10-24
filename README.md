@@ -45,13 +45,15 @@ The importer is not part of the image; run it from the repository checkout with 
 
 ```sh
 npm ci
-npm run import -- /path/to/statement.csv --dry-run
-npm run import -- /path/to/statement.csv --dsn postgres://analyser:change-me@localhost:5432/transaction_analyser
+npm run import -- /path/to/statement.csv --person Anna --dry-run
+npm run import -- /path/to/statement.csv --person Anna --dsn postgres://analyser:change-me@localhost:5432/transaction_analyser
 ```
+
+`--person` is required and names the person the statement belongs to. The person must already exist — create it on the People screen first, or use `Default` — because an import never creates one. The name is matched ignoring letter case and surrounding whitespace.
 
 The file must be UTF-8, semicolon-delimited, and carry exactly this header: `Date;Value date;Category;Name;Purpose;Account;Bank;Amount;Currency`.
 
-Dates are `DD.MM.YYYY`, amounts use a comma decimal separator (`-1.234,56`), the currency must be `EUR`, and zero amounts are rejected. A row already stored is skipped rather than imported again, so re-running an import of the same statement adds nothing; a statement that legitimately contains the same transaction twice still produces two rows. `--dry-run` validates the whole file, reads the database to report which rows are new and which are already stored, and writes nothing. Every run is recorded and shown on the Imports screen. Each newly imported transaction is categorised by the categories stored at import time; the stored transactions are re-evaluated whenever the category set changes, except transactions you have assigned by hand, which keep their category. Without `--dsn` the importer uses `$DATABASE_URL`.
+Dates are `DD.MM.YYYY`, amounts use a comma decimal separator (`-1.234,56`), the currency must be `EUR`, and zero amounts are rejected. A row already stored for the same person is skipped rather than imported again, so re-running an import of the same statement adds nothing; a statement that legitimately contains the same transaction twice still produces two rows. The same row imported for another person is new, so two people's identical statements do not collide. `--dry-run` validates the whole file, reads the database to report which rows are new and which are already stored for that person, and writes nothing. Every run is recorded, names its person, and is shown on the Imports screen. Each newly imported transaction is categorised by the categories stored at import time; the stored transactions are re-evaluated whenever the category set changes, except transactions you have assigned by hand, which keep their category. Without `--dsn` the importer uses `$DATABASE_URL`.
 
 ## Keeping the account current
 
@@ -62,7 +64,10 @@ Set the credentials in the environment or in a gitignored `.env` file:
 ```sh
 EASYBANK_USER=...
 EASYBANK_PIN=...
+EASYBANK_PERSON=Anna
 ```
+
+`EASYBANK_PERSON` names the person the sync imports into and defaults to `Default` when it is absent or empty. The person must already exist; an unknown name fails the run and writes nothing rather than creating a person. Renaming `Default` on the People screen without updating this variable therefore makes the next unconfigured sync fail loudly until it is corrected. Every run — scheduled, manual, or started from the screen — imports into the same configured person.
 
 The nightly task runs at 03:00 Europe/Vienna while the server runs. Until `EASYBANK_SYNC_WRITE=true` is set, every run is non-writing: it records what it would import and changes no transaction. The result of every run appears on the Imports screen, which also offers a control that starts the same sync on demand. Once the non-writing runs look right, set `EASYBANK_SYNC_WRITE=true` to let it write.
 
@@ -92,16 +97,18 @@ The window defaults to the first day of the preceding calendar quarter through t
 
 - Pin `vX.Y.Z` or `sha-<commit>`; the `latest` and `main` tags move with the default branch.
 - To upgrade, pull the new image and recreate the application container with the same `DATABASE_URL`; the pending migrations are applied while it starts, and every applied migration is recorded in the database's `pgmigrations` table, so no migration is ever applied twice.
-- A database whose schema was applied by hand before the migration history existed is adopted once by starting with `MIGRATE_BASELINE` set to the highest applied version (for example `0008`); the variable is ignored once the database records migrations. Migrations are forward-only: correct a bad migration with a new file or by restoring a backup.
+- A database whose schema was applied by hand before the migration history existed is adopted once by starting with `MIGRATE_BASELINE` set to the highest applied version (for example `0009`); the variable is ignored once the database records migrations. Migrations are forward-only: correct a bad migration with a new file or by restoring a backup.
+- The version that adds people creates a person named `Default` and assigns every existing transaction to it during the first start; a fresh database also gets `Default`, with no transaction. Nothing has to be entered by hand: rename `Default` on the People screen to the first person's name, or keep the name. A rename changes what every future import must name, so update saved import commands and `EASYBANK_PERSON` to match.
 - Back up the database with `tools/backup-postgres.sh [directory]`; it requires the quick-start container name `transaction-analyser-postgres` and writes a timestamped `.sql.gz`, by default under `backups/`.
 
 ## What it does
 
-- **Transactions** - searchable across every transaction by purpose, counterparty, or account (applied with the Search button or Enter), and filterable by category and period (a calendar month or a whole calendar year), with the sum of displayed rows; select text to add it as a pattern to a category without leaving the table, and assign a category by hand to one row or to a checked selection, keeping that choice when the categories are re-applied.
+- **Transactions** - a Person column and a person filter, searchable within the selected person by purpose, counterparty, or account (applied with the Search button or Enter), and filterable by person, category, and period (a calendar month or a whole calendar year), with the sum of displayed rows; select text to add it as a pattern to a category without leaving the table, and assign a category by hand to one row or to a checked selection, keeping that choice when the categories are re-applied.
 - **Categories** - regular expressions matched against the purpose line or the counterparty name, and inclusive date windows, assign transactions, with match previews, a hidden flag, and an optional expense type (recurring or one-time) that classifies the category for the analysis screens.
-- **Analytics** - category spending pie charts for each of the last 12 months, switchable to whole-calendar-year totals for every year with data; filterable by expense type.
-- **Monthly totals** - a month-by-category matrix over every month with data; filterable by expense type.
-- **Monthly average** - average spend per category over a chosen number of months; filterable by expense type.
+- **People** - the named owners every transaction belongs to; the list shows each person's transaction count, and a person can be created or renamed but never deleted. Renaming keeps every transaction it owns and changes what future imports must name.
+- **Analytics** - category spending pie charts for each of the last 12 months, switchable to whole-calendar-year totals for every year with data; filterable by person and expense type, with every month, year, and slice link carrying the selected person to the transactions screen.
+- **Monthly totals** - a month-by-category matrix over every month with data; filterable by person and expense type, with each amount linking to the matching transactions for that person.
+- **Monthly average** - average spend per category over a chosen number of months; filterable by person and expense type.
 
 ## Development
 

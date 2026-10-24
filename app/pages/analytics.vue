@@ -6,12 +6,15 @@ import {
   createMonthlyCategoryChartData,
   createYearlyCategoryChartData,
   filterTransactionsByExpenseType,
+  filterTransactionsByPerson,
   formatEuroAmount,
   getLocalDateString,
   getMonthlyCategorySpendingTotals,
+  getPersonChoices,
   getYearlyCategorySpendingTotals,
   groupTransactionsByAvailableYear,
   groupTransactionsByMonth,
+  resolvePersonChoice,
   type CategoryPieDatum,
   type CategorySpendingTotal,
   type CategorySpendingTransaction,
@@ -20,15 +23,49 @@ import {
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
 const router = useRouter();
+const route = router.currentRoute;
 const today = getLocalDateString(new Date());
 const hideUncategorised = ref(false);
 const view = ref<'months' | 'years'>('months');
 const expenseType = ref<ExpenseTypeChoice>('all');
 
-// The expense-type choice is a selection over the already-fetched transactions, so
-// every panel is recomputed from them and no further request is made.
+// The person choices come from the returned transactions. The selection is
+// URL-backed and independent of the expense type and the hide control; an
+// absent or unknown person means all people.
+const personChoices = computed(() => getPersonChoices(transactions.value ?? []));
+const selectedPerson = ref<string | null>(null);
+
+watch(
+  [() => route.value.query.person, personChoices],
+  () => {
+    selectedPerson.value = resolvePersonChoice(route.value.query.person, personChoices.value);
+  },
+  { immediate: true },
+);
+
+function onPersonChange(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  const next = value === 'all' ? null : value;
+  selectedPerson.value = next;
+  const query = { ...route.value.query };
+  if (next === null) {
+    delete query.person;
+  } else if (personChoices.value.some(({ id }) => id === next)) {
+    query.person = next;
+  } else {
+    delete query.person;
+  }
+  void router.replace({ path: route.value.path, query });
+}
+
+// The person selection scopes the already-fetched transactions before the
+// expense-type choice, so every panel is recomputed from them without a request.
+const personTransactions = computed(() =>
+  filterTransactionsByPerson(transactions.value ?? [], selectedPerson.value),
+);
+
 const selectedTransactions = computed(() =>
-  filterTransactionsByExpenseType(transactions.value ?? [], expenseType.value),
+  filterTransactionsByExpenseType(personTransactions.value, expenseType.value),
 );
 
 const monthlyCharts = computed(() =>
@@ -100,7 +137,29 @@ function categoryFilterValue(key: string): string {
 function transactionLocation(periodKey: 'month' | 'year', period: string, categoryKey: string) {
   return {
     path: '/',
-    query: { [periodKey]: period, category: categoryFilterValue(categoryKey) },
+    query: {
+      [periodKey]: period,
+      category: categoryFilterValue(categoryKey),
+      ...personQuery(),
+    },
+  };
+}
+
+// The selected person travels on every drill-down link, so the transaction screen
+// opens with the same population that produced the clicked figure. All people
+// carries no person value.
+function personQuery(): Record<string, string> {
+  return selectedPerson.value === null ? {} : { person: selectedPerson.value };
+}
+
+function periodLocation(periodKey: 'month' | 'year', period: string) {
+  return {
+    path: '/',
+    query: {
+      [periodKey]: period,
+      category: 'all',
+      ...personQuery(),
+    },
   };
 }
 
@@ -229,6 +288,21 @@ function chartOption(chart: DisplayedChart): EChartsOption {
         </label>
       </fieldset>
 
+      <label class="mt-4 inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
+        Person
+        <select
+          :value="selectedPerson ?? 'all'"
+          data-testid="person-filter"
+          class="min-h-11 max-w-full rounded-sheet border border-rule-strong bg-surface px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          @change="onPersonChange"
+        >
+          <option value="all">All people</option>
+          <option v-for="person in personChoices" :key="person.id" :value="person.id">
+            {{ person.name }}
+          </option>
+        </select>
+      </label>
+
       <label class="mt-2 inline-flex min-h-11 items-center gap-3 py-2 text-sm text-muted">
         <input
           v-model="hideUncategorised"
@@ -253,7 +327,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
         >
           <h2 class="font-display text-lg font-semibold text-ink">
             <NuxtLink
-              :to="{ path: '/', query: { month: month.key, category: 'all' } }"
+              :to="periodLocation('month', month.key)"
               :aria-label="`View all transactions for ${month.label}`"
               class="hover:underline"
               data-testid="month-link"
@@ -316,7 +390,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
         >
           <h2 class="font-display text-lg font-semibold text-ink">
             <NuxtLink
-              :to="{ path: '/', query: { year: year.key, category: 'all' } }"
+              :to="periodLocation('year', year.key)"
               :aria-label="`View all transactions for ${year.label}`"
               class="hover:underline"
               data-testid="year-link"

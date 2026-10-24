@@ -20,6 +20,7 @@ type AssignedTransaction = {
   purpose: string;
   counterpartyName: string;
   counterpartyAccount: string | null;
+  person: { id: string; name: string };
   categoryAssignment: 'manual' | 'automatic';
   category: FixtureCategory | null;
 };
@@ -39,6 +40,7 @@ function fixtureTransactions(): AssignedTransaction[] {
       purpose: 'REWE Markt Berlin 4711',
       counterpartyName: 'REWE',
       counterpartyAccount: null,
+      person: { id: '1', name: 'Default' },
       categoryAssignment: 'automatic',
       category: null,
     },
@@ -50,6 +52,7 @@ function fixtureTransactions(): AssignedTransaction[] {
       purpose: 'Already sorted',
       counterpartyName: 'Shop',
       counterpartyAccount: null,
+      person: { id: '1', name: 'Default' },
       categoryAssignment: 'automatic',
       category: { id: '1', name: 'Groceries', hidden: false },
     },

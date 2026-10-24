@@ -18,6 +18,8 @@ const transactions = [
     purpose: 'REWE Markt Berlin 4711',
     counterpartyName: 'REWE',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
+    categoryAssignment: 'automatic',
     category: null,
   },
   {
@@ -28,6 +30,8 @@ const transactions = [
     purpose: 'Already sorted',
     counterpartyName: 'Shop',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
+    categoryAssignment: 'automatic',
     category: { id: '1', name: 'Groceries', hidden: false },
   },
 ];

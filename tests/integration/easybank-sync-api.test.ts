@@ -279,6 +279,41 @@ describe('sync-start endpoint against a spawned server', () => {
     });
   });
 
+  describe('with a configured person and writing enabled', () => {
+    let server: TestServer;
+
+    beforeAll(async () => {
+      server = await startServer({
+        EASYBANK_USER: 'user',
+        EASYBANK_PIN: 'pin',
+        EASYBANK_SYNC_WRITE: 'true',
+        EASYBANK_PERSON: '  anna  ',
+      });
+    });
+
+    afterAll(async () => {
+      await stopServer(server);
+    });
+
+    it('imports into the configured person and records it on the run', async () => {
+      const response = await startSync(server);
+
+      expect(await response.json()).toEqual({ status: 'success' });
+      const stored = await connection().query(`
+        SELECT DISTINCT p.name AS person
+        FROM transactions AS t
+        JOIN people AS p ON p.id = t.person_id
+      `);
+      expect(stored.rows).toEqual([{ person: 'Anna' }]);
+      const runs = await connection().query(`
+        SELECT r.source, p.name AS person
+        FROM import_runs AS r
+        LEFT JOIN people AS p ON p.id = r.person_id
+      `);
+      expect(runs.rows).toEqual([{ source: 'ui', person: 'Anna' }]);
+    });
+  });
+
   describe('without credentials', () => {
     let server: TestServer;
 

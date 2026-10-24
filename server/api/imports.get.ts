@@ -13,22 +13,25 @@
 const RECENT_RUN_LIMIT = 50;
 
 const SELECT_RECENT_RUNS = `
-  SELECT id,
-         to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS started_at,
+  SELECT r.id,
+         to_char(r.started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS started_at,
          CASE
-           WHEN finished_at IS NULL THEN NULL
-           ELSE to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+           WHEN r.finished_at IS NULL THEN NULL
+           ELSE to_char(r.finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
          END AS finished_at,
-         source,
-         non_writing,
-         outcome,
-         rows_read,
-         rows_already_stored,
-         rows_written,
-         rows_categorised,
-         error
-  FROM import_runs
-  ORDER BY started_at DESC, id DESC
+         r.source,
+         r.non_writing,
+         r.outcome,
+         r.rows_read,
+         r.rows_already_stored,
+         r.rows_written,
+         r.rows_categorised,
+         r.error,
+         p.id AS person_id,
+         p.name AS person_name
+  FROM import_runs AS r
+  LEFT JOIN people AS p ON p.id = r.person_id
+  ORDER BY r.started_at DESC, r.id DESC
   LIMIT ${RECENT_RUN_LIMIT}
 `;
 
@@ -46,6 +49,8 @@ type ImportRunRow = {
   rows_written: number;
   rows_categorised: number;
   error: string | null;
+  person_id: string | null;
+  person_name: string | null;
 };
 
 // A driver's error message can carry the host and port, which are parts of the
@@ -87,5 +92,9 @@ export default defineEventHandler(async () => {
     rowsWritten: row.rows_written,
     rowsCategorised: row.rows_categorised,
     error: row.error,
+    person:
+      row.person_id === null
+        ? null
+        : { id: row.person_id, name: row.person_name },
   }));
 });

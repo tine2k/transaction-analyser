@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // The import log screen. It reads GET /api/imports and shows the most recent
 // import runs, newest first: when each ran, whether it was the scheduled sync or a
-// manual import, whether it wrote, what it read / already stored / wrote, and the
-// reason when it failed. It derives nothing from transactions and invents no run;
-// it shows only what the endpoint returned.
+// manual import, the person it imported into, whether it wrote, what it read /
+// already stored / wrote, and the reason when it failed. A run recorded before the
+// person extension reads as not recorded. It derives nothing from transactions and
+// invents no run; it shows only what the endpoint returned.
 //
 // Its Sync now control starts the same sync the nightly schedule runs through
 // POST /api/easybank/sync, waits for the answer, then refreshes the log so the
@@ -30,6 +31,7 @@ type ImportRun = {
   startedAt: string;
   finishedAt: string | null;
   source: string;
+  person: { id: string; name: string } | null;
   nonWriting: boolean;
   outcome: string;
   rowsRead: number;
@@ -252,12 +254,13 @@ function outcomeLabel(run: ImportRun): string {
     >
       <table class="w-max min-w-full border-collapse text-left text-sm" data-testid="imports-table">
         <caption class="sr-only">
-          The most recent import runs with their source, outcome, and row counts
+          The most recent import runs with their source, person, outcome, and row counts
         </caption>
         <thead>
           <tr class="border-b border-rule-strong">
             <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Started</th>
             <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Source</th>
+            <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Person</th>
             <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Mode</th>
             <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Outcome</th>
             <th scope="col" class="whitespace-nowrap px-3 py-2 text-right font-semibold text-ink">Read</th>
@@ -282,6 +285,9 @@ function outcomeLabel(run: ImportRun): string {
               {{ displayTime(run.startedAt) }}
             </th>
             <td class="whitespace-nowrap px-3 py-2 text-ink">{{ sourceLabel(run.source) }}</td>
+            <td class="whitespace-nowrap px-3 py-2 text-ink" data-testid="import-run-person">
+              {{ run.person?.name ?? 'Not recorded' }}
+            </td>
             <td class="whitespace-nowrap px-3 py-2 text-ink" data-testid="import-run-mode">
               {{ run.nonWriting ? 'Non-writing' : 'Writing' }}
             </td>

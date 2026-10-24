@@ -121,8 +121,8 @@ async function insertTransaction(
   categoryName: string | null = null,
 ): Promise<void> {
   await connection().query(
-    `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id)
-     VALUES ('2026-03-01', '2026-03-01', -1.00, $1, $2, NULL, (SELECT id FROM categories WHERE name = $3))`,
+    `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id, person_id)
+     VALUES ('2026-03-01', '2026-03-01', -1.00, $1, $2, NULL, (SELECT id FROM categories WHERE name = $3), (SELECT id FROM people WHERE name = 'Default'))`,
     [purpose, counterpartyName, categoryName],
   );
 }

@@ -7,6 +7,7 @@ import { expect, test, type Page } from '@playwright/test';
 const screens = [
   { path: '/', title: 'Transactions · Expenses' },
   { path: '/categories', title: 'Categories · Expenses' },
+  { path: '/people', title: 'People · Expenses' },
   { path: '/analytics', title: 'Analytics · Expenses' },
   { path: '/monthly-totals', title: 'Monthly totals · Expenses' },
   { path: '/monthly-average', title: 'Monthly average · Expenses' },
@@ -17,7 +18,7 @@ async function interceptApi(page: Page): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const { pathname } = new URL(route.request().url());
 
-    if (pathname === '/api/transactions' || pathname === '/api/categories' || pathname === '/api/imports') {
+    if (pathname === '/api/transactions' || pathname === '/api/categories' || pathname === '/api/imports' || pathname === '/api/people') {
       await route.fulfill({ json: [] });
       return;
     }

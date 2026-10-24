@@ -21,6 +21,7 @@ type FixtureTransaction = {
   purpose: string;
   counterpartyName: string;
   counterpartyAccount: string | null;
+  person: { id: string; name: string };
   categoryAssignment: 'automatic';
   category: { id: string; name: string; hidden: boolean } | null;
 };
@@ -38,6 +39,7 @@ function transaction(
     purpose: `Transaction ${id}`,
     counterpartyName: 'Shop',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
     categoryAssignment: 'automatic',
     category,
   };

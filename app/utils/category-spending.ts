@@ -1,12 +1,18 @@
 export type CategorySpendingTransaction = {
   bookingDate: string;
   amount: string;
+  person: { id: string; name: string };
   category: {
     id: string;
     name: string;
     hidden: boolean;
     expenseType: 'recurring' | 'one-time' | null;
   } | null;
+};
+
+export type PersonChoice = {
+  id: string;
+  name: string;
 };
 
 export type CategoryTransactionGroup = {
@@ -85,6 +91,40 @@ export function createCategoryColorMap(categoryKeys: string[]): Map<string, stri
     key,
     CATEGORY_COLOR_PALETTE[index % CATEGORY_COLOR_PALETTE.length]!,
   ]));
+}
+
+// The people the returned transactions represent, ordered by name ignoring case
+// and then by identity. A person with no transaction is not offered, because the
+// analysis views only have rows to recompute.
+export function getPersonChoices(transactions: CategorySpendingTransaction[]): PersonChoice[] {
+  const byId = new Map<string, PersonChoice>();
+  for (const transaction of transactions) {
+    byId.set(transaction.person.id, transaction.person);
+  }
+  return [...byId.values()].sort((left, right) =>
+    left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
+    || left.id.localeCompare(right.id, undefined, { numeric: true }),
+  );
+}
+
+// A person identity read from the route query. An absent, unknown, or unoffered
+// value means all people, which is represented as null.
+export function resolvePersonChoice(value: unknown, choices: PersonChoice[]): string | null {
+  if (typeof value !== 'string' || value === '') {
+    return null;
+  }
+  return choices.some(({ id }) => id === value) ? value : null;
+}
+
+// The person filter is a selection over the already-fetched transactions. All
+// people (null) leaves every transaction eligible.
+export function filterTransactionsByPerson(
+  transactions: CategorySpendingTransaction[],
+  personId: string | null,
+): CategorySpendingTransaction[] {
+  return personId === null
+    ? transactions
+    : transactions.filter((transaction) => transaction.person.id === personId);
 }
 
 function parseDecimal(value: string): DecimalParts {

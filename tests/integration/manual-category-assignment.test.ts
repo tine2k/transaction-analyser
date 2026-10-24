@@ -109,8 +109,8 @@ async function insertCategory(name: string, patterns: string[]): Promise<void> {
 
 async function insertTransaction(purpose: string, counterpartyName: string): Promise<void> {
   await connection().query(
-    `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id)
-     VALUES ('2026-03-01', '2026-03-01', -1.00, $1, $2, NULL, NULL)`,
+    `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id, person_id)
+     VALUES ('2026-03-01', '2026-03-01', -1.00, $1, $2, NULL, NULL, (SELECT id FROM people WHERE name = 'Default'))`,
     [purpose, counterpartyName],
   );
 }
@@ -327,8 +327,8 @@ describe('manual category assignment integration', () => {
     );
     const categoryId = (insertedCategory.rows[0] as { id: string }).id;
     const insertedTransaction = await connection().query(
-      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id)
-       VALUES ('2026-03-01', '2026-03-01', -2.00, 'Odd purchase', 'Acme', NULL, NULL)
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id, person_id)
+       VALUES ('2026-03-01', '2026-03-01', -2.00, 'Odd purchase', 'Acme', NULL, NULL, (SELECT id FROM people WHERE name = 'Default'))
        RETURNING id`,
     );
     const transactionId = (insertedTransaction.rows[0] as { id: string }).id;

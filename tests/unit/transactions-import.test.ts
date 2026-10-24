@@ -4,11 +4,13 @@ import {
   ImportFailure,
   checkHeader,
   decodeStrictUtf8,
+  fingerprint,
   parseCsvText,
   planWrites,
   redact,
   validateRecords,
 } from '../../shared/transactions-import';
+import type { ImportRow } from '../../shared/transactions-import';
 
 const HEADER = 'Date;Value date;Category;Name;Purpose;Account;Bank;Amount;Currency';
 
@@ -142,6 +144,21 @@ describe('transaction CSV parsing and validation', () => {
 });
 
 describe('dedupe allocation', () => {
+  it('puts the person in a row’s fingerprint', () => {
+    const row: ImportRow = {
+      line: 2,
+      bookingDate: '2026-09-25',
+      valueDate: '2026-09-25',
+      amount: '-9.99',
+      purpose: 'Purchase',
+      counterpartyName: 'Shop',
+      counterpartyAccount: null,
+    };
+
+    expect(fingerprint(row, '1')).toBe(fingerprint({ ...row, line: 99 }, '1'));
+    expect(fingerprint(row, '1')).not.toBe(fingerprint(row, '2'));
+  });
+
   it('writes every row when the table holds none', () => {
     const plan = planWrites(new Map([['a', 2]]), new Map());
 

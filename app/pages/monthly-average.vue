@@ -2,15 +2,20 @@
 import {
   compareDecimalStrings,
   filterTransactionsByExpenseType,
+  filterTransactionsByPerson,
   formatEuroAmount,
   getCategoryMonthlyAverages,
   getLocalDateString,
+  getPersonChoices,
+  resolvePersonChoice,
   type CategorySpendingTransaction,
   type CategoryMonthlyAverage,
   type ExpenseTypeChoice,
 } from '../utils/category-spending';
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
+const router = useRouter();
+const route = router.currentRoute;
 const today = getLocalDateString(new Date());
 
 const monthCount = ref('12');
@@ -18,6 +23,33 @@ const appliedMonthCount = ref(12);
 const sortColumn = ref<'amount' | 'category'>('amount');
 const sortDirection = ref<'asc' | 'desc'>('desc');
 const expenseType = ref<ExpenseTypeChoice>('all');
+
+// The person choices come from the returned transactions. The selection is
+// URL-backed and independent of the window and the expense type; an absent or
+// unknown person means all people.
+const personChoices = computed(() => getPersonChoices(transactions.value ?? []));
+const selectedPerson = ref<string | null>(null);
+
+watch(
+  [() => route.value.query.person, personChoices],
+  () => {
+    selectedPerson.value = resolvePersonChoice(route.value.query.person, personChoices.value);
+  },
+  { immediate: true },
+);
+
+function onPersonChange(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  const next = value === 'all' ? null : value;
+  selectedPerson.value = next;
+  const query = { ...route.value.query };
+  if (next === null || !personChoices.value.some(({ id }) => id === next)) {
+    delete query.person;
+  } else {
+    query.person = next;
+  }
+  void router.replace({ path: route.value.path, query });
+}
 
 function onMonthCountInput(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
@@ -29,11 +61,15 @@ function onMonthCountInput(event: Event): void {
   }
 }
 
-// The expense-type choice is a selection over the already-fetched transactions and
-// is independent of the averaging window: changing either recomputes the list from
-// the same data, without another request.
+// The person and expense-type choices are selections over the already-fetched
+// transactions and are independent of the averaging window: changing any of them
+// recomputes the list from the same data, without another request.
+const personTransactions = computed(() =>
+  filterTransactionsByPerson(transactions.value ?? [], selectedPerson.value),
+);
+
 const selectedTransactions = computed(() =>
-  filterTransactionsByExpenseType(transactions.value ?? [], expenseType.value),
+  filterTransactionsByExpenseType(personTransactions.value, expenseType.value),
 );
 
 const averages = computed(() => getCategoryMonthlyAverages(
@@ -100,6 +136,21 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
           class="min-h-11 w-24 rounded-sheet border border-rule-strong px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           @input="onMonthCountInput"
         >
+      </label>
+
+      <label class="mt-4 inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
+        Person
+        <select
+          :value="selectedPerson ?? 'all'"
+          data-testid="person-filter"
+          class="min-h-11 max-w-full rounded-sheet border border-rule-strong bg-surface px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          @change="onPersonChange"
+        >
+          <option value="all">All people</option>
+          <option v-for="person in personChoices" :key="person.id" :value="person.id">
+            {{ person.name }}
+          </option>
+        </select>
       </label>
 
       <p class="mt-2 text-sm text-muted" data-testid="applied-window">

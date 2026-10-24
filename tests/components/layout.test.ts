@@ -24,6 +24,7 @@ describe('default layout navigation', () => {
     expect(links.map((link) => [link.text(), link.attributes('href')])).toEqual([
       ['Transactions', '/'],
       ['Categories', '/categories'],
+      ['People', '/people'],
       ['Analytics', '/analytics'],
       ['Monthly totals', '/monthly-totals'],
       ['Monthly average', '/monthly-average'],
@@ -36,24 +37,30 @@ describe('default layout navigation', () => {
 
     route.path = '/analytics';
     const analytics = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(analytics.findAll('nav a')[2]?.attributes('aria-current')).toBe('page');
+    expect(analytics.findAll('nav a')[3]?.attributes('aria-current')).toBe('page');
     await analytics.unmount();
+
+    route.path = '/people';
+    const people = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
+    expect(people.findAll('nav a')[2]?.text()).toBe('People');
+    expect(people.findAll('nav a')[2]?.attributes('aria-current')).toBe('page');
+    await people.unmount();
 
     route.path = '/monthly-totals';
     const monthlyTotals = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(monthlyTotals.findAll('nav a')[3]?.attributes('aria-current')).toBe('page');
+    expect(monthlyTotals.findAll('nav a')[4]?.attributes('aria-current')).toBe('page');
     await monthlyTotals.unmount();
 
     route.path = '/monthly-average';
     const monthlyAverage = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(monthlyAverage.findAll('nav a')[4]?.text()).toBe('Monthly average');
-    expect(monthlyAverage.findAll('nav a')[4]?.attributes('aria-current')).toBe('page');
+    expect(monthlyAverage.findAll('nav a')[5]?.text()).toBe('Monthly average');
+    expect(monthlyAverage.findAll('nav a')[5]?.attributes('aria-current')).toBe('page');
     await monthlyAverage.unmount();
 
     route.path = '/imports';
     const imports = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(imports.findAll('nav a')[5]?.text()).toBe('Imports');
-    expect(imports.findAll('nav a')[5]?.attributes('aria-current')).toBe('page');
+    expect(imports.findAll('nav a')[6]?.text()).toBe('Imports');
+    expect(imports.findAll('nav a')[6]?.attributes('aria-current')).toBe('page');
   });
 
   it('exposes and toggles the mobile navigation and closes it after choosing a destination', async () => {
@@ -65,7 +72,7 @@ describe('default layout navigation', () => {
     expect(toggle.attributes('aria-expanded')).toBe('false');
     expect(toggle.attributes('aria-label')).toBe('Open screen navigation');
     expect(toggle.findAll('svg[aria-hidden="true"]')).toHaveLength(1);
-    expect(wrapper.findAll('#screen-navigation a')).toHaveLength(6);
+    expect(wrapper.findAll('#screen-navigation a')).toHaveLength(7);
 
     await toggle.trigger('click');
     expect(toggle.attributes('aria-expanded')).toBe('true');

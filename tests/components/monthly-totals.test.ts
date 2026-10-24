@@ -1,4 +1,5 @@
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
+import { flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -26,13 +27,13 @@ describe('monthly category totals page', () => {
 
   it('loads transactions once and renders all represented months with blank zero cells', async () => {
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2026-09-02', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-04', amount: '-3.25', category: null },
-      { bookingDate: '2026-09-05', amount: '1234567.89', category: { id: '3', name: 'Rent', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-06', amount: '0.00', category: { id: '4', name: 'Zero-only', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-12', amount: '-2.00', category: { id: '2', name: 'Transport', hidden: false, expenseType: null } },
-      { bookingDate: '2020-01-15', amount: '-5.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-12.50', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-03', amount: '4.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-04', amount: '-3.25', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: '2026-09-05', amount: '1234567.89', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Rent', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-06', amount: '0.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '4', name: 'Zero-only', hidden: false, expenseType: null } },
+      { bookingDate: '2026-08-12', amount: '-2.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Transport', hidden: false, expenseType: null } },
+      { bookingDate: '2020-01-15', amount: '-5.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(MonthlyTotals);
@@ -85,13 +86,13 @@ describe('monthly category totals page', () => {
 
   it('links populated cells to their month and category and leaves blank cells inert', async () => {
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2026-09-02', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '4.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-04', amount: '-3.25', category: null },
-      { bookingDate: '2026-09-05', amount: '1234567.89', category: { id: '3', name: 'Rent', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-06', amount: '0.00', category: { id: '4', name: 'Zero-only', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-12', amount: '-2.00', category: { id: '2', name: 'Transport', hidden: false, expenseType: null } },
-      { bookingDate: '2020-01-15', amount: '-5.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-12.50', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-03', amount: '4.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-04', amount: '-3.25', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
+      { bookingDate: '2026-09-05', amount: '1234567.89', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Rent', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-06', amount: '0.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '4', name: 'Zero-only', hidden: false, expenseType: null } },
+      { bookingDate: '2026-08-12', amount: '-2.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Transport', hidden: false, expenseType: null } },
+      { bookingDate: '2020-01-15', amount: '-5.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(MonthlyTotals);
@@ -126,8 +127,8 @@ describe('monthly category totals page', () => {
 
   it('excludes a hidden category from the table while leaving other cells unchanged', async () => {
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2026-09-02', amount: '-12.50', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '-99.00', category: { id: '9', name: 'Internal', hidden: true, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-12.50', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-03', amount: '-99.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '9', name: 'Internal', hidden: true, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(MonthlyTotals);
@@ -147,7 +148,7 @@ describe('monthly category totals page', () => {
     expect(loading.find('[data-testid="monthly-totals-table"]').exists()).toBe(false);
 
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2026-09-28', amount: '-12.50', category: { id: '1', name: 'Stale', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-28', amount: '-12.50', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Stale', hidden: false, expenseType: null } },
     ], { error: new Error('failed') }));
     const failed = await mountSuspended(MonthlyTotals);
     expect(failed.text()).toContain('Monthly category totals could not be loaded');
@@ -163,9 +164,9 @@ describe('monthly category totals page', () => {
 
   it('filters the table by expense type without another request', async () => {
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2026-09-02', amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: 'recurring' } },
-      { bookingDate: '2026-09-03', amount: '-20.00', category: { id: '2', name: 'New car', hidden: false, expenseType: 'one-time' } },
-      { bookingDate: '2026-09-04', amount: '-3.00', category: null },
+      { bookingDate: '2026-09-02', amount: '-10.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: 'recurring' } },
+      { bookingDate: '2026-09-03', amount: '-20.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '2', name: 'New car', hidden: false, expenseType: 'one-time' } },
+      { bookingDate: '2026-09-04', amount: '-3.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: null },
     ]));
 
     const wrapper = await mountSuspended(MonthlyTotals);
@@ -187,7 +188,7 @@ describe('monthly category totals page', () => {
 
   it('shows no rows or columns with an explanation when a filter leaves nothing', async () => {
     mocks.useFetch.mockReturnValue(response([
-      { bookingDate: '2026-09-02', amount: '-10.00', category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-02', amount: '-10.00', person: { id: '1', name: 'Default' }, person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ]));
 
     const wrapper = await mountSuspended(MonthlyTotals);
@@ -196,5 +197,55 @@ describe('monthly category totals page', () => {
     expect(wrapper.findAll('[data-testid="month-row"]')).toHaveLength(0);
     expect(wrapper.findAll('[data-testid="category-heading"]')).toHaveLength(0);
     expect(wrapper.text()).toContain('No category data for these months.');
+  });
+});
+
+describe('the monthly totals person filter', () => {
+  const anna = { id: '2', name: 'Anna' };
+  const defaultPerson = { id: '1', name: 'Default' };
+
+  beforeEach(() => {
+    mocks.useFetch.mockReset();
+  });
+
+  function withPeople() {
+    return response([
+      { bookingDate: '2026-09-02', amount: '-10.00', person: anna, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-03', amount: '-2.00', person: defaultPerson, category: null },
+    ]);
+  }
+
+  it('reads the person from the URL, scopes the table, and carries it through cell links', async () => {
+    mocks.useFetch.mockReturnValue(withPeople());
+
+    const wrapper = await mountSuspended(MonthlyTotals, { route: '/?person=2' });
+
+    expect((wrapper.get('[data-testid="person-filter"]').element as HTMLSelectElement).value).toBe('2');
+    expect(wrapper.findAll('[data-testid="category-heading"]').map((heading) => heading.text()))
+      .toEqual(['Groceries']);
+
+    const link = new URL(wrapper.get('[data-testid="category-total-link"]').attributes('href')!, 'http://localhost');
+    expect(link.searchParams.get('month')).toBe('2026-09');
+    expect(link.searchParams.get('category')).toBe('1');
+    expect(link.searchParams.get('person')).toBe('2');
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to all people and omits the person from cell links', async () => {
+    mocks.useFetch.mockReturnValue(withPeople());
+
+    const wrapper = await mountSuspended(MonthlyTotals, { route: '/?person=999' });
+
+    expect((wrapper.get('[data-testid="person-filter"]').element as HTMLSelectElement).value).toBe('all');
+    expect(wrapper.findAll('[data-testid="category-heading"]').map((heading) => heading.text()))
+      .toEqual(['Groceries', 'Uncategorised']);
+    const link = new URL(wrapper.get('[data-testid="category-total-link"]').attributes('href')!, 'http://localhost');
+    expect(link.searchParams.has('person')).toBe(false);
+
+    await wrapper.get('[data-testid="person-filter"]').setValue('2');
+    await flushPromises();
+    expect(wrapper.findAll('[data-testid="category-heading"]').map((heading) => heading.text()))
+      .toEqual(['Groceries']);
+    expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 });

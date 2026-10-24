@@ -7,9 +7,11 @@ import {
   InvalidRowsFailure,
   finishImportRun,
   importCsv,
+  resolvePerson,
+  setImportRunPerson,
   startImportRun,
 } from '../../shared/transactions-import';
-import type { ImportPlan } from '../../shared/transactions-import';
+import type { ImportPlan, Person } from '../../shared/transactions-import';
 
 const testDatabaseUrl = process.env['TEST_DATABASE_URL'];
 const HEADER = 'Date;Value date;Category;Name;Purpose;Account;Bank;Amount;Currency';
@@ -53,11 +55,13 @@ function connection(): pg.Client {
 
 // The same start-import-finish wrapper the command-line importer uses, so the run
 // records the tests assert on are produced by the real path.
-async function runImport(text: string, dryRun = false): Promise<ImportPlan> {
+async function runImport(text: string, dryRun = false, personName = 'Default'): Promise<ImportPlan> {
   const client = connection();
   const runId = await startImportRun(client, { source: 'manual', nonWriting: dryRun });
   try {
-    const plan = await importCsv(client, { kind: 'text', text, label: 'test.csv' }, { dryRun });
+    const person = await resolvePerson(client, personName);
+    await setImportRunPerson(client, runId, person.id);
+    const plan = await importCsv(client, { kind: 'text', text, label: 'test.csv' }, { dryRun, person });
     await finishImportRun(client, runId, {
       outcome: 'success',
       rowsRead: plan.rowsRead,
@@ -81,6 +85,15 @@ async function runImport(text: string, dryRun = false): Promise<ImportPlan> {
   }
 }
 
+async function personByName(name: string): Promise<Person> {
+  const result = await connection().query('SELECT id, name FROM people WHERE lower(name) = lower($1)', [name]);
+  const row = result.rows[0] as { id: string; name: string } | undefined;
+  if (row === undefined) {
+    throw new Error(`no fixture person named ${name}`);
+  }
+  return { id: String(row.id), name: row.name };
+}
+
 async function transactionCount(): Promise<number> {
   const result = await connection().query('SELECT count(*)::int AS count FROM transactions');
   return (result.rows[0] as { count: number }).count;
@@ -91,6 +104,16 @@ async function runs(): Promise<Array<Record<string, unknown>>> {
     'SELECT source, non_writing, outcome, rows_read, rows_already_stored, rows_written, rows_categorised, error FROM import_runs ORDER BY id',
   );
   return result.rows as Array<Record<string, unknown>>;
+}
+
+async function runPersons(): Promise<Array<{ outcome: string; person: string | null }>> {
+  const result = await connection().query(`
+    SELECT r.outcome, p.name AS person
+    FROM import_runs AS r
+    LEFT JOIN people AS p ON p.id = r.person_id
+    ORDER BY r.id
+  `);
+  return result.rows as Array<{ outcome: string; person: string | null }>;
 }
 
 describe('transaction import against PostgreSQL', () => {
@@ -157,8 +180,8 @@ describe('transaction import against PostgreSQL', () => {
   it('leaves a stored transaction, including its category, exactly as it was', async () => {
     await connection().query("INSERT INTO categories (name, patterns) VALUES ('Groceries', ARRAY['shop'])");
     await connection().query(
-      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id)
-       VALUES ('2026-09-25', '2026-09-25', -9.99, 'Purchase', 'Shop', NULL, (SELECT id FROM categories WHERE name = 'Groceries'))`,
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id, person_id)
+       VALUES ('2026-09-25', '2026-09-25', -9.99, 'Purchase', 'Shop', NULL, (SELECT id FROM categories WHERE name = 'Groceries'), (SELECT id FROM people WHERE name = 'Default'))`,
     );
     const before = await connection().query(
       'SELECT id, booking_date, value_date, amount, purpose, counterparty_name, counterparty_account, category_id FROM transactions ORDER BY id',
@@ -231,8 +254,8 @@ describe('transaction import against PostgreSQL', () => {
   it('does not re-evaluate a transaction it did not write', async () => {
     await connection().query("INSERT INTO categories (name, patterns) VALUES ('Groceries', ARRAY['shop'])");
     await connection().query(
-      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name)
-       VALUES ('2026-09-24', '2026-09-24', -1.00, 'Old shop purchase', 'Old Shop')`,
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, person_id)
+       VALUES ('2026-09-24', '2026-09-24', -1.00, 'Old shop purchase', 'Old Shop', (SELECT id FROM people WHERE name = 'Default'))`,
     );
 
     const plan = await runImport(csv(row({ purpose: 'A fresh shop purchase' })));
@@ -253,8 +276,8 @@ describe('transaction import against PostgreSQL', () => {
   it('assigns no category in the non-writing mode', async () => {
     await connection().query("INSERT INTO categories (name, patterns) VALUES ('Groceries', ARRAY['shop'])");
     await connection().query(
-      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name)
-       VALUES ('2026-09-24', '2026-09-24', -1.00, 'Old shop purchase', 'Old Shop')`,
+      `INSERT INTO transactions (booking_date, value_date, amount, purpose, counterparty_name, person_id)
+       VALUES ('2026-09-24', '2026-09-24', -1.00, 'Old shop purchase', 'Old Shop', (SELECT id FROM people WHERE name = 'Default'))`,
     );
 
     const plan = await runImport(csv(row({ purpose: 'A fresh shop purchase' })), true);
@@ -381,5 +404,67 @@ describe('transaction import against PostgreSQL', () => {
     expect(await transactionCount()).toBe(0);
     expect((await runs())[0]).toMatchObject({ outcome: 'failed', rows_written: 0 });
     assert.ok((await runs())[0]?.error);
+  });
+
+  it('keeps the dedupe identity per person', async () => {
+    const first = await runImport(csv(row()), false, 'Default');
+    expect(first).toMatchObject({ rowsRead: 1, rowsAlreadyStored: 0, rowsWritten: 1 });
+
+    const forAnna = await runImport(csv(row()), false, 'Anna');
+    expect(forAnna).toMatchObject({ rowsRead: 1, rowsAlreadyStored: 0, rowsWritten: 1 });
+
+    const annaAgain = await runImport(csv(row()), false, 'Anna');
+    expect(annaAgain).toMatchObject({ rowsRead: 1, rowsAlreadyStored: 1, rowsWritten: 0 });
+
+    const stored = await connection().query(`
+      SELECT p.name AS person, count(*)::int AS count
+      FROM transactions AS t
+      JOIN people AS p ON p.id = t.person_id
+      GROUP BY p.name
+      ORDER BY p.name
+    `);
+    expect(stored.rows).toEqual([
+      { person: 'Anna', count: 1 },
+      { person: 'Default', count: 1 },
+    ]);
+    expect(await runPersons()).toEqual([
+      { outcome: 'success', person: 'Default' },
+      { outcome: 'success', person: 'Anna' },
+      { outcome: 'success', person: 'Anna' },
+    ]);
+  });
+
+  it('resolves a stored person ignoring case and surrounding whitespace', async () => {
+    const anna = await personByName('Anna');
+
+    const plan = await runImport(csv(row()), false, '  aNNa  ');
+
+    expect(plan).toMatchObject({ rowsRead: 1, rowsWritten: 1 });
+    const stored = await connection().query('SELECT person_id FROM transactions');
+    expect(stored.rows).toEqual([{ person_id: anna.id }]);
+    expect(await runPersons()).toEqual([{ outcome: 'success', person: 'Anna' }]);
+  });
+
+  it('refuses an unknown person and records a failed run with no person', async () => {
+    await expect(runImport(csv(row()), false, 'Ghost')).rejects.toThrow(/no person named "Ghost"/);
+
+    expect(await transactionCount()).toBe(0);
+    const people = await connection().query('SELECT count(*)::int AS count FROM people WHERE lower(name) = lower($1)', ['Ghost']);
+    expect(people.rows[0]).toEqual({ count: 0 });
+    expect(await runPersons()).toEqual([{ outcome: 'failed', person: null }]);
+  });
+
+  it('classifies a dry run against the named person and writes nothing', async () => {
+    await runImport(csv(row()), false, 'Default');
+
+    const annaDryRun = await runImport(csv(row()), true, 'Anna');
+
+    expect(annaDryRun).toMatchObject({ rowsRead: 1, rowsAlreadyStored: 0, rowsWritten: 0 });
+    expect(annaDryRun.newRows).toHaveLength(1);
+    expect(await transactionCount()).toBe(1);
+    expect(await runPersons()).toEqual([
+      { outcome: 'success', person: 'Default' },
+      { outcome: 'success', person: 'Anna' },
+    ]);
   });
 });

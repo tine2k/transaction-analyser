@@ -102,6 +102,13 @@ function categoriesResponse() {
 
 const mountedWrappers: Array<{ unmount: () => void }> = [];
 
+// The table derives its default period from the browser's current year, so the
+// tests freeze the clock instead of relying on a year that will expire.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
+});
+
 async function mountTransactions(options?: { route?: string; attachTo?: Element }) {
   const wrapper = await mountSuspended(Transactions, options);
   mountedWrappers.push(wrapper);
@@ -172,13 +179,13 @@ describe('transaction list filters', () => {
     vi.restoreAllMocks();
   });
 
-  it('defaults to uncategorised and retains full-response counts and endpoint order', async () => {
+  it('defaults to the current year and uncategorised, and retains full-response counts and endpoint order', async () => {
     const wrapper = await mountTransactions();
 
     expect((wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
       .toBe('uncategorised');
     expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
-      .toBe('all');
+      .toBe('2026');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['1']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-0.25'));
@@ -186,6 +193,121 @@ describe('transaction list filters', () => {
     expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('All categories (5)');
     expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('Uncategorised (1)');
     expect(mocks.useFetch).toHaveBeenCalledTimes(2);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it('shows the current year and all categories when the year has no uncategorised transaction', async () => {
+    const data: TestTransaction[] = [
+      {
+        id: '1', bookingDate: '2026-01-05', valueDate: '2026-01-05', amount: '-1.00',
+        purpose: 'Current year, categorised', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+      {
+        id: '2', bookingDate: '2025-12-30', valueDate: '2025-12-30', amount: '-2.00',
+        purpose: 'Older, uncategorised', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: null,
+      },
+    ];
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+
+    const wrapper = await mountTransactions();
+
+    expect((wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
+      .toBe('all');
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
+      .toBe('2026');
+    expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['1']);
+  });
+
+  it('falls back to the newest represented year when the current year has no transaction', async () => {
+    const data: TestTransaction[] = [
+      {
+        id: '1', bookingDate: '2025-06-01', valueDate: '2025-06-01', amount: '-1.00',
+        purpose: 'Newest year, uncategorised', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: null,
+      },
+      {
+        id: '2', bookingDate: '2024-06-01', valueDate: '2024-06-01', amount: '-2.00',
+        purpose: 'Older, categorised', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+    ];
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+
+    const wrapper = await mountTransactions();
+
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
+      .toBe('2025');
+    expect((wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
+      .toBe('uncategorised');
+    expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['1']);
+  });
+
+  it('defaults to all periods and all categories when no transaction is returned', async () => {
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse([]) : categoriesResponse());
+
+    const wrapper = await mountTransactions();
+
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
+      .toBe('all');
+    expect((wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
+      .toBe('all');
+    expect(wrapper.text()).toContain('There are no transactions to show.');
+  });
+
+  it('uses an offered query period to choose the category default', async () => {
+    const data: TestTransaction[] = [
+      {
+        id: '1', bookingDate: '2026-02-10', valueDate: '2026-02-10', amount: '-1.00',
+        purpose: 'February, uncategorised', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: null,
+      },
+      {
+        id: '2', bookingDate: '2026-03-10', valueDate: '2026-03-10', amount: '-2.00',
+        purpose: 'March, categorised', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+    ];
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+
+    const uncategorisedMonth = await mountTransactions({ route: '/?month=2026-02' });
+    expect((uncategorisedMonth.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
+      .toBe('uncategorised');
+    expect(uncategorisedMonth.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['1']);
+
+    const categorisedMonth = await mountTransactions({ route: '/?month=2026-03' });
+    expect((categorisedMonth.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
+      .toBe('all');
+    expect(categorisedMonth.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['2']);
+  });
+
+  it('keeps an explicitly selected all-periods filter when another filter changes', async () => {
+    const wrapper = await mountTransactions();
+
+    await wrapper.get('[data-testid="period-filter"]').setValue('all');
+    await flushPromises();
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
+      .toBe('all');
+
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
+      .toBe('all');
   });
 
   it('gives both filters a full-width mobile layout and touch-sized control height', async () => {
@@ -289,7 +411,7 @@ describe('transaction list filters', () => {
     expect((wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement).value)
       .toBe('uncategorised');
     expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
-      .toBe('all');
+      .toBe('2026');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['1']);
   });

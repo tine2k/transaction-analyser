@@ -183,17 +183,23 @@ const periods = computed<PeriodGroups>(() => {
   return { years, months };
 });
 
-function categoryFromQuery(): string {
-  const requested = queryString(route.value.query.category);
-  if (requested === 'all' || requested === 'uncategorised') {
-    return requested;
+// The period default prefers the browser's current calendar year when the
+// response represents it, then the newest represented year, and all periods
+// when the response is empty. Only represented periods can be offered by the
+// control, so an unrepresented current year cannot be selected.
+const defaultPeriod = computed(() => {
+  const year = String(new Date().getFullYear());
+  if (periods.value.years.some((option) => option.value === year)) {
+    return year;
   }
-  return requested !== undefined && categories.value.some(({ id }) => id === requested)
-    ? requested
-    : 'uncategorised';
-}
+  return periods.value.years[0]?.value ?? 'all';
+});
 
-function periodFromQuery(): string {
+// The effective period is an offered query month or year when the route names
+// one, otherwise the period default. The category default follows it: it is
+// uncategorised only when that period holds an uncategorised transaction, so a
+// fully categorised period opens on all categories instead of an empty table.
+function effectivePeriod(): string {
   const options = [...periods.value.years, ...periods.value.months];
   for (const key of ['month', 'year'] as const) {
     const requested = queryString(route.value.query[key]);
@@ -201,11 +207,44 @@ function periodFromQuery(): string {
       return requested;
     }
   }
-  return 'all';
+  return defaultPeriod.value;
+}
+
+function matchesPeriod(bookingDate: string, period: string): boolean {
+  if (period === 'all') {
+    return true;
+  }
+  return isYearKey(period)
+    ? bookingDate.slice(0, 4) === period
+    : bookingDate.slice(0, 7) === period;
+}
+
+function categoryFromQuery(): string {
+  const requested = queryString(route.value.query.category);
+  if (requested === 'all' || requested === 'uncategorised') {
+    return requested;
+  }
+  if (requested !== undefined && categories.value.some(({ id }) => id === requested)) {
+    return requested;
+  }
+  const period = effectivePeriod();
+  return (transactions.value ?? []).some(
+    (transaction) => transaction.category === null && matchesPeriod(transaction.bookingDate, period),
+  )
+    ? 'uncategorised'
+    : 'all';
+}
+
+function periodFromQuery(): string {
+  return effectivePeriod();
 }
 
 const selectedCategory = ref('uncategorised');
 const selectedPeriod = ref('all');
+// An explicit all-periods selection has no query value to read back, so it is
+// held locally; otherwise a later filter change would reapply the period
+// default and silently narrow the view again.
+const allPeriodsSelected = ref(false);
 const activeSort = ref<TransactionSort | null>(null);
 
 const categoryFilter = computed({
@@ -244,6 +283,7 @@ function setCategoryQuery(value: string): void {
 }
 
 function setPeriodQuery(value: string): void {
+  allPeriodsSelected.value = value === 'all';
   const query = queryWithActiveSort();
   delete query.month;
   delete query.year;
@@ -296,7 +336,10 @@ watch(
   ],
   () => {
     selectedCategory.value = categoryFromQuery();
-    selectedPeriod.value = periodFromQuery();
+    const queryPeriod = queryString(route.value.query.month) ?? queryString(route.value.query.year);
+    if (queryPeriod !== undefined || !allPeriodsSelected.value) {
+      selectedPeriod.value = periodFromQuery();
+    }
     activeSort.value = sortFromQuery();
   },
   { immediate: true },
@@ -305,15 +348,6 @@ watch(
 const uncategorisedTransactions = computed(() =>
   (transactions.value ?? []).filter((transaction) => transaction.category === null),
 );
-
-function matchesPeriod(bookingDate: string, period: string): boolean {
-  if (period === 'all') {
-    return true;
-  }
-  return isYearKey(period)
-    ? bookingDate.slice(0, 4) === period
-    : bookingDate.slice(0, 7) === period;
-}
 
 const visibleTransactions = computed(() =>
   (transactions.value ?? []).filter((transaction) => {

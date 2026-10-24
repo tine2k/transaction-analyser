@@ -1297,6 +1297,32 @@ describe('transaction search', () => {
     return wrapper.get('[data-testid="transaction-search"]');
   }
 
+  function searchButton(wrapper: Awaited<ReturnType<typeof mountTransactions>>) {
+    return wrapper.get('[data-testid="search-submit"]');
+  }
+
+  function routeQuery(wrapper: Awaited<ReturnType<typeof mountTransactions>>): Record<string, string | undefined> {
+    return wrapper.vm.$router.currentRoute.value.query as Record<string, string | undefined>;
+  }
+
+  // vue-router resolves a replace after the next macrotask in the test
+  // environment, so wait once for the applied route to become current.
+  async function settle(): Promise<void> {
+    await flushPromises();
+    await wait(20);
+    await flushPromises();
+  }
+
+  async function applyViaForm(wrapper: Awaited<ReturnType<typeof mountTransactions>>): Promise<void> {
+    await wrapper.get('form').trigger('submit');
+    await settle();
+  }
+
+  async function clearViaButton(wrapper: Awaited<ReturnType<typeof mountTransactions>>): Promise<void> {
+    await wrapper.get('[data-testid="clear-search"]').trigger('click');
+    await settle();
+  }
+
   function categorySelect(wrapper: Awaited<ReturnType<typeof mountTransactions>>) {
     return wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement;
   }
@@ -1305,7 +1331,7 @@ describe('transaction search', () => {
     return wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement;
   }
 
-  it('searches every transaction, pauses the filters, and restores them when cleared', async () => {
+  it('applies a search through the form and leaves the view unchanged while typing', async () => {
     const wrapper = await mountTransactions();
 
     expect(shownIds(wrapper)).toEqual(['s3']);
@@ -1313,12 +1339,24 @@ describe('transaction search', () => {
     expect(periodSelect(wrapper).value).toBe('2026');
     expect(searchField(wrapper).attributes('type')).toBe('search');
     expect(wrapper.get('label[for="transaction-search"]').text()).toBe('Search all transactions');
+    expect(searchButton(wrapper).text()).toBe('Search');
+    expect(searchButton(wrapper).attributes('type')).toBe('submit');
     expect(wrapper.find('[data-testid="filters-paused-note"]').exists()).toBe(false);
 
     await searchField(wrapper).setValue('market');
     await flushPromises();
 
+    expect(shownIds(wrapper)).toEqual(['s3']);
+    expect(categorySelect(wrapper).disabled).toBe(false);
+    expect(periodSelect(wrapper).disabled).toBe(false);
+    expect(routeQuery(wrapper).q).toBeUndefined();
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-0.25'));
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1 transaction');
+
+    await applyViaForm(wrapper);
+
     expect(shownIds(wrapper)).toEqual(['s1']);
+    expect(routeQuery(wrapper).q).toBe('market');
     expect(categorySelect(wrapper).value).toBe('uncategorised');
     expect(periodSelect(wrapper).value).toBe('2026');
     expect(categorySelect(wrapper).disabled).toBe(true);
@@ -1329,32 +1367,52 @@ describe('transaction search', () => {
     expect(mocks.useFetch).toHaveBeenCalledTimes(2);
     expect(mocks.fetch).not.toHaveBeenCalled();
 
-    await wrapper.get('[data-testid="clear-search"]').trigger('click');
+    await searchField(wrapper).setValue('');
     await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s1']);
+    expect(categorySelect(wrapper).disabled).toBe(true);
+    expect(wrapper.find('[data-testid="clear-search"]').exists()).toBe(true);
+
+    await clearViaButton(wrapper);
 
     expect(shownIds(wrapper)).toEqual(['s3']);
+    expect(routeQuery(wrapper).q).toBeUndefined();
     expect(categorySelect(wrapper).disabled).toBe(false);
     expect(periodSelect(wrapper).disabled).toBe(false);
     expect(wrapper.find('[data-testid="filters-paused-note"]').exists()).toBe(false);
   });
 
-  it('matches each descriptive field and applies the case, diacritic, and term rules', async () => {
+  it('applies the draft when the form is submitted', async () => {
     const wrapper = await mountTransactions();
-
-    await searchField(wrapper).setValue('MULLER');
-    await flushPromises();
-    expect(shownIds(wrapper)).toEqual(['s1']);
 
     await searchField(wrapper).setValue('rail');
     await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s3']);
+
+    await wrapper.get('form').trigger('submit');
+    await settle();
+
+    expect(shownIds(wrapper)).toEqual(['s2']);
+    expect(routeQuery(wrapper).q).toBe('rail');
+  });
+
+  it('matches each descriptive field after submission and applies the case, diacritic, and term rules', async () => {
+    const wrapper = await mountTransactions();
+
+    await searchField(wrapper).setValue('MULLER');
+    await applyViaForm(wrapper);
+    expect(shownIds(wrapper)).toEqual(['s1']);
+
+    await searchField(wrapper).setValue('rail');
+    await applyViaForm(wrapper);
     expect(shownIds(wrapper)).toEqual(['s2']);
 
     await searchField(wrapper).setValue('3457');
-    await flushPromises();
+    await applyViaForm(wrapper);
     expect(shownIds(wrapper)).toEqual(['s1']);
 
     await searchField(wrapper).setValue('market rail');
-    await flushPromises();
+    await applyViaForm(wrapper);
     expect(shownIds(wrapper)).toEqual([]);
     expect(wrapper.text()).toContain('There are no transactions matching');
     expect(wrapper.text()).toContain('market rail');
@@ -1364,7 +1422,7 @@ describe('transaction search', () => {
     const wrapper = await mountTransactions();
 
     await searchField(wrapper).setValue('a');
-    await flushPromises();
+    await applyViaForm(wrapper);
 
     expect(shownIds(wrapper)).toEqual(['s1', 's2', 's3']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-8.75'));
@@ -1373,16 +1431,15 @@ describe('transaction search', () => {
     expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('Uncategorised (1)');
 
     await searchField(wrapper).setValue('purchase');
-    await flushPromises();
+    await applyViaForm(wrapper);
 
     expect(shownIds(wrapper)).toEqual(['s3']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-0.25'));
     expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1 transaction');
   });
 
-  it('initializes from q and writes the trimmed value while preserving the other controls', async () => {
+  it('initializes from q, keeps typing out of the query, and applies the trimmed value', async () => {
     const wrapper = await mountTransactions({ route: '/?category=all&month=2024-03&q=market' });
-    const replace = vi.spyOn(wrapper.vm.$router, 'replace');
 
     expect((searchField(wrapper).element as HTMLInputElement).value).toBe('market');
     expect(shownIds(wrapper)).toEqual(['s1']);
@@ -1392,66 +1449,65 @@ describe('transaction search', () => {
 
     await searchField(wrapper).setValue('  rail  ');
     await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s1']);
+    expect(routeQuery(wrapper).q).toBe('market');
+    expect((searchField(wrapper).element as HTMLInputElement).value).toBe('  rail  ');
+
+    await applyViaForm(wrapper);
+
     expect(shownIds(wrapper)).toEqual(['s2']);
-    expect(replace).not.toHaveBeenCalled();
+    expect(routeQuery(wrapper).q).toBe('rail');
+    expect(routeQuery(wrapper).category).toBe('all');
+    expect(routeQuery(wrapper).month).toBe('2024-03');
+    expect((searchField(wrapper).element as HTMLInputElement).value).toBe('rail');
 
-    await wait(300);
-    await flushPromises();
+    await clearViaButton(wrapper);
 
-    const written = replace.mock.calls.at(-1)?.[0] as { query: Record<string, string> };
-    expect(written.query).toEqual({ category: 'all', month: '2024-03', q: 'rail' });
-
-    await wrapper.get('[data-testid="clear-search"]').trigger('click');
-    await wait(300);
-    await flushPromises();
-
-    const cleared = replace.mock.calls.at(-1)?.[0] as { query: Record<string, string> };
-    expect(cleared.query.q).toBeUndefined();
-    expect(cleared.query).toEqual({ category: 'all', month: '2024-03' });
+    expect(routeQuery(wrapper).q).toBeUndefined();
+    expect(routeQuery(wrapper).category).toBe('all');
+    expect(routeQuery(wrapper).month).toBe('2024-03');
+    expect(shownIds(wrapper)).toEqual(['s1']);
   });
 
-  it('keeps a trailing space while typing a multi-term query', async () => {
+  it('keeps a trailing space in the draft and trims it only when applied', async () => {
     const wrapper = await mountTransactions();
     const field = searchField(wrapper);
 
     await field.setValue('market ');
     await flushPromises();
     expect((field.element as HTMLInputElement).value).toBe('market ');
-    expect(shownIds(wrapper)).toEqual(['s1']);
+    expect(shownIds(wrapper)).toEqual(['s3']);
+    expect(routeQuery(wrapper).q).toBeUndefined();
 
-    await wait(350);
-    await flushPromises();
-    expect((field.element as HTMLInputElement).value).toBe('market ');
+    await applyViaForm(wrapper);
 
-    await field.setValue('market gmbh');
-    await flushPromises();
+    expect((field.element as HTMLInputElement).value).toBe('market');
     expect(shownIds(wrapper)).toEqual(['s1']);
+    expect(routeQuery(wrapper).q).toBe('market');
   });
 
-  it('adopts an external route change and cancels the stale pending write', async () => {
+  it('adopts an applied search from an external route change', async () => {
     const wrapper = await mountTransactions({ route: '/?category=all&q=market' });
-    const replace = vi.spyOn(wrapper.vm.$router, 'replace');
 
     expect(shownIds(wrapper)).toEqual(['s1']);
 
     await searchField(wrapper).setValue('gmbh');
     await flushPromises();
+    expect(routeQuery(wrapper).q).toBe('market');
 
     await wrapper.vm.$router.push({ path: '/', query: { category: 'all', q: 'rail' } });
-    await flushPromises();
-    await wait(350);
-    await flushPromises();
+    await settle();
 
     expect((searchField(wrapper).element as HTMLInputElement).value).toBe('rail');
     expect(shownIds(wrapper)).toEqual(['s2']);
-    expect(replace).not.toHaveBeenCalled();
+    expect(routeQuery(wrapper).q).toBe('rail');
   });
 
-  it('clears the selection when the search changes and selects all matches', async () => {
+  it('leaves the selection alone while typing and clears it when the search is applied', async () => {
     const wrapper = await mountTransactions();
 
     await searchField(wrapper).setValue('a');
-    await flushPromises();
+    await applyViaForm(wrapper);
     await wrapper.get('[data-testid="select-all-visible"]').setValue(true);
 
     expect(wrapper.findAll('[data-testid="row-select"]').map((box) => (box.element as HTMLInputElement).checked))
@@ -1461,12 +1517,19 @@ describe('transaction search', () => {
     await searchField(wrapper).setValue('rail');
     await flushPromises();
 
+    expect(shownIds(wrapper)).toEqual(['s1', 's2', 's3']);
+    expect(wrapper.findAll('[data-testid="row-select"]').every((box) => (box.element as HTMLInputElement).checked))
+      .toBe(true);
+    expect(wrapper.get('[data-testid="bulk-assignment-bar"]').text()).toContain('3 transactions selected');
+
+    await applyViaForm(wrapper);
+
+    expect(shownIds(wrapper)).toEqual(['s2']);
     expect(wrapper.find('[data-testid="bulk-assignment-bar"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-testid="row-select"]').every((box) => !(box.element as HTMLInputElement).checked))
       .toBe(true);
 
     await wrapper.get('[data-testid="select-all-visible"]').setValue(true);
-    expect(shownIds(wrapper)).toEqual(['s2']);
     expect(wrapper.findAll('[data-testid="row-select"]').map((box) => (box.element as HTMLInputElement).checked))
       .toEqual([true]);
     expect(wrapper.get('[data-testid="bulk-assignment-bar"]').text()).toContain('1 transaction selected');
@@ -1485,7 +1548,7 @@ describe('transaction search', () => {
     const wrapper = await mountTransactions();
 
     await searchField(wrapper).setValue('rail');
-    await flushPromises();
+    await applyViaForm(wrapper);
     await wrapper.get('[data-testid="select-all-visible"]').setValue(true);
     await wrapper.get('[data-testid="bulk-assignment-category"]').setValue('1');
     await wrapper.get('[data-testid="bulk-assignment-apply"]').trigger('click');
@@ -1516,16 +1579,15 @@ describe('transaction search', () => {
     expect(header().getAttribute('aria-sort')).toBe('ascending');
 
     await searchField(wrapper).setValue('a');
-    await flushPromises();
+    await applyViaForm(wrapper);
     expect(shownIds(wrapper)).toEqual(['s1', 's2', 's3']);
     expect(header().getAttribute('aria-sort')).toBe('ascending');
 
     await searchField(wrapper).setValue('purchase');
-    await flushPromises();
+    await applyViaForm(wrapper);
     expect(shownIds(wrapper)).toEqual(['s3']);
 
-    await wrapper.get('[data-testid="clear-search"]').trigger('click');
-    await flushPromises();
+    await clearViaButton(wrapper);
     expect(shownIds(wrapper)).toEqual(['s1', 's2', 's3']);
     expect(header().getAttribute('aria-sort')).toBe('ascending');
   });
@@ -1535,11 +1597,14 @@ describe('transaction search', () => {
 
     await searchField(wrapper).setValue('zzz');
     await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s3']);
+    expect(wrapper.text()).not.toContain('There are no transactions matching');
+
+    await applyViaForm(wrapper);
     expect(wrapper.text()).toContain('There are no transactions matching');
     expect(wrapper.text()).toContain('zzz');
 
-    await wrapper.get('[data-testid="clear-search"]').trigger('click');
-    await flushPromises();
+    await clearViaButton(wrapper);
     await wrapper.get('[data-testid="category-filter"]').setValue('1');
     await flushPromises();
     expect(shownIds(wrapper)).toEqual([]);
@@ -1551,3 +1616,4 @@ describe('transaction search', () => {
     expect(empty.text()).toContain('There are no transactions to show');
   });
 });
+

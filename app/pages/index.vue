@@ -5,7 +5,11 @@ import {
   sumSignedAmountStrings,
 } from '../utils/category-spending';
 import { IconMapPin } from '@tabler/icons-vue';
-import { matchesTransactionSearch } from '../utils/transaction-search';
+import {
+  createTransactionSearchIndex,
+  matchesTransactionSearchTerms,
+  searchTerms,
+} from '../utils/transaction-search';
 
 // The index route reads stored transactions from the read-only GET
 // /api/transactions endpoint. Category and booking-period filters are derived
@@ -31,11 +35,11 @@ import { matchesTransactionSearch } from '../utils/transaction-search';
 // carried in the route query. A route without a sort keeps the endpoint's order,
 // and equal values keep their relative endpoint order.
 //
-// The all-transactions search matches the descriptive fields. A non-empty search
-// bypasses the category and period filters, which stay visible with their values
-// but are disabled until the search is cleared. The trimmed search text is
-// carried in the route query as `q`; typing filters immediately while the query
-// write is debounced.
+// The all-transactions search matches the descriptive fields. The field holds a
+// draft that takes effect only when the form is submitted; a non-empty applied
+// search bypasses the category and period filters, which stay visible with their
+// values but are disabled until the search is cleared. The trimmed applied text
+// is carried in the route query as `q`.
 //
 // The page also offers manual category assignment. Every row's category cell
 // hosts a select that pins the row to a chosen category or clears the pin by
@@ -254,8 +258,10 @@ const selectedPeriod = ref('all');
 const allPeriodsSelected = ref(false);
 const activeSort = ref<TransactionSort | null>(null);
 const searchText = ref('');
-const searchQuery = computed(() => searchText.value.trim());
-const searchActive = computed(() => searchQuery.value !== '');
+// The field is a draft. The route's q is the applied search, so typing alone
+// cannot change the rows, filters, summary, selection, or URL.
+const appliedSearch = computed(() => (queryString(route.value.query.q) ?? '').trim());
+const searchActive = computed(() => appliedSearch.value !== '');
 
 const categoryFilter = computed({
   get: () => selectedCategory.value,
@@ -316,22 +322,15 @@ function setSortQuery(sort: TransactionSort): void {
   });
 }
 
-const SEARCH_QUERY_DEBOUNCE_MS = 250;
-let searchWriteTimer: ReturnType<typeof setTimeout> | null = null;
-// The trimmed value the component last wrote, so a route change caused by its
-// own debounced write is never mistaken for an external navigation.
-let lastWrittenSearchQuery: string | null = null;
-
-function routeSearchQuery(): string {
-  return (queryString(route.value.query.q) ?? '').trim();
-}
-
-// The route carries the trimmed search text. The write is debounced so typing
-// filters immediately without turning every keystroke into a navigation, and it
-// preserves the category, period, and sort values already in the query.
-function writeSearchQuery(): void {
-  const trimmed = searchQuery.value;
-  lastWrittenSearchQuery = trimmed;
+// The form's submit path and the Clear control both end here. Applying is an
+// immediate route write: the applied search is the route's q, which keeps the
+// view linkable and lets the field, filters, and selection follow one value.
+function applySearch(): void {
+  const trimmed = searchText.value.trim();
+  searchText.value = trimmed;
+  if (trimmed === appliedSearch.value) {
+    return;
+  }
   const query = { ...queryWithActiveSort() };
   if (trimmed === '') {
     delete query.q;
@@ -341,43 +340,17 @@ function writeSearchQuery(): void {
   void router.replace({ path: '/', query });
 }
 
-watch(searchQuery, (value) => {
-  if (searchWriteTimer !== null) {
-    clearTimeout(searchWriteTimer);
-    searchWriteTimer = null;
-  }
-  // The route already describes this text; writing it again would only add a
-  // navigation, for example when the text was just adopted from the route.
-  if (value === routeSearchQuery()) {
-    return;
-  }
-  searchWriteTimer = setTimeout(() => {
-    searchWriteTimer = null;
-    writeSearchQuery();
-  }, SEARCH_QUERY_DEBOUNCE_MS);
-});
+function clearSearch(): void {
+  searchText.value = '';
+  applySearch();
+}
 
-watch(
-  () => queryString(route.value.query.q),
-  (value) => {
-    const fromRoute = (value ?? '').trim();
-    // An own write that resolves after the user typed again must not roll the
-    // field back or cancel the newer pending write.
-    if (fromRoute === lastWrittenSearchQuery) {
-      lastWrittenSearchQuery = null;
-      return;
-    }
-    if (fromRoute === searchQuery.value) {
-      return;
-    }
-    if (searchWriteTimer !== null) {
-      clearTimeout(searchWriteTimer);
-      searchWriteTimer = null;
-    }
-    searchText.value = fromRoute;
-  },
-  { immediate: true },
-);
+// Initial load and back/forward navigation restore the draft from the applied
+// search. Typing changes only the draft, so the field is not written back while
+// the user is editing.
+watch(appliedSearch, (value) => {
+  searchText.value = value;
+}, { immediate: true });
 
 // A different column starts ascending; the active column alternates. The route
 // query is updated alongside the local state so the sorted view is linkable.
@@ -422,12 +395,18 @@ const uncategorisedTransactions = computed(() =>
   (transactions.value ?? []).filter((transaction) => transaction.category === null),
 );
 
-// A non-empty search covers every returned transaction and overrides the
-// category and period filters; an empty search keeps the filtered view.
+// The descriptive text is normalised once per loaded response, so applying a
+// search only parses its terms and compares against already-normalised rows.
+const searchIndex = computed(() => createTransactionSearchIndex(transactions.value ?? []));
+
+// An applied search covers every returned transaction and overrides the
+// category and period filters; no applied search keeps the filtered view.
 const visibleTransactions = computed(() => {
-  if (searchQuery.value !== '') {
+  if (appliedSearch.value !== '') {
+    const terms = searchTerms(appliedSearch.value);
+    const index = searchIndex.value;
     return (transactions.value ?? []).filter((transaction) =>
-      matchesTransactionSearch(transaction, searchQuery.value));
+      matchesTransactionSearchTerms(index.get(transaction.id) ?? '', terms));
   }
   return (transactions.value ?? []).filter((transaction) => {
     const categoryMatches = categoryFilter.value === 'all'
@@ -589,7 +568,7 @@ function clearSelection(): void {
   selectedIds.value = new Set();
 }
 
-watch([categoryFilter, periodFilter, searchQuery], () => {
+watch([categoryFilter, periodFilter, appliedSearch], () => {
   clearSelection();
 });
 
@@ -911,9 +890,6 @@ onBeforeUnmount(() => {
   if (refreshTimer !== null) {
     clearTimeout(refreshTimer);
   }
-  if (searchWriteTimer !== null) {
-    clearTimeout(searchWriteTimer);
-  }
   if (statusTimer !== null) {
     clearTimeout(statusTimer);
   }
@@ -934,7 +910,7 @@ onBeforeUnmount(() => {
       <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
         <div class="grid w-full gap-1 text-sm font-medium text-muted sm:w-auto">
           <label for="transaction-search">Search all transactions</label>
-          <div class="flex min-w-0 items-center gap-2">
+          <form class="flex min-w-0 items-center gap-2" @submit.prevent="applySearch">
             <input
               id="transaction-search"
               v-model="searchText"
@@ -946,16 +922,23 @@ onBeforeUnmount(() => {
               class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-80"
             >
             <button
-              v-if="searchText !== ''"
+              type="submit"
+              data-testid="search-submit"
+              class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-sheet bg-ink px-3 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            >
+              Search
+            </button>
+            <button
+              v-if="searchText !== '' || searchActive"
               type="button"
               data-testid="clear-search"
               aria-label="Clear search"
               class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              @click="searchText = ''"
+              @click="clearSearch"
             >
               Clear
             </button>
-          </div>
+          </form>
         </div>
         <label class="grid w-full gap-1 text-sm font-medium text-muted sm:w-auto">
           Category
@@ -1017,7 +1000,7 @@ onBeforeUnmount(() => {
       </p>
 
       <p v-else-if="visibleTransactions.length === 0 && searchActive" class="mt-4 text-muted">
-        There are no transactions matching “{{ searchQuery }}”.
+        There are no transactions matching “{{ appliedSearch }}”.
       </p>
 
       <p v-else-if="visibleTransactions.length === 0" class="mt-4 text-muted">

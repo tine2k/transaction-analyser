@@ -33,14 +33,31 @@ export function transactionSearchText(transaction: SearchableTransaction): strin
   ].join(' ').trim());
 }
 
+// The index is built once per loaded transaction response, so an applied search
+// only parses its query and compares already-normalised text.
+export function createTransactionSearchIndex(
+  transactions: ReadonlyArray<SearchableTransaction & { id: string }>,
+): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const transaction of transactions) {
+    index.set(transaction.id, transactionSearchText(transaction));
+  }
+  return index;
+}
+
+export function matchesTransactionSearchTerms(
+  text: string,
+  terms: readonly string[],
+): boolean {
+  return terms.every((term) => text.includes(term));
+}
+
 export function matchesTransactionSearch(
   transaction: SearchableTransaction,
   query: string,
 ): boolean {
-  const terms = searchTerms(query);
-  if (terms.length === 0) {
-    return true;
-  }
-  const text = transactionSearchText(transaction);
-  return terms.every((term) => text.includes(term));
+  return matchesTransactionSearchTerms(
+    transactionSearchText(transaction),
+    searchTerms(query),
+  );
 }

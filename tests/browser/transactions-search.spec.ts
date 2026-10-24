@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// All-transactions search on the transactions table. The API is intercepted, so
-// the checks exercise the rendered filtering, the paused filter controls, the
-// route query, and the reload and clear behaviour in headless Chromium.
+// Explicit all-transactions search on the transactions table. The API is
+// intercepted, so the checks exercise the rendered draft behaviour, the Search
+// button and Enter, the route query, and the reload and clear behaviour in
+// headless Chromium.
 //
-// See openspec/changes/add-transaction-search/specs/transaction-table/spec.md
+// See openspec/changes/submit-transaction-search/specs/transaction-table/spec.md
 
 const currentYear = new Date().getFullYear();
 const olderYear = currentYear - 2;
@@ -73,7 +74,7 @@ async function shownIds(page: Page): Promise<Array<string | null>> {
     rows.map((row) => row.getAttribute('data-transaction-id')));
 }
 
-test('searching spans every transaction, pauses the filters, and survives a reload', async ({ page }) => {
+test('typing stays inert and the Search button applies the search', async ({ page }) => {
   await interceptApi(page);
   await page.goto('/', { waitUntil: 'networkidle' });
 
@@ -81,7 +82,16 @@ test('searching spans every transaction, pauses the filters, and survives a relo
   await expect(page.getByTestId('category-filter')).toHaveValue('uncategorised');
   await expect(page.getByTestId('period-filter')).toHaveValue(String(currentYear));
 
-  await page.getByTestId('transaction-search').fill('market');
+  const field = page.getByTestId('transaction-search');
+  await field.fill('market');
+
+  expect(await shownIds(page)).toEqual(['3']);
+  await expect(page.getByTestId('category-filter')).toBeEnabled();
+  await expect(page.getByTestId('period-filter')).toBeEnabled();
+  await expect(page.getByTestId('filters-paused-note')).toHaveCount(0);
+  expect(new URL(page.url()).searchParams.get('q')).toBeNull();
+
+  await page.getByTestId('search-submit').click();
 
   await expect.poll(() => shownIds(page)).toEqual(['1']);
   await expect(page.getByTestId('category-filter')).toBeDisabled();
@@ -96,6 +106,10 @@ test('searching spans every transaction, pauses the filters, and survives a relo
   await expect(page.getByTestId('category-filter')).toBeDisabled();
   await expect(page.getByTestId('period-filter')).toBeDisabled();
 
+  await page.getByTestId('transaction-search').fill('');
+  expect(await shownIds(page)).toEqual(['1']);
+  await expect(page.getByTestId('clear-search')).toBeVisible();
+
   await page.getByTestId('clear-search').click();
 
   await expect.poll(() => shownIds(page)).toEqual(['3']);
@@ -106,11 +120,30 @@ test('searching spans every transaction, pauses the filters, and survives a relo
   await expect.poll(() => new URL(page.url()).searchParams.get('q')).toBeNull();
 });
 
-test('a search that matches nothing explains the result', async ({ page }) => {
+test('Enter applies the draft', async ({ page }) => {
   await interceptApi(page);
   await page.goto('/', { waitUntil: 'networkidle' });
 
-  await page.getByTestId('transaction-search').fill('zzz');
+  const field = page.getByTestId('transaction-search');
+  await field.fill('rail');
+  expect(await shownIds(page)).toEqual(['3']);
+
+  await field.press('Enter');
+
+  await expect.poll(() => shownIds(page)).toEqual(['2']);
+  await expect.poll(() => new URL(page.url()).searchParams.get('q')).toBe('rail');
+  await expect(field).toHaveValue('rail');
+});
+
+test('a submitted search that matches nothing explains the result', async ({ page }) => {
+  await interceptApi(page);
+  await page.goto('/', { waitUntil: 'networkidle' });
+
+  const field = page.getByTestId('transaction-search');
+  await field.fill('zzz');
+  expect(await shownIds(page)).toEqual(['3']);
+
+  await page.getByTestId('search-submit').click();
 
   await expect(page.getByText(/There are no transactions matching/)).toBeVisible();
   await expect(page.getByTestId('visible-count')).toHaveText('0 transactions');

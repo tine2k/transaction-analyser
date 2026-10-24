@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createTransactionSearchIndex,
   matchesTransactionSearch,
+  matchesTransactionSearchTerms,
   normalizeSearchText,
   searchTerms,
   transactionSearchText,
@@ -55,5 +57,28 @@ describe('transaction search matching', () => {
 
   it('rejects text that occurs in no descriptive field', () => {
     expect(matchesTransactionSearch(transaction, 'salary')).toBe(false);
+  });
+});
+
+describe('transaction search index', () => {
+  it('maps each transaction identity to its normalised descriptive text', () => {
+    const index = createTransactionSearchIndex([
+      { id: 'a', ...transaction },
+      { id: 'b', purpose: 'February travel', counterpartyName: 'Rail', counterpartyAccount: null },
+    ]);
+
+    expect(index.get('a')).toBe('card payment market muller gmbh at61 1904 3002 3457 3201');
+    expect(index.get('b')).toBe('february travel rail');
+    expect(index.size).toBe(2);
+  });
+
+  it('matches already-normalised terms against indexed text', () => {
+    const index = createTransactionSearchIndex([{ id: 'a', ...transaction }]);
+    const text = index.get('a') ?? '';
+    const terms = searchTerms('MÜLLER payment');
+
+    expect(matchesTransactionSearchTerms(text, terms)).toBe(true);
+    expect(matchesTransactionSearchTerms(text, searchTerms('market rail'))).toBe(false);
+    expect(matchesTransactionSearchTerms(text, [])).toBe(true);
   });
 });

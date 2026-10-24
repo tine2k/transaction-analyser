@@ -296,18 +296,41 @@ The system SHALL answer a screen-started sync request with the run's outcome onc
 - **WHEN** the credentials are absent and the control is used
 - **THEN** no login is attempted, no run is recorded, and the answer states that the sync is not configured
 
-### Requirement: The sync imports into one configured person
+### Requirement: The sync person is required at startup and by the sync command
 
-The sync SHALL read its person from `EASYBANK_PERSON` at run time, defaulting to `Default` when the
-variable is absent or empty. It SHALL trim the name, resolve it against stored people ignoring letter
-case, and require that the person exists; it SHALL NOT create one. Every retrieved row SHALL be
-imported into that one person for the nightly, manual, and screen-started runs. A run that cannot
-resolve its person SHALL be recorded as failed, write no transaction, and leave the server serving.
+The server SHALL fail startup with a non-zero exit and serve no request when `EASYBANK_PERSON` is
+missing, empty, or whitespace-only, and the message SHALL name the variable without including a
+credential. The manual sync command SHALL exit non-zero before logging in, reading the bank, or
+opening the database when the variable is unusable. Its help option SHALL still work without the
+variable. There SHALL be no default person.
 
-#### Scenario: Default is used when no person is configured
+#### Scenario: Startup without the variable fails
 
-- **WHEN** the sync runs with `EASYBANK_PERSON` absent or empty and a person named `Default` exists
-- **THEN** the retrieved rows are imported into `Default`
+- **WHEN** the server is started with no `EASYBANK_PERSON` in the environment
+- **THEN** the process exits non-zero before serving any request, and the message names the missing variable
+
+#### Scenario: Startup with an empty variable fails
+
+- **WHEN** the server is started with `EASYBANK_PERSON` set to an empty value or only whitespace
+- **THEN** the process exits non-zero and serves no request
+
+#### Scenario: The sync command refuses before contacting the bank
+
+- **WHEN** the manual sync command runs without a usable `EASYBANK_PERSON`
+- **THEN** it exits non-zero before logging in, reading the bank, or opening the database, and the message names the missing variable
+
+#### Scenario: The sync command still shows its help
+
+- **WHEN** the manual sync command is asked for help without a usable `EASYBANK_PERSON`
+- **THEN** it prints its usage and exits zero without requiring the variable
+
+### Requirement: The sync resolves its configured person for every run
+
+The sync SHALL read its person from `EASYBANK_PERSON` at run time, trim the name, and resolve it
+against stored people ignoring letter case. It SHALL require that the person exists and SHALL NOT
+create one. Every retrieved row SHALL be imported into that one person for the nightly, manual, and
+screen-started runs. A run that cannot resolve its person SHALL be recorded as failed, write no
+transaction, and leave the server serving.
 
 #### Scenario: A configured person is used
 
@@ -328,11 +351,6 @@ resolve its person SHALL be recorded as failed, write no transaction, and leave 
 
 - **WHEN** the sync cannot resolve the configured person
 - **THEN** the run is recorded as failed with the reason, creates no person, and writes no transaction
-
-#### Scenario: A renamed Default fails loudly until configured
-
-- **WHEN** the person named `Default` has been renamed and `EASYBANK_PERSON` is still absent
-- **THEN** the sync fails to resolve `Default`, records a failed run, and writes no transaction
 
 #### Scenario: The manual command uses the same person
 

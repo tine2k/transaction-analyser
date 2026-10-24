@@ -69,6 +69,7 @@ async function startServer(databaseUrl: string): Promise<{ child: ChildProcess; 
       DATABASE_URL: databaseUrl,
       HOST: '127.0.0.1',
       PORT: String(port),
+      EASYBANK_PERSON: 'Default',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

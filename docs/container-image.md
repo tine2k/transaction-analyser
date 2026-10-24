@@ -16,16 +16,17 @@ The build uses Node 24 and the checked-in `package-lock.json`. Environment files
 
 Provision and operate PostgreSQL separately. The image applies the pending migrations from `db/migrations` while it starts, so preparing a database means only providing a reachable database and its address. An existing database whose schema was applied by hand before the migration history existed is adopted once by starting the image with `MIGRATE_BASELINE` set to the highest applied file version (for example `0008`); the variable is ignored once the database records migrations.
 
-Set `DATABASE_URL` in the environment of the container at run time, not when building the image:
+Set `DATABASE_URL` and `EASYBANK_PERSON` in the environment of the container at run time, not when building the image:
 
 ```sh
 docker run --rm --name transaction-analyser \
   -p 3000:3000 \
   --env DATABASE_URL \
+  --env EASYBANK_PERSON \
   transaction-analyser:local
 ```
 
-The database address must be reachable from the container. In particular, `localhost` inside the container refers to the container itself, not the host machine. Use the database host or network address that is reachable from the container runtime. The same image can be run with a different `DATABASE_URL` without rebuilding. Starting the image without `DATABASE_URL`, or against a database it cannot reach or migrate, exits with a non-zero status and serves nothing.
+The database address must be reachable from the container. In particular, `localhost` inside the container refers to the container itself, not the host machine. Use the database host or network address that is reachable from the container runtime. The same image can be run with a different `DATABASE_URL` without rebuilding. `EASYBANK_PERSON` names the person the Easybank sync imports into and is required: a fresh database seeds `Default`, which can be renamed on the People screen. Starting the image without `DATABASE_URL` or `EASYBANK_PERSON`, or against a database it cannot reach or migrate, exits with a non-zero status and serves nothing.
 
 ## Verify with disposable test databases
 
@@ -39,6 +40,7 @@ PGHOST=127.0.0.1 bash tests/run-with-test-database.sh bash -c '
   name=transaction-analyser-image-test
   docker run --detach --name "$name" --network host \
     --env DATABASE_URL="$TEST_DATABASE_URL" \
+    --env EASYBANK_PERSON=Default \
     transaction-analyser:local
   cleanup() { docker rm --force "$name" >/dev/null 2>&1 || true; }
   trap cleanup EXIT

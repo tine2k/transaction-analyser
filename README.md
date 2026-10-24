@@ -34,10 +34,13 @@ Prerequisites: Docker, Git, and Node.js 24 with npm (Node is needed only for the
    docker run --detach --name transaction-analyser --network transaction-analyser \
      --publish 3000:3000 \
      --env DATABASE_URL=postgres://analyser:change-me@transaction-analyser-postgres:5432/transaction_analyser \
+     --env EASYBANK_PERSON=Default \
      ghcr.io/tine2k/transaction-analyser:latest
    until curl --fail --silent http://localhost:3000/api/health > /dev/null; do sleep 1; done
    curl --fail http://localhost:3000/api/health   # {"status":"ok"}
    ```
+
+   `EASYBANK_PERSON` is required: the server refuses to start without it. `Default` exists on a fresh database; rename it on the People screen and update this value to the new name, or the sync fails.
 
 ## Importing transactions
 
@@ -59,7 +62,7 @@ Dates are `DD.MM.YYYY`, amounts use a comma decimal separator (`-1.234,56`), the
 
 The server can read the Easybank Giro account's transaction list every night and import only what is new. It uses the login and the transaction list, which need no confirmation in the easybank app; the CSV export and the search panel are deliberately not used, because the bank protects those with app confirmation.
 
-Set the credentials in the environment or in a gitignored `.env` file:
+Set the credentials and the person in the environment or in a gitignored `.env` file:
 
 ```sh
 EASYBANK_USER=...
@@ -67,7 +70,7 @@ EASYBANK_PIN=...
 EASYBANK_PERSON=Anna
 ```
 
-`EASYBANK_PERSON` names the person the sync imports into and defaults to `Default` when it is absent or empty. The person must already exist; an unknown name fails the run and writes nothing rather than creating a person. Renaming `Default` on the People screen without updating this variable therefore makes the next unconfigured sync fail loudly until it is corrected. Every run — scheduled, manual, or started from the screen — imports into the same configured person.
+`EASYBANK_PERSON` is required: the server refuses to start without it, and the sync command exits with a failure before it opens the database. It names the person the sync imports into; the person must already exist. An unknown name fails the run and writes nothing rather than creating a person. Renaming the person on the People screen without updating this variable makes the next sync fail loudly until it is corrected. Every run — scheduled, manual, or started from the screen — imports into the same configured person.
 
 The nightly task runs at 03:00 Europe/Vienna while the server runs. Until `EASYBANK_SYNC_WRITE=true` is set, every run is non-writing: it records what it would import and changes no transaction. The result of every run appears on the Imports screen, which also offers a control that starts the same sync on demand. Once the non-writing runs look right, set `EASYBANK_SYNC_WRITE=true` to let it write.
 
@@ -99,6 +102,7 @@ The window defaults to the first day of the preceding calendar quarter through t
 - To upgrade, pull the new image and recreate the application container with the same `DATABASE_URL`; the pending migrations are applied while it starts, and every applied migration is recorded in the database's `pgmigrations` table, so no migration is ever applied twice.
 - A database whose schema was applied by hand before the migration history existed is adopted once by starting with `MIGRATE_BASELINE` set to the highest applied version (for example `0009`); the variable is ignored once the database records migrations. Migrations are forward-only: correct a bad migration with a new file or by restoring a backup.
 - The version that adds people creates a person named `Default` and assigns every existing transaction to it during the first start; a fresh database also gets `Default`, with no transaction. Nothing has to be entered by hand: rename `Default` on the People screen to the first person's name, or keep the name. A rename changes what every future import must name, so update saved import commands and `EASYBANK_PERSON` to match.
+- The version that makes `EASYBANK_PERSON` mandatory refuses to start without it. Read the current person's name on the People screen and set `EASYBANK_PERSON` to it before upgrading; a fresh installation can use `Default` until the person is renamed.
 - Back up the database with `tools/backup-postgres.sh [directory]`; it requires the quick-start container name `transaction-analyser-postgres` and writes a timestamped `.sql.gz`, by default under `backups/`.
 
 ## What it does
@@ -112,6 +116,6 @@ The window defaults to the first day of the preceding calendar quarter through t
 
 ## Development
 
-`npm install` then `npm run dev` serves the app on http://127.0.0.1:3000. The server requires a reachable database: set `DATABASE_URL` in the environment or a gitignored `.env` file, and the pending migrations are applied at startup. `npm test` runs the unit, component, and integration suites; see [tests/README.md](tests/README.md) for prerequisites. The full container reference is in [docs/container-image.md](docs/container-image.md).
+`npm install` then `npm run dev` serves the app on http://127.0.0.1:3000. The server requires a reachable database: set `DATABASE_URL` in the environment or a gitignored `.env` file, and the pending migrations are applied at startup. It also requires `EASYBANK_PERSON`, the name of an existing person; use `Default` on a fresh database. `npm test` runs the unit, component, and integration suites; see [tests/README.md](tests/README.md) for prerequisites. The full container reference is in [docs/container-image.md](docs/container-image.md).
 
 The application icon is drawn in `public/icon.svg`, which is the only place its geometry lives. `node tools/render-app-icon.mjs` regenerates the PNGs beside it from that file, using the Playwright Chromium (`npm run test:browser:install` installs it). The PNGs are committed and no build step rasterises the artwork. A home-screen shortcut keeps the icon it was added with, so a changed icon appears only after the shortcut is removed and added again.

@@ -31,6 +31,7 @@ function options(overrides: Record<string, unknown> = {}) {
   return {
     user: 'user',
     pin: 'pin',
+    person: 'Default',
     from: '2026-07-01',
     to: '2026-10-31',
     dryRun: false,

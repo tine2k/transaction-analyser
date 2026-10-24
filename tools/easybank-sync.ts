@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { describeError, redact } from '../shared/transactions-import.ts';
-import { defaultWindow, personFromEnv, syncEasybank } from '../shared/easybank-sync.ts';
+import { defaultWindow, requirePersonFromEnv, syncEasybank } from '../shared/easybank-sync.ts';
 import { notificationConfigFromEnv } from '../shared/import-notification.ts';
 
 type Options = { from: string | null; to: string | null; dsn: string | null; write: boolean };
@@ -62,8 +62,8 @@ const USAGE = [
   '  --write               Write the new rows. Without it the run only reports.',
   '',
   'Credentials come from EASYBANK_USER and EASYBANK_PIN in the environment.',
-  'EASYBANK_PERSON names the person the rows are imported into; it defaults to',
-  'Default when unset or empty. The person must already exist.',
+  'EASYBANK_PERSON is required and names the person the rows are imported into.',
+  'The person must already exist.',
   'Pushover notifications use PUSHOVER_TOKEN and PUSHOVER_USER; without them',
   'no notification is sent and the sync is unaffected.',
 ].join('\n');
@@ -74,6 +74,10 @@ async function main(): Promise<number> {
     console.log(USAGE);
     return 0;
   }
+
+  // The person is required before the database is resolved: a sync that cannot
+  // name its destination must not open a connection or contact the bank.
+  const person = requirePersonFromEnv(process.env);
 
   const dsn = options.dsn ?? process.env['DATABASE_URL'] ?? null;
   if (dsn === null || dsn === '') {
@@ -102,7 +106,7 @@ async function main(): Promise<number> {
     const result = await syncEasybank(client, {
       user,
       pin,
-      person: personFromEnv(process.env),
+      person,
       from,
       to,
       dryRun: !options.write,

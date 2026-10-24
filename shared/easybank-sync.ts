@@ -22,15 +22,24 @@ import { notifyImport } from './import-notification.ts';
 import type { ImportNotificationConfig } from './import-notification.ts';
 import { retrieveGiroTransactions } from './easybank.ts';
 
-// The person a sync imports into when EASYBANK_PERSON is absent or empty. The
-// migration seeds this person, so an unconfigured sync has a target.
-export const DEFAULT_PERSON = 'Default';
-
-// The configured person's name. An absent or empty variable means `Default`; the
-// name is trimmed here and resolved against the stored people by syncEasybank.
-export function personFromEnv(env: Record<string, string | undefined>): string {
+// The configured person's name, trimmed. An absent or empty variable yields null:
+// EASYBANK_PERSON is required, so no person is chosen here on its behalf.
+export function personFromEnv(env: Record<string, string | undefined>): string | null {
   const value = env['EASYBANK_PERSON']?.trim() ?? '';
-  return value === '' ? DEFAULT_PERSON : value;
+  return value === '' ? null : value;
+}
+
+// The configured person for a process that cannot run without one. The server
+// calls this while starting and the sync command before it opens a database, so
+// both refuse rather than import into a guessed person.
+export function requirePersonFromEnv(env: Record<string, string | undefined>): string {
+  const person = personFromEnv(env);
+  if (person === null) {
+    throw new Error(
+      'EASYBANK_PERSON is not set: set it to the name of an existing person before starting the application',
+    );
+  }
+  return person;
 }
 
 // The value date below which the sync imports nothing. The history already held
@@ -97,13 +106,11 @@ export async function syncEasybank(
   }
 
   const runId = await startImportRun(database, { source: options.source, nonWriting: options.dryRun });
-  const configuredPerson =
-    typeof options.person === 'string' && options.person.trim() !== '' ? options.person : DEFAULT_PERSON;
 
   try {
     // The person is resolved before the bank is read or any row is written. A run
     // that cannot resolve one is recorded as failed and carries no person.
-    const person = await resolvePerson(database, configuredPerson);
+    const person = await resolvePerson(database, options.person);
     await setImportRunPerson(database, runId, person.id);
 
     const retrieved = await retrieveGiroTransactions({

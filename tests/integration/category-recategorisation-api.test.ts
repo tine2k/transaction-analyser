@@ -68,6 +68,7 @@ async function startServer(databaseUrl: string): Promise<{ child: ChildProcess; 
       DATABASE_URL: databaseUrl,
       HOST: '127.0.0.1',
       PORT: String(port),
+      EASYBANK_PERSON: 'Default',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -236,6 +237,7 @@ describe('category re-categorisation API integration', () => {
         DATABASE_URL: 'postgres://test:secret@127.0.0.1:1/unreachable',
         HOST: '127.0.0.1',
         PORT: String(port),
+        EASYBANK_PERSON: 'Default',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

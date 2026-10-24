@@ -191,27 +191,21 @@ describe('easybank sync against PostgreSQL and a fake bank', () => {
     }
   });
 
-  it('imports into Default when no person is configured', async () => {
+  it('records a failed run when no person is configured', async () => {
     const result = await syncEasybank(connection(), options({ person: '', dryRun: false }));
 
-    expect(result.status).toBe('success');
-    if (result.status !== 'success') {
+    expect(result.status).toBe('failed');
+    if (result.status !== 'failed') {
       return;
     }
-    expect(result.person).toEqual({ id: expect.any(String), name: 'Default' });
-    expect(result.plan).toMatchObject({ rowsRead: 2, rowsWritten: 2 });
-    const stored = await connection().query(`
-      SELECT DISTINCT p.name AS person
-      FROM transactions AS t
-      JOIN people AS p ON p.id = t.person_id
-    `);
-    expect(stored.rows).toEqual([{ person: 'Default' }]);
+    expect(result.error).toMatch(/a person is required/);
+    expect(await transactionCount()).toBe(0);
     const runs = await connection().query(`
-      SELECT p.name AS person
+      SELECT r.outcome, r.rows_written, p.name AS person
       FROM import_runs AS r
       LEFT JOIN people AS p ON p.id = r.person_id
     `);
-    expect(runs.rows).toEqual([{ person: 'Default' }]);
+    expect(runs.rows).toEqual([{ outcome: 'failed', rows_written: 0, person: null }]);
   });
 
   it('imports into a configured person ignoring case and whitespace', async () => {
@@ -253,28 +247,5 @@ describe('easybank sync against PostgreSQL and a fake bank', () => {
     expect(runs.rows).toEqual([{ outcome: 'failed', rows_written: 0, person: null }]);
     const created = await connection().query('SELECT count(*)::int AS count FROM people WHERE lower(name) = lower($1)', ['Ghost']);
     expect(created.rows[0]).toEqual({ count: 0 });
-  });
-
-  it('fails loudly when Default has been renamed and no person is configured', async () => {
-    await connection().query("UPDATE people SET name = 'Someone Else' WHERE lower(name) = 'default'");
-
-    try {
-      const result = await syncEasybank(connection(), options({ person: '', dryRun: false }));
-
-      expect(result.status).toBe('failed');
-      if (result.status !== 'failed') {
-        return;
-      }
-      expect(result.error).toMatch(/no person named "Default"/);
-      expect(await transactionCount()).toBe(0);
-      const runs = await connection().query(`
-        SELECT r.outcome, p.name AS person
-        FROM import_runs AS r
-        LEFT JOIN people AS p ON p.id = r.person_id
-      `);
-      expect(runs.rows).toEqual([{ outcome: 'failed', person: null }]);
-    } finally {
-      await connection().query("UPDATE people SET name = 'Default' WHERE lower(name) = 'someone else'");
-    }
   });
 });

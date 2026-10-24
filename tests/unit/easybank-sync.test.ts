@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { personFromEnv, syncSourceFromPayload } from '../../shared/easybank-sync';
+import { personFromEnv, requirePersonFromEnv, syncSourceFromPayload } from '../../shared/easybank-sync';
 
 describe('sync source from a task payload', () => {
   it('records a run the imports screen started as the ui source', () => {
@@ -17,16 +17,31 @@ describe('sync source from a task payload', () => {
 });
 
 describe('the configured sync person', () => {
-  it('defaults to Default when the variable is absent', () => {
-    expect(personFromEnv({})).toBe('Default');
+  it('is absent when the variable is absent', () => {
+    expect(personFromEnv({})).toBeNull();
   });
 
-  it('defaults to Default when the variable is empty or whitespace', () => {
-    expect(personFromEnv({ EASYBANK_PERSON: '' })).toBe('Default');
-    expect(personFromEnv({ EASYBANK_PERSON: '   ' })).toBe('Default');
+  it('is absent when the variable is empty or whitespace', () => {
+    expect(personFromEnv({ EASYBANK_PERSON: '' })).toBeNull();
+    expect(personFromEnv({ EASYBANK_PERSON: '   ' })).toBeNull();
   });
 
   it('uses the configured name with surrounding whitespace removed', () => {
     expect(personFromEnv({ EASYBANK_PERSON: '  Anna  ' })).toBe('Anna');
+  });
+});
+
+describe('the required sync person', () => {
+  it('returns the configured name', () => {
+    expect(requirePersonFromEnv({ EASYBANK_PERSON: '  Anna  ' })).toBe('Anna');
+  });
+
+  it('refuses to choose a person when the variable is absent', () => {
+    expect(() => requirePersonFromEnv({})).toThrow(/EASYBANK_PERSON is not set/);
+  });
+
+  it('refuses to choose a person when the variable is empty or whitespace', () => {
+    expect(() => requirePersonFromEnv({ EASYBANK_PERSON: '' })).toThrow(/EASYBANK_PERSON is not set/);
+    expect(() => requirePersonFromEnv({ EASYBANK_PERSON: '   ' })).toThrow(/EASYBANK_PERSON is not set/);
   });
 });

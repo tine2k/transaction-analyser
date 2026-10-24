@@ -60,6 +60,7 @@ async function startServer(environment: Record<string, string>): Promise<TestSer
       DATABASE_URL: testDatabaseUrl ?? '',
       HOST: '127.0.0.1',
       PORT: String(port),
+      EASYBANK_PERSON: 'Default',
       PUSHOVER_TOKEN: '',
       PUSHOVER_USER: '',
       PUSHOVER_BASE_URL: '',

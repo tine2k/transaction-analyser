@@ -92,6 +92,7 @@ describe('API integration', () => {
         DATABASE_URL: testDatabaseUrl,
         HOST: '127.0.0.1',
         PORT: String(port),
+        EASYBANK_PERSON: 'Default',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

@@ -27,6 +27,9 @@ export default defineConfig({
       // pending migrations before it serves and fails without an address.
       // See openspec/changes/add-startup-database-migrations/design.md D10.
       DATABASE_URL: process.env['TEST_DATABASE_URL'] ?? '',
+      // The sync person is required at startup; the fixture seeds `Default`.
+      // See openspec/changes/require-easybank-sync-person/specs/easybank-sync/spec.md
+      EASYBANK_PERSON: 'Default',
     },
   },
 });

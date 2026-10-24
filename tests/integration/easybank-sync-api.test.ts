@@ -48,50 +48,90 @@ async function availablePort(): Promise<number> {
   return address.port;
 }
 
-type TestServer = {
+type SpawnedServer = {
   process: ChildProcess;
   baseUrl: string;
   output: () => string;
 };
 
-async function startServer(environment: Record<string, string>): Promise<TestServer> {
+type TestServer = SpawnedServer;
+
+// Starts the built server without waiting for it. An environment entry whose value
+// is undefined is removed from the child's environment, which is how a test asks
+// for an absent variable rather than one it has set to a value.
+async function spawnServer(environment: Record<string, string | undefined>): Promise<SpawnedServer> {
   const port = await availablePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   let output = '';
+  const childEnvironment: NodeJS.ProcessEnv = {
+    ...process.env,
+    DATABASE_URL: testDatabaseUrl ?? '',
+    HOST: '127.0.0.1',
+    PORT: String(port),
+    EASYBANK_USER: '',
+    EASYBANK_PIN: '',
+    EASYBANK_SYNC_WRITE: '',
+    EASYBANK_BASE_URL: bank.baseUrl,
+    EASYBANK_PERSON: 'Default',
+  };
+  for (const [name, value] of Object.entries(environment)) {
+    if (value === undefined) {
+      delete childEnvironment[name];
+    } else {
+      childEnvironment[name] = value;
+    }
+  }
+
   const child = spawn(process.execPath, ['.output/server/index.mjs'], {
     cwd: process.cwd(),
-    env: {
-      ...process.env,
-      DATABASE_URL: testDatabaseUrl ?? '',
-      HOST: '127.0.0.1',
-      PORT: String(port),
-      EASYBANK_USER: '',
-      EASYBANK_PIN: '',
-      EASYBANK_SYNC_WRITE: '',
-      EASYBANK_BASE_URL: bank.baseUrl,
-      ...environment,
-    },
+    env: childEnvironment,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout?.on('data', (chunk: Buffer) => { output += chunk.toString(); });
   child.stderr?.on('data', (chunk: Buffer) => { output += chunk.toString(); });
 
+  return { process: child, baseUrl, output: () => output };
+}
+
+async function startServer(environment: Record<string, string> = {}): Promise<TestServer> {
+  const server = await spawnServer(environment);
   const deadline = Date.now() + startupTimeoutMs;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null || child.signalCode !== null) {
-      throw new Error(`test server exited before becoming ready:\n${output}`);
+    if (server.process.exitCode !== null || server.process.signalCode !== null) {
+      throw new Error(`test server exited before becoming ready:\n${server.output()}`);
     }
     try {
-      const response = await fetch(`${baseUrl}/api/health`);
+      const response = await fetch(`${server.baseUrl}/api/health`);
       if (response.ok) {
-        return { process: child, baseUrl, output: () => output };
+        return server;
       }
     } catch {
       // The server has not bound its port yet.
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error(`test server did not become ready within ${startupTimeoutMs}ms:\n${output}`);
+  throw new Error(`test server did not become ready within ${startupTimeoutMs}ms:\n${server.output()}`);
+}
+
+async function waitForExit(server: SpawnedServer, timeoutMs: number): Promise<number | null> {
+  return await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      server.process.kill('SIGKILL');
+      reject(new Error(`test server did not exit within ${timeoutMs}ms:\n${server.output()}`));
+    }, timeoutMs);
+    server.process.once('close', (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+}
+
+async function startRefusedServer(
+  environment: Record<string, string | undefined>,
+): Promise<{ exitCode: number | null; output: string; baseUrl: string }> {
+  const server = await spawnServer(environment);
+  const exitCode = await waitForExit(server, startupTimeoutMs);
+  return { exitCode, output: server.output(), baseUrl: server.baseUrl };
 }
 
 async function stopServer(server: TestServer): Promise<void> {
@@ -331,6 +371,35 @@ describe('sync-start endpoint against a spawned server', () => {
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ status: 'unconfigured' });
       expect(await recordedRuns()).toHaveLength(0);
+    });
+  });
+
+  describe('startup requires the sync person', () => {
+    it('exits non-zero without serving when the variable is absent', async () => {
+      const refused = await startRefusedServer({ EASYBANK_PERSON: undefined });
+
+      expect(refused.exitCode).toBe(1);
+      expect(refused.output).toContain('EASYBANK_PERSON');
+      await expect(fetch(`${refused.baseUrl}/api/health`)).rejects.toThrow();
+    });
+
+    it('exits non-zero without serving when the variable is blank', async () => {
+      const refused = await startRefusedServer({ EASYBANK_PERSON: '   ' });
+
+      expect(refused.exitCode).toBe(1);
+      expect(refused.output).toContain('EASYBANK_PERSON');
+      await expect(fetch(`${refused.baseUrl}/api/health`)).rejects.toThrow();
+    });
+
+    it('serves when the variable names a person', async () => {
+      const server = await startServer({ EASYBANK_PERSON: 'Default' });
+
+      try {
+        const response = await fetch(`${server.baseUrl}/api/health`);
+        expect(response.ok).toBe(true);
+      } finally {
+        await stopServer(server);
+      }
     });
   });
 });

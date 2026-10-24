@@ -106,3 +106,5 @@ The window defaults to the first day of the preceding calendar quarter through t
 ## Development
 
 `npm install` then `npm run dev` serves the app on http://127.0.0.1:3000. The server requires a reachable database: set `DATABASE_URL` in the environment or a gitignored `.env` file, and the pending migrations are applied at startup. `npm test` runs the unit, component, and integration suites; see [tests/README.md](tests/README.md) for prerequisites. The full container reference is in [docs/container-image.md](docs/container-image.md).
+
+The application icon is drawn in `public/icon.svg`, which is the only place its geometry lives. `node tools/render-app-icon.mjs` regenerates the PNGs beside it from that file, using the Playwright Chromium (`npm run test:browser:install` installs it). The PNGs are committed and no build step rasterises the artwork. A home-screen shortcut keeps the icon it was added with, so a changed icon appears only after the shortcut is removed and added again.

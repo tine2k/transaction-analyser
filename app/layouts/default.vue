@@ -17,12 +17,6 @@ import {
   IconX,
 } from '@tabler/icons-vue';
 
-useHead({
-  htmlAttrs: { lang: 'en' },
-  title: 'Transaction Analyser',
-  meta: [{ name: 'description', content: 'Reads transactions from a bank export.' }],
-});
-
 const route = useRoute();
 const mobileNavOpen = ref(false);
 
@@ -34,6 +28,18 @@ const screens = [
   { to: '/monthly-average', label: 'Monthly average', icon: IconChartHistogram },
   { to: '/imports', label: 'Imports', icon: IconDownload },
 ] as const;
+
+// The tab title takes the screen's name from the same list the menu is built from, so
+// the two cannot drift: a route added to `screens` is named in the tab as well. A path
+// no screen matches shows the application name alone.
+// See openspec/changes/add-application-icon-and-name/design.md D5.
+const screenLabel = computed(() => screens.find(({ to }) => to === route.path)?.label);
+
+useHead({
+  htmlAttrs: { lang: 'en' },
+  title: computed(() => (screenLabel.value === undefined ? 'Expenses' : `${screenLabel.value} · Expenses`)),
+  meta: [{ name: 'description', content: 'Reads transactions from a bank export.' }],
+});
 
 function isCurrent(to: string): boolean {
   return route.path === to;
@@ -50,7 +56,7 @@ watch(() => route.path, () => {
       <div class="w-full px-4 py-4 sm:py-6">
         <div class="flex items-center justify-between gap-4">
           <p class="font-display text-xl font-semibold text-ink">
-            Transaction Analyser
+            Expenses
           </p>
           <button
             type="button"

@@ -189,6 +189,7 @@ describe('sendTestNotification', () => {
     expect(body.get('user')).toBe('user-key');
     expect(body.get('title')?.toLowerCase()).toContain('test');
     expect(body.get('message')?.toLowerCase()).toContain('test');
+    expect(body.get('message')).toContain('Expenses');
     expect(body.get('message')).not.toContain('categorised');
   });
 

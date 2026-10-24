@@ -19,6 +19,26 @@ export default defineNuxtConfig({
   // half-built application off the network.
   devServer: { host: '127.0.0.1' },
 
+  // The home-screen identity. These belong here rather than in the layout's useHead:
+  // with ssr disabled the layout runs only after the client application boots, and the
+  // icon and manifest must already be in the document a browser is asked to install.
+  // The manifest omits `display`, so an added shortcut keeps the normal browser launch.
+  // See openspec/changes/add-application-icon-and-name/design.md D4.
+  app: {
+    head: {
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/icon.svg' },
+        { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/icon-192.png' },
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+        { rel: 'manifest', href: '/site.webmanifest' },
+      ],
+      meta: [
+        { name: 'apple-mobile-web-app-title', content: 'Expenses' },
+        { name: 'theme-color', content: '#F6F6F3' },
+      ],
+    },
+  },
+
   // The one stylesheet, loaded for every route including the failure page.
   // `~` resolves to app/ in Nuxt 4, so this is app/assets/css/main.css.
   css: ['~/assets/css/main.css'],

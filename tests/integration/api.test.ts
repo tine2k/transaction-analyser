@@ -703,4 +703,74 @@ describe('API integration', () => {
     const after = await database.query('SELECT * FROM import_runs ORDER BY id');
     expect(after.rows).toEqual(before.rows);
   });
+
+  // The home-screen identity: iOS reads the touch icon rather than the manifest, and
+  // an opaque PNG is required because transparency is rendered as black.
+  // See openspec/changes/add-application-icon-and-name/specs/frontend-shell/spec.md
+  it('serves the touch icon as an opaque 180x180 PNG', async () => {
+    const response = await request('/apple-touch-icon.png');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('image/png');
+
+    const image = Buffer.from(await response.arrayBuffer());
+    expect(image.subarray(1, 4).toString('ascii')).toBe('PNG');
+    expect(image.readUInt32BE(16)).toBe(180);
+    expect(image.readUInt32BE(20)).toBe(180);
+    expect(image[24]).toBe(8);
+    // Colour type 2 is truecolour without an alpha channel.
+    expect(image[25]).toBe(2);
+  });
+
+  it('delivers the icon, manifest, and label in the application shell', async () => {
+    const response = await request('/');
+
+    expect(response.status).toBe(200);
+
+    const shell = await response.text();
+    // The metadata has to be in the document delivered before the application boots,
+    // because iOS reads the icon from the page it is asked to install.
+    const headEnd = shell.indexOf('</head>');
+    expect(headEnd).toBeGreaterThan(-1);
+    const head = shell.slice(0, headEnd);
+
+    for (const marker of [
+      'rel="apple-touch-icon"',
+      'href="/apple-touch-icon.png"',
+      'rel="manifest"',
+      'href="/site.webmanifest"',
+      'name="apple-mobile-web-app-title"',
+      'content="Expenses"',
+    ]) {
+      expect(head).toContain(marker);
+    }
+  });
+
+  it('serves a manifest naming the application whose icons resolve', async () => {
+    const response = await request('/site.webmanifest');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('application/manifest+json');
+
+    const manifest = (await response.json()) as {
+      name?: string;
+      short_name?: string;
+      display?: string;
+      icons?: Array<{ src: string; sizes: string; type: string }>;
+    };
+
+    expect(manifest.name).toBe('Expenses');
+    expect(manifest.short_name).toBe('Expenses');
+    // Omitted display means `browser`: an added shortcut keeps the normal launch.
+    expect(manifest.display).toBeUndefined();
+
+    const sizes = (manifest.icons ?? []).map(({ sizes: entry }) => entry);
+    expect(sizes).toEqual(expect.arrayContaining(['192x192', '512x512']));
+
+    for (const icon of manifest.icons ?? []) {
+      const iconResponse = await request(icon.src);
+      expect(iconResponse.status).toBe(200);
+      expect(iconResponse.headers.get('content-type')).toContain('image/png');
+    }
+  });
 });

@@ -8,6 +8,14 @@ mockNuxtImport('useRoute', () => () => route);
 import DefaultLayout from '../../app/layouts/default.vue';
 
 describe('default layout navigation', () => {
+  it('names the application in the masthead', async () => {
+    route.path = '/';
+    const wrapper = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
+
+    expect(wrapper.get('header p').text()).toBe('Expenses');
+    await wrapper.unmount();
+  });
+
   it('links to each screen and marks the current screen', async () => {
     route.path = '/';
     const transactions = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });

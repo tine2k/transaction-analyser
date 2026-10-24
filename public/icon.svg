@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The application icon: a spending pie chart in the application's own category inks,
+  on the paper ground. This file is the only place the geometry is drawn; the PNGs
+  beside it are rendered from it by tools/render-app-icon.mjs.
+
+  Field 180, disc 158.4 (88%), seams 5.544 (3.5% of the disc) in the paper colour so
+  the wedge separation survives an operating system that flattens the colours.
+  Wedges run clockwise from twelve o'clock: 54% / 28% / 18%.
+
+  See openspec/changes/add-application-icon-and-name/design.md D1.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <rect width="180" height="180" fill="#f6f6f3" />
+
+  <g fill="none">
+    <!-- 0deg -> 194.4deg, 54% -->
+    <path fill="#2f5fa8" d="M90 90 L90 10.8 A79.2 79.2 0 1 1 70.3038 166.7118 Z" />
+    <!-- 194.4deg -> 295.2deg, 28% -->
+    <path fill="#d97a2b" d="M90 90 L70.3038 166.7118 A79.2 79.2 0 0 1 18.3377 56.2783 Z" />
+    <!-- 295.2deg -> 360deg, 18% -->
+    <path fill="#3e8e5a" d="M90 90 L18.3377 56.2783 A79.2 79.2 0 0 1 90 10.8 Z" />
+  </g>
+
+  <g stroke="#f6f6f3" stroke-width="5.544" stroke-linecap="butt">
+    <path d="M90 90 L90 10.8" />
+    <path d="M90 90 L70.3038 166.7118" />
+    <path d="M90 90 L18.3377 56.2783" />
+  </g>
+
+  <!-- Caps the point where the three seams meet, so no wedge tip pokes into the hub. -->
+  <circle cx="90" cy="90" r="3.6" fill="#f6f6f3" />
+</svg>

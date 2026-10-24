@@ -168,7 +168,7 @@ export async function notifyImport(
 // distinguishable from a run's summary.
 const TEST_SUMMARY: ImportNotificationSummary = {
   title: 'Pushover test',
-  message: 'This is a test message from the transaction analyser.',
+  message: 'This is a test message from Expenses.',
 };
 
 // Sends the test message when the credentials are configured, and reports what

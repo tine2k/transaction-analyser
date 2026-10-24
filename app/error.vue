@@ -7,6 +7,11 @@ import type { NuxtError } from '#app';
 // See openspec/changes/add-nuxt-application-shell/specs/frontend-shell/spec.md
 const props = defineProps<{ error: NuxtError }>();
 
+// A missing path leaves the layout observing no screen, so the title is the application
+// name; pinning it here keeps that true even when the router still holds the screen the
+// failure was reached from.
+useHead({ title: 'Expenses' });
+
 const isMissing = computed(() => props.error.status === 404);
 const heading = computed(() => (isMissing.value ? 'This page does not exist' : 'Something went wrong'));
 const detail = computed(() =>

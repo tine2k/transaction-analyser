@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 // checks exercise the rendered emphasis: the visible count is the primary
 // figure, the sum is secondary, and both stay tied to the visible rows.
 //
-// See openspec/changes/promote-transaction-count/specs/transaction-table/spec.md
+// See openspec/changes/reduce-transaction-count-size/specs/transaction-table/spec.md
 
 const currentYear = new Date().getFullYear();
 
@@ -66,6 +66,18 @@ async function interceptApi(page: Page): Promise<void> {
   });
 }
 
+async function readSummaryType(page: Page): Promise<{ countFontSize: number; sumFontSize: number }> {
+  return page.getByTestId('visible-total').evaluate((summaryElement) => {
+    const countElement = summaryElement.querySelector('[data-testid="visible-count"]') as HTMLElement;
+    const sumElement = summaryElement.querySelector('p:last-child') as HTMLElement;
+
+    return {
+      countFontSize: Number.parseFloat(window.getComputedStyle(countElement).fontSize),
+      sumFontSize: Number.parseFloat(window.getComputedStyle(sumElement).fontSize),
+    };
+  });
+}
+
 test('the visible count leads the summary and the sum follows it', async ({ page }) => {
   await interceptApi(page);
   await page.goto('/', { waitUntil: 'networkidle' });
@@ -98,6 +110,22 @@ test('the visible count leads the summary and the sum follows it', async ({ page
   expect(hierarchy.countColor).toBe('rgb(32, 36, 43)');
   expect(hierarchy.sumColor).toBe('rgb(90, 96, 104)');
   expect(hierarchy.countBeforeSum).toBe(true);
+});
+
+test('the visible count keeps the compact text-xl size at every viewport', async ({ page }) => {
+  await interceptApi(page);
+
+  for (const viewport of [
+    { width: 375, height: 800 },
+    { width: 1280, height: 800 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/', { waitUntil: 'networkidle' });
+
+    const { countFontSize, sumFontSize } = await readSummaryType(page);
+    expect(countFontSize).toBe(20);
+    expect(sumFontSize).toBeLessThan(countFontSize);
+  }
 });
 
 test('a zero-match search keeps the zero count and euro zero', async ({ page }) => {

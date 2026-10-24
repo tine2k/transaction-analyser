@@ -1203,7 +1203,7 @@ onBeforeUnmount(() => {
 
       <div class="mt-4" data-testid="visible-total">
         <p
-          class="font-display text-2xl font-semibold tabular-nums text-ink sm:text-3xl"
+          class="font-display text-xl font-semibold tabular-nums text-ink"
           data-testid="visible-count"
         >
           {{ visibleTransactions.length }} transaction{{ visibleTransactions.length === 1 ? '' : 's' }}

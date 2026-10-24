@@ -387,7 +387,7 @@ The system SHALL display a sum for the transaction rows currently shown after ap
 
 ### Requirement: The displayed transaction count accompanies the sum
 
-The system SHALL display, as the summary's primary figure, the number of transaction rows currently shown, with the sum of those rows presented as secondary information beneath it. The count SHALL cover the same rows as the sum, SHALL change when the visible rows change, and SHALL NOT describe the complete endpoint response while a filter is active. The count SHALL be labelled as a count of transactions, using singular wording for exactly one visible transaction and plural wording otherwise, and SHALL be zero when no row is visible. The count SHALL precede the sum in the summary's reading order and SHALL use the summary's largest type and the primary ink colour, so the number of rows is read before the money they total.
+The system SHALL display, as the summary's primary figure, the number of transaction rows currently shown, with the sum of those rows presented as secondary information beneath it. The count SHALL cover the same rows as the sum, SHALL change when the visible rows change, and SHALL NOT describe the complete endpoint response while a filter is active. The count SHALL be labelled as a count of transactions, using singular wording for exactly one visible transaction and plural wording otherwise, and SHALL be zero when no row is visible. The count SHALL precede the sum in the summary's reading order and SHALL use the summary's largest type and the primary ink colour, capped at the interface type scale's `text-xl` step (1.25rem) so it stays at that size at every viewport width rather than growing to page-title scale.
 
 #### Scenario: The count matches the visible rows the sum covers
 
@@ -423,6 +423,11 @@ The system SHALL display, as the summary's primary figure, the number of transac
 
 - **WHEN** the visible rows change so the count is one, many, or zero
 - **THEN** the count remains the summary's primary figure with the appropriate singular or plural wording, and the sum remains secondary
+
+#### Scenario: The count stays compact at every viewport
+
+- **WHEN** the summary is rendered on a narrow or a wide viewport
+- **THEN** the count renders at the `text-xl` step of 20px in both cases, without scaling up at the wider viewport, while the sum remains smaller and muted
 
 ### Requirement: The filter options show transaction counts
 

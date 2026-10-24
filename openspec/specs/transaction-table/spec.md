@@ -353,7 +353,7 @@ The system SHALL offer a category filter with choices for all categories, uncate
 
 ### Requirement: The table shows the exact sum of visible transaction amounts
 
-The system SHALL display a sum for the transaction rows currently shown after applying the active filters. The sum SHALL be the signed arithmetic total of those rows' returned decimal amounts, SHALL be computed with exact decimal arithmetic without floating-point rounding, and SHALL change when the visible rows change. The system SHALL present the sum using the browser's active locale's EUR currency and number conventions, including locale-appropriate thousands grouping and currency placement, while preserving the exact decimal value without rounding it. The sum SHALL be presented separately from the transaction columns and SHALL NOT alter or imply a stored transaction value. When no row is visible, the sum SHALL be zero, presented as a locale-formatted euro zero.
+The system SHALL display a sum for the transaction rows currently shown after applying the active filters. The sum SHALL be the signed arithmetic total of those rows' returned decimal amounts, SHALL be computed with exact decimal arithmetic without floating-point rounding, and SHALL change when the visible rows change. The system SHALL present the sum using the browser's active locale's EUR currency and number conventions, including locale-appropriate thousands grouping and currency placement, while preserving the exact decimal value without rounding it. The sum SHALL be presented separately from the transaction columns and SHALL NOT alter or imply a stored transaction value. The sum SHALL be presented as secondary information beneath the displayed transaction count: its label and value SHALL use smaller type and the muted text colour, and it SHALL NOT compete with the count for visual emphasis. When no row is visible, the sum SHALL be zero, presented as a locale-formatted euro zero.
 
 #### Scenario: The sum reflects only visible rows
 
@@ -375,9 +375,19 @@ The system SHALL display a sum for the transaction rows currently shown after ap
 - **WHEN** the active filters match no transaction
 - **THEN** the table's displayed sum is a locale-formatted euro zero
 
+#### Scenario: The sum is secondary to the count
+
+- **WHEN** the summary is rendered with at least one visible transaction
+- **THEN** the sum is presented beneath the count in smaller type and the muted text colour, while the count carries the summary's primary emphasis
+
+#### Scenario: The secondary placement survives filtering
+
+- **WHEN** the user changes a filter and the visible rows and their sum change
+- **THEN** the updated sum remains secondary to the count rather than becoming the summary's dominant figure
+
 ### Requirement: The displayed transaction count accompanies the sum
 
-The system SHALL display, adjacent to the sum of visible transactions, the number of transaction rows currently shown. The count SHALL cover the same rows as the sum, SHALL change when the visible rows change, and SHALL NOT describe the complete endpoint response while a filter is active. The count SHALL be labelled as a count of transactions, using singular wording for exactly one visible transaction and plural wording otherwise, and SHALL be zero when no row is visible.
+The system SHALL display, as the summary's primary figure, the number of transaction rows currently shown, with the sum of those rows presented as secondary information beneath it. The count SHALL cover the same rows as the sum, SHALL change when the visible rows change, and SHALL NOT describe the complete endpoint response while a filter is active. The count SHALL be labelled as a count of transactions, using singular wording for exactly one visible transaction and plural wording otherwise, and SHALL be zero when no row is visible. The count SHALL precede the sum in the summary's reading order and SHALL use the summary's largest type and the primary ink colour, so the number of rows is read before the money they total.
 
 #### Scenario: The count matches the visible rows the sum covers
 
@@ -398,6 +408,21 @@ The system SHALL display, adjacent to the sum of visible transactions, the numbe
 
 - **WHEN** the active filters match no transaction
 - **THEN** the displayed transaction count is 0, the sum remains a locale-formatted euro zero, and the empty state is shown
+
+#### Scenario: The count is the summary's most prominent figure
+
+- **WHEN** the summary is rendered with at least one visible transaction
+- **THEN** the count uses a larger type size and the primary ink colour, and the sum uses smaller muted type
+
+#### Scenario: The count precedes the sum
+
+- **WHEN** the summary is read in document order
+- **THEN** the transaction count comes before the sum of displayed transactions
+
+#### Scenario: The count keeps its prominence for every visible row count
+
+- **WHEN** the visible rows change so the count is one, many, or zero
+- **THEN** the count remains the summary's primary figure with the appropriate singular or plural wording, and the sum remains secondary
 
 ### Requirement: The filter options show transaction counts
 

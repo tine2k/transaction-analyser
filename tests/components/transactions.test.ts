@@ -232,6 +232,21 @@ function fetchCalls(url: string): unknown[][] {
   return mocks.fetch.mock.calls.filter(([calledUrl]) => calledUrl === url);
 }
 
+function expectCountBeforeSum(
+  wrapper: Awaited<ReturnType<typeof mountTransactions>>,
+  expectedCount: string,
+): void {
+  const summary = wrapper.get('[data-testid="visible-total"]');
+  const count = summary.get('[data-testid="visible-count"]');
+  const sumLine = summary.get('p:last-child');
+  const normalize = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
+  expect(count.text()).toBe(expectedCount);
+  const summaryText = normalize(summary.text());
+  expect(summaryText.indexOf(expectedCount)).toBeGreaterThanOrEqual(0);
+  expect(summaryText.indexOf(expectedCount)).toBeLessThan(summaryText.indexOf(normalize(sumLine.text())));
+}
+
 describe('transaction list filters', () => {
   beforeEach(() => {
     mocks.useFetch.mockReset();
@@ -264,6 +279,24 @@ describe('transaction list filters', () => {
     expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('Uncategorised (1)');
     expect(mocks.useFetch).toHaveBeenCalledTimes(2);
     expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it('presents the count before the sum with singular, plural, and zero wording', async () => {
+    const wrapper = await mountTransactions();
+    expectCountBeforeSum(wrapper, '1 transaction');
+
+    await wrapper.get('[data-testid="category-filter"]').setValue('all');
+    await flushPromises();
+    await wrapper.get('[data-testid="period-filter"]').setValue('2026-02');
+    await flushPromises();
+    expectCountBeforeSum(wrapper, '4 transactions');
+
+    await wrapper.get('[data-testid="category-filter"]').setValue('1');
+    await flushPromises();
+    await wrapper.get('[data-testid="period-filter"]').setValue('2026-03');
+    await flushPromises();
+    expect(wrapper.findAll('tbody tr')).toHaveLength(0);
+    expectCountBeforeSum(wrapper, '0 transactions');
   });
 
   it('shows the current year and all categories when the year has no uncategorised transaction', async () => {

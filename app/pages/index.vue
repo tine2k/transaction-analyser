@@ -1201,11 +1201,18 @@ onBeforeUnmount(() => {
         Filters are paused while searching. Clear the search to use them again.
       </p>
 
-      <p class="mt-4 text-sm text-muted" data-testid="visible-total">
-        Sum of displayed transactions:
-        <span class="text-xl font-semibold tabular-nums text-ink">{{ formatEuroAmount(visibleTotal) }}</span>
-        (<span class="tabular-nums" data-testid="visible-count">{{ visibleTransactions.length }} transaction{{ visibleTransactions.length === 1 ? '' : 's' }}</span>)
-      </p>
+      <div class="mt-4" data-testid="visible-total">
+        <p
+          class="font-display text-2xl font-semibold tabular-nums text-ink sm:text-3xl"
+          data-testid="visible-count"
+        >
+          {{ visibleTransactions.length }} transaction{{ visibleTransactions.length === 1 ? '' : 's' }}
+        </p>
+        <p class="mt-1 text-sm text-muted">
+          Sum of displayed transactions:
+          <span class="tabular-nums">{{ formatEuroAmount(visibleTotal) }}</span>
+        </p>
+      </div>
 
       <p v-if="transactions.length === 0" class="mt-4 text-muted">
         There are no transactions to show.

@@ -1248,3 +1248,306 @@ describe('manual category assignment', () => {
     expect(status.classes()).toContain('text-failure');
   });
 });
+
+describe('transaction search', () => {
+  const searchTransactions: TestTransaction[] = [
+    {
+      id: 's1', bookingDate: '2024-03-01', valueDate: '2024-03-01', amount: '-12.50',
+      purpose: 'Card payment Market', counterpartyName: 'Müller GmbH',
+      counterpartyAccount: 'AT61 1904 3002 3457 3201',
+      categoryAssignment: 'automatic',
+      category: { id: '1', name: 'Groceries', hidden: false },
+    },
+    {
+      id: 's2', bookingDate: '2026-02-10', valueDate: '2026-02-10', amount: '4.00',
+      purpose: 'February travel', counterpartyName: 'Rail', counterpartyAccount: null,
+      categoryAssignment: 'automatic',
+      category: { id: '2', name: 'Travel', hidden: false },
+    },
+    {
+      id: 's3', bookingDate: '2026-02-15', valueDate: '2026-02-15', amount: '-0.25',
+      purpose: 'Uncategorised purchase', counterpartyName: 'Shop', counterpartyAccount: 'AT99',
+      categoryAssignment: 'automatic',
+      category: null,
+    },
+  ];
+
+  beforeEach(() => {
+    mocks.useFetch.mockReset();
+    mocks.fetch.mockReset();
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(searchTransactions) : categoriesResponse());
+  });
+
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) {
+      wrapper.unmount();
+    }
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function shownIds(wrapper: Awaited<ReturnType<typeof mountTransactions>>): string[] {
+    return wrapper.findAll('tbody tr')
+      .map((row) => row.attributes('data-transaction-id') ?? '');
+  }
+
+  function searchField(wrapper: Awaited<ReturnType<typeof mountTransactions>>) {
+    return wrapper.get('[data-testid="transaction-search"]');
+  }
+
+  function categorySelect(wrapper: Awaited<ReturnType<typeof mountTransactions>>) {
+    return wrapper.get('[data-testid="category-filter"]').element as HTMLSelectElement;
+  }
+
+  function periodSelect(wrapper: Awaited<ReturnType<typeof mountTransactions>>) {
+    return wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement;
+  }
+
+  it('searches every transaction, pauses the filters, and restores them when cleared', async () => {
+    const wrapper = await mountTransactions();
+
+    expect(shownIds(wrapper)).toEqual(['s3']);
+    expect(categorySelect(wrapper).value).toBe('uncategorised');
+    expect(periodSelect(wrapper).value).toBe('2026');
+    expect(searchField(wrapper).attributes('type')).toBe('search');
+    expect(wrapper.get('label[for="transaction-search"]').text()).toBe('Search all transactions');
+    expect(wrapper.find('[data-testid="filters-paused-note"]').exists()).toBe(false);
+
+    await searchField(wrapper).setValue('market');
+    await flushPromises();
+
+    expect(shownIds(wrapper)).toEqual(['s1']);
+    expect(categorySelect(wrapper).value).toBe('uncategorised');
+    expect(periodSelect(wrapper).value).toBe('2026');
+    expect(categorySelect(wrapper).disabled).toBe(true);
+    expect(periodSelect(wrapper).disabled).toBe(true);
+    expect(categorySelect(wrapper).getAttribute('aria-describedby')).toBe('filters-paused-note');
+    expect(periodSelect(wrapper).getAttribute('aria-describedby')).toBe('filters-paused-note');
+    expect(wrapper.get('[data-testid="filters-paused-note"]').text()).toContain('Filters are paused while searching');
+    expect(mocks.useFetch).toHaveBeenCalledTimes(2);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-testid="clear-search"]').trigger('click');
+    await flushPromises();
+
+    expect(shownIds(wrapper)).toEqual(['s3']);
+    expect(categorySelect(wrapper).disabled).toBe(false);
+    expect(periodSelect(wrapper).disabled).toBe(false);
+    expect(wrapper.find('[data-testid="filters-paused-note"]').exists()).toBe(false);
+  });
+
+  it('matches each descriptive field and applies the case, diacritic, and term rules', async () => {
+    const wrapper = await mountTransactions();
+
+    await searchField(wrapper).setValue('MULLER');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s1']);
+
+    await searchField(wrapper).setValue('rail');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s2']);
+
+    await searchField(wrapper).setValue('3457');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s1']);
+
+    await searchField(wrapper).setValue('market rail');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual([]);
+    expect(wrapper.text()).toContain('There are no transactions matching');
+    expect(wrapper.text()).toContain('market rail');
+  });
+
+  it('keeps the sum and count on the matches and leaves the option counts whole-response', async () => {
+    const wrapper = await mountTransactions();
+
+    await searchField(wrapper).setValue('a');
+    await flushPromises();
+
+    expect(shownIds(wrapper)).toEqual(['s1', 's2', 's3']);
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-8.75'));
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('3 transactions');
+    expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('All categories (3)');
+    expect(wrapper.get('[data-testid="category-filter"]').text()).toContain('Uncategorised (1)');
+
+    await searchField(wrapper).setValue('purchase');
+    await flushPromises();
+
+    expect(shownIds(wrapper)).toEqual(['s3']);
+    expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-0.25'));
+    expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1 transaction');
+  });
+
+  it('initializes from q and writes the trimmed value while preserving the other controls', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=all&month=2024-03&q=market' });
+    const replace = vi.spyOn(wrapper.vm.$router, 'replace');
+
+    expect((searchField(wrapper).element as HTMLInputElement).value).toBe('market');
+    expect(shownIds(wrapper)).toEqual(['s1']);
+    expect(categorySelect(wrapper).value).toBe('all');
+    expect(periodSelect(wrapper).value).toBe('2024-03');
+    expect(categorySelect(wrapper).disabled).toBe(true);
+
+    await searchField(wrapper).setValue('  rail  ');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s2']);
+    expect(replace).not.toHaveBeenCalled();
+
+    await wait(300);
+    await flushPromises();
+
+    const written = replace.mock.calls.at(-1)?.[0] as { query: Record<string, string> };
+    expect(written.query).toEqual({ category: 'all', month: '2024-03', q: 'rail' });
+
+    await wrapper.get('[data-testid="clear-search"]').trigger('click');
+    await wait(300);
+    await flushPromises();
+
+    const cleared = replace.mock.calls.at(-1)?.[0] as { query: Record<string, string> };
+    expect(cleared.query.q).toBeUndefined();
+    expect(cleared.query).toEqual({ category: 'all', month: '2024-03' });
+  });
+
+  it('keeps a trailing space while typing a multi-term query', async () => {
+    const wrapper = await mountTransactions();
+    const field = searchField(wrapper);
+
+    await field.setValue('market ');
+    await flushPromises();
+    expect((field.element as HTMLInputElement).value).toBe('market ');
+    expect(shownIds(wrapper)).toEqual(['s1']);
+
+    await wait(350);
+    await flushPromises();
+    expect((field.element as HTMLInputElement).value).toBe('market ');
+
+    await field.setValue('market gmbh');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s1']);
+  });
+
+  it('adopts an external route change and cancels the stale pending write', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=all&q=market' });
+    const replace = vi.spyOn(wrapper.vm.$router, 'replace');
+
+    expect(shownIds(wrapper)).toEqual(['s1']);
+
+    await searchField(wrapper).setValue('gmbh');
+    await flushPromises();
+
+    await wrapper.vm.$router.push({ path: '/', query: { category: 'all', q: 'rail' } });
+    await flushPromises();
+    await wait(350);
+    await flushPromises();
+
+    expect((searchField(wrapper).element as HTMLInputElement).value).toBe('rail');
+    expect(shownIds(wrapper)).toEqual(['s2']);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('clears the selection when the search changes and selects all matches', async () => {
+    const wrapper = await mountTransactions();
+
+    await searchField(wrapper).setValue('a');
+    await flushPromises();
+    await wrapper.get('[data-testid="select-all-visible"]').setValue(true);
+
+    expect(wrapper.findAll('[data-testid="row-select"]').map((box) => (box.element as HTMLInputElement).checked))
+      .toEqual([true, true, true]);
+    expect(wrapper.get('[data-testid="bulk-assignment-bar"]').text()).toContain('3 transactions selected');
+
+    await searchField(wrapper).setValue('rail');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="bulk-assignment-bar"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="row-select"]').every((box) => !(box.element as HTMLInputElement).checked))
+      .toBe(true);
+
+    await wrapper.get('[data-testid="select-all-visible"]').setValue(true);
+    expect(shownIds(wrapper)).toEqual(['s2']);
+    expect(wrapper.findAll('[data-testid="row-select"]').map((box) => (box.element as HTMLInputElement).checked))
+      .toEqual([true]);
+    expect(wrapper.get('[data-testid="bulk-assignment-bar"]').text()).toContain('1 transaction selected');
+  });
+
+  it('assigns only the search matches and keeps the search after the refresh', async () => {
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/transactions/category-assignments') {
+        return Promise.resolve({ updated: 1 });
+      }
+      if (url === '/api/transactions') {
+        return Promise.resolve(searchTransactions);
+      }
+      return Promise.reject(new Error('unexpected request'));
+    });
+    const wrapper = await mountTransactions();
+
+    await searchField(wrapper).setValue('rail');
+    await flushPromises();
+    await wrapper.get('[data-testid="select-all-visible"]').setValue(true);
+    await wrapper.get('[data-testid="bulk-assignment-category"]').setValue('1');
+    await wrapper.get('[data-testid="bulk-assignment-apply"]').trigger('click');
+    await flushPromises();
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/transactions/category-assignments', {
+      method: 'POST',
+      body: { transactionIds: ['s2'], categoryId: '1' },
+    });
+
+    await wait(350);
+    await flushPromises();
+
+    expect(fetchCalls('/api/transactions')).toHaveLength(1);
+    expect(shownIds(wrapper)).toEqual(['s2']);
+    expect((searchField(wrapper).element as HTMLInputElement).value).toBe('rail');
+    expect(periodSelect(wrapper).disabled).toBe(true);
+  });
+
+  it('keeps the active sort while searching and after clearing', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=all&sort=purpose&direction=asc' });
+    const header = () => wrapper.get('[data-testid="sort-purpose"]').element.closest('th') as HTMLElement;
+
+    await wrapper.get('[data-testid="period-filter"]').setValue('all');
+    await flushPromises();
+
+    expect(shownIds(wrapper)).toEqual(['s1', 's2', 's3']);
+    expect(header().getAttribute('aria-sort')).toBe('ascending');
+
+    await searchField(wrapper).setValue('a');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s1', 's2', 's3']);
+    expect(header().getAttribute('aria-sort')).toBe('ascending');
+
+    await searchField(wrapper).setValue('purchase');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s3']);
+
+    await wrapper.get('[data-testid="clear-search"]').trigger('click');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual(['s1', 's2', 's3']);
+    expect(header().getAttribute('aria-sort')).toBe('ascending');
+  });
+
+  it('distinguishes no search matches from the other empty states', async () => {
+    const wrapper = await mountTransactions();
+
+    await searchField(wrapper).setValue('zzz');
+    await flushPromises();
+    expect(wrapper.text()).toContain('There are no transactions matching');
+    expect(wrapper.text()).toContain('zzz');
+
+    await wrapper.get('[data-testid="clear-search"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="category-filter"]').setValue('1');
+    await flushPromises();
+    expect(shownIds(wrapper)).toEqual([]);
+    expect(wrapper.text()).toContain('There are no transactions matching the selected filters');
+
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse([]) : categoriesResponse());
+    const empty = await mountTransactions();
+    expect(empty.text()).toContain('There are no transactions to show');
+  });
+});

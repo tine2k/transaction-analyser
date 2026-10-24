@@ -97,7 +97,7 @@ The window defaults to the first day of the preceding calendar quarter through t
 
 ## What it does
 
-- **Transactions** - filterable by category and period (a calendar month or a whole calendar year), with the sum of displayed rows; select text to add it as a pattern to a category without leaving the table, and assign a category by hand to one row or to a checked selection, keeping that choice when the categories are re-applied.
+- **Transactions** - searchable across every transaction by purpose, counterparty, or account, and filterable by category and period (a calendar month or a whole calendar year), with the sum of displayed rows; select text to add it as a pattern to a category without leaving the table, and assign a category by hand to one row or to a checked selection, keeping that choice when the categories are re-applied.
 - **Categories** - regular expressions matched against the purpose line or the counterparty name, and inclusive date windows, assign transactions, with match previews, a hidden flag, and an optional expense type (recurring or one-time) that classifies the category for the analysis screens.
 - **Analytics** - category spending pie charts for each of the last 12 months, switchable to whole-calendar-year totals for every year with data; filterable by expense type.
 - **Monthly totals** - a month-by-category matrix over every month with data; filterable by expense type.

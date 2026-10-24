@@ -5,6 +5,7 @@ import {
   sumSignedAmountStrings,
 } from '../utils/category-spending';
 import { IconMapPin } from '@tabler/icons-vue';
+import { matchesTransactionSearch } from '../utils/transaction-search';
 
 // The index route reads stored transactions from the read-only GET
 // /api/transactions endpoint. Category and booking-period filters are derived
@@ -29,6 +30,12 @@ import { IconMapPin } from '@tabler/icons-vue';
 // Column headers sort the filtered rows, and the active column and direction are
 // carried in the route query. A route without a sort keeps the endpoint's order,
 // and equal values keep their relative endpoint order.
+//
+// The all-transactions search matches the descriptive fields. A non-empty search
+// bypasses the category and period filters, which stay visible with their values
+// but are disabled until the search is cleared. The trimmed search text is
+// carried in the route query as `q`; typing filters immediately while the query
+// write is debounced.
 //
 // The page also offers manual category assignment. Every row's category cell
 // hosts a select that pins the row to a chosen category or clears the pin by
@@ -246,6 +253,9 @@ const selectedPeriod = ref('all');
 // default and silently narrow the view again.
 const allPeriodsSelected = ref(false);
 const activeSort = ref<TransactionSort | null>(null);
+const searchText = ref('');
+const searchQuery = computed(() => searchText.value.trim());
+const searchActive = computed(() => searchQuery.value !== '');
 
 const categoryFilter = computed({
   get: () => selectedCategory.value,
@@ -306,6 +316,69 @@ function setSortQuery(sort: TransactionSort): void {
   });
 }
 
+const SEARCH_QUERY_DEBOUNCE_MS = 250;
+let searchWriteTimer: ReturnType<typeof setTimeout> | null = null;
+// The trimmed value the component last wrote, so a route change caused by its
+// own debounced write is never mistaken for an external navigation.
+let lastWrittenSearchQuery: string | null = null;
+
+function routeSearchQuery(): string {
+  return (queryString(route.value.query.q) ?? '').trim();
+}
+
+// The route carries the trimmed search text. The write is debounced so typing
+// filters immediately without turning every keystroke into a navigation, and it
+// preserves the category, period, and sort values already in the query.
+function writeSearchQuery(): void {
+  const trimmed = searchQuery.value;
+  lastWrittenSearchQuery = trimmed;
+  const query = { ...queryWithActiveSort() };
+  if (trimmed === '') {
+    delete query.q;
+  } else {
+    query.q = trimmed;
+  }
+  void router.replace({ path: '/', query });
+}
+
+watch(searchQuery, (value) => {
+  if (searchWriteTimer !== null) {
+    clearTimeout(searchWriteTimer);
+    searchWriteTimer = null;
+  }
+  // The route already describes this text; writing it again would only add a
+  // navigation, for example when the text was just adopted from the route.
+  if (value === routeSearchQuery()) {
+    return;
+  }
+  searchWriteTimer = setTimeout(() => {
+    searchWriteTimer = null;
+    writeSearchQuery();
+  }, SEARCH_QUERY_DEBOUNCE_MS);
+});
+
+watch(
+  () => queryString(route.value.query.q),
+  (value) => {
+    const fromRoute = (value ?? '').trim();
+    // An own write that resolves after the user typed again must not roll the
+    // field back or cancel the newer pending write.
+    if (fromRoute === lastWrittenSearchQuery) {
+      lastWrittenSearchQuery = null;
+      return;
+    }
+    if (fromRoute === searchQuery.value) {
+      return;
+    }
+    if (searchWriteTimer !== null) {
+      clearTimeout(searchWriteTimer);
+      searchWriteTimer = null;
+    }
+    searchText.value = fromRoute;
+  },
+  { immediate: true },
+);
+
 // A different column starts ascending; the active column alternates. The route
 // query is updated alongside the local state so the sorted view is linkable.
 function activateSort(column: SortColumn): void {
@@ -349,15 +422,21 @@ const uncategorisedTransactions = computed(() =>
   (transactions.value ?? []).filter((transaction) => transaction.category === null),
 );
 
-const visibleTransactions = computed(() =>
-  (transactions.value ?? []).filter((transaction) => {
+// A non-empty search covers every returned transaction and overrides the
+// category and period filters; an empty search keeps the filtered view.
+const visibleTransactions = computed(() => {
+  if (searchQuery.value !== '') {
+    return (transactions.value ?? []).filter((transaction) =>
+      matchesTransactionSearch(transaction, searchQuery.value));
+  }
+  return (transactions.value ?? []).filter((transaction) => {
     const categoryMatches = categoryFilter.value === 'all'
       || (categoryFilter.value === 'uncategorised'
         ? transaction.category === null
         : transaction.category?.id === categoryFilter.value);
     return categoryMatches && matchesPeriod(transaction.bookingDate, periodFilter.value);
-  }),
-);
+  });
+});
 
 // Sorting is a presentation concern layered on the filtered rows. The endpoint's
 // response index is kept so rows that compare equal keep their relative order,
@@ -510,7 +589,7 @@ function clearSelection(): void {
   selectedIds.value = new Set();
 }
 
-watch([categoryFilter, periodFilter], () => {
+watch([categoryFilter, periodFilter, searchQuery], () => {
   clearSelection();
 });
 
@@ -832,6 +911,9 @@ onBeforeUnmount(() => {
   if (refreshTimer !== null) {
     clearTimeout(refreshTimer);
   }
+  if (searchWriteTimer !== null) {
+    clearTimeout(searchWriteTimer);
+  }
   if (statusTimer !== null) {
     clearTimeout(statusTimer);
   }
@@ -850,12 +932,39 @@ onBeforeUnmount(() => {
 
     <template v-else-if="transactions">
       <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+        <div class="grid w-full gap-1 text-sm font-medium text-muted sm:w-auto">
+          <label for="transaction-search">Search all transactions</label>
+          <div class="flex min-w-0 items-center gap-2">
+            <input
+              id="transaction-search"
+              v-model="searchText"
+              type="search"
+              data-testid="transaction-search"
+              autocomplete="off"
+              :aria-describedby="searchActive ? 'filters-paused-note' : undefined"
+              placeholder="Purpose, counterparty, account"
+              class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-80"
+            >
+            <button
+              v-if="searchText !== ''"
+              type="button"
+              data-testid="clear-search"
+              aria-label="Clear search"
+              class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              @click="searchText = ''"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
         <label class="grid w-full gap-1 text-sm font-medium text-muted sm:w-auto">
           Category
           <select
             v-model="categoryFilter"
             data-testid="category-filter"
-            class="min-h-11 w-full max-w-full rounded-sheet border border-rule-strong bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-auto"
+            :disabled="searchActive"
+            :aria-describedby="searchActive ? 'filters-paused-note' : undefined"
+            class="min-h-11 w-full max-w-full rounded-sheet border border-rule-strong bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-60 sm:w-auto"
           >
             <option value="all">All categories ({{ transactions.length }})</option>
             <option value="uncategorised">Uncategorised ({{ uncategorisedTransactions.length }})</option>
@@ -869,7 +978,9 @@ onBeforeUnmount(() => {
           <select
             v-model="periodFilter"
             data-testid="period-filter"
-            class="min-h-11 w-full max-w-full rounded-sheet border border-rule-strong bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-auto"
+            :disabled="searchActive"
+            :aria-describedby="searchActive ? 'filters-paused-note' : undefined"
+            class="min-h-11 w-full max-w-full rounded-sheet border border-rule-strong bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-60 sm:w-auto"
           >
             <option value="all">All periods</option>
             <optgroup v-if="periods.years.length > 0" label="Years">
@@ -886,6 +997,15 @@ onBeforeUnmount(() => {
         </label>
       </div>
 
+      <p
+        v-if="searchActive"
+        id="filters-paused-note"
+        data-testid="filters-paused-note"
+        class="mt-2 text-sm text-muted"
+      >
+        Filters are paused while searching. Clear the search to use them again.
+      </p>
+
       <p class="mt-4 text-sm text-muted" data-testid="visible-total">
         Sum of displayed transactions:
         <span class="text-xl font-semibold tabular-nums text-ink">{{ formatEuroAmount(visibleTotal) }}</span>
@@ -894,6 +1014,10 @@ onBeforeUnmount(() => {
 
       <p v-if="transactions.length === 0" class="mt-4 text-muted">
         There are no transactions to show.
+      </p>
+
+      <p v-else-if="visibleTransactions.length === 0 && searchActive" class="mt-4 text-muted">
+        There are no transactions matching “{{ searchQuery }}”.
       </p>
 
       <p v-else-if="visibleTransactions.length === 0" class="mt-4 text-muted">

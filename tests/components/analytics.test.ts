@@ -143,11 +143,7 @@ describe('category spending page', () => {
     expect(currentOption.series[0].minShowLabelAngle).toBe(0);
     expect(currentOption.series[0].labelLayout.hideOverlap).toBe(false);
     expect(currentOption.series[0].data.map((datum) => currentLabel.formatter({ data: datum })))
-      .toEqual([
-        `Rent\n${formatEuroAmount('1234567.89')}`,
-        `Groceries\n${formatEuroAmount('16.50')}`,
-        `Uncategorised\n${formatEuroAmount('3.25')}`,
-      ]);
+      .toEqual(['Rent', 'Groceries', 'Uncategorised']);
     expect(currentOption.tooltip.formatter({ data: currentOption.series[0].data[1] }))
       .toBe(`Groceries: ${formatEuroAmount('16.50')}`);
 
@@ -317,6 +313,9 @@ describe('category spending page', () => {
     expect(charts).toHaveLength(3);
     expect(charts[2]?.props('option').series[0].data.map(({ name, amount }) => [name, amount]))
       .toEqual([['Groceries', '16.50'], ['Uncategorised', '3.25']]);
+    const yearLabel = charts[2]?.props('option').series[0].label;
+    expect(charts[2]?.props('option').series[0].data.map((datum) => yearLabel.formatter({ data: datum })))
+      .toEqual(['Groceries', 'Uncategorised']);
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 

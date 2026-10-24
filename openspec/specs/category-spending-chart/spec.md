@@ -8,7 +8,7 @@ Defines the browser analytics page that presents a separate category spending pi
 
 ### Requirement: The analytics route presents twelve monthly category pie charts
 
-The system SHALL provide an analytics page at `/analytics` and SHALL request the same-origin `GET /api/transactions` endpoint once when the route is loaded. The page SHALL use the returned transactions as its only transaction data source. In the months view it SHALL present exactly twelve month-labelled chart panels, ordered newest to oldest: the current calendar month and the eleven preceding calendar months. For each month, the page SHALL include transactions whose booking date falls within that calendar month, through today for the current month. Each panel SHALL contain one pie chart whose slices group only that month's transactions by category and sum the absolute value of their amounts; incoming and outgoing amounts SHALL both contribute positively. A transaction whose category is hidden SHALL NOT contribute to any panel, slice, or visible category total, and a hidden category SHALL NOT appear as a slice or a visible total in any of the twelve months. Transactions without a category SHALL contribute to a distinct `Uncategorised` slice by default. Each month's visible category totals and pie slices SHALL be ordered from the greatest exact absolute total to the least; categories with equal totals SHALL be ordered by category name ascending. Every pie slice SHALL have a visible label that identifies its category and displays its exact absolute euro total. All displayed euro totals, including category totals, slice labels, and tooltips, SHALL use the browser's active locale's number and currency conventions, including locale-appropriate thousands grouping, without rounding the exact total. A page-wide control SHALL allow the user to hide or show the `Uncategorised` category; when hidden, uncategorised totals SHALL be omitted from every chart and its visible category totals, without changing stored data. The control SHALL show `Uncategorised` by default. Transactions SHALL NOT be combined across months.
+The system SHALL provide an analytics page at `/analytics` and SHALL request the same-origin `GET /api/transactions` endpoint once when the route is loaded. The page SHALL use the returned transactions as its only transaction data source. In the months view it SHALL present exactly twelve month-labelled chart panels, ordered newest to oldest: the current calendar month and the eleven preceding calendar months. For each month, the page SHALL include transactions whose booking date falls within that calendar month, through today for the current month. Each panel SHALL contain one pie chart whose slices group only that month's transactions by category and sum the absolute value of their amounts; incoming and outgoing amounts SHALL both contribute positively. A transaction whose category is hidden SHALL NOT contribute to any panel, slice, or visible category total, and a hidden category SHALL NOT appear as a slice or a visible total in any of the twelve months. Transactions without a category SHALL contribute to a distinct `Uncategorised` slice by default. Each month's visible category totals and pie slices SHALL be ordered from the greatest exact absolute total to the least; categories with equal totals SHALL be ordered by category name ascending. Every pie slice SHALL have a visible label that identifies its category by name; slice labels SHALL NOT display euro amounts, and each slice's exact absolute euro total SHALL be available in its tooltip and in the month's visible category totals. All displayed euro totals, including category totals and tooltips, SHALL use the browser's active locale's number and currency conventions, including locale-appropriate thousands grouping, without rounding the exact total. A page-wide control SHALL allow the user to hide or show the `Uncategorised` category; when hidden, uncategorised totals SHALL be omitted from every chart and its visible category totals, without changing stored data. The control SHALL show `Uncategorised` by default. Transactions SHALL NOT be combined across months.
 
 #### Scenario: Exactly twelve monthly charts are presented
 
@@ -62,13 +62,18 @@ The system SHALL provide an analytics page at `/analytics` and SHALL request the
 
 #### Scenario: Euro totals use the browser locale and preserve exact values
 
-- **WHEN** a displayed monthly total, slice label, or tooltip contains a large euro amount
+- **WHEN** a displayed monthly total or tooltip contains a large euro amount
 - **THEN** it uses the browser's active locale's EUR currency and number formatting, includes locale-appropriate thousands grouping, and does not round the exact total
 
 #### Scenario: Every pie slice has a visible category and amount label
 
 - **WHEN** a monthly chart contains one or more pie slices
-- **THEN** every slice visibly displays its category name and its formatted exact euro total without requiring hover or selection
+- **THEN** every slice visibly displays its category name without requiring hover or selection, and its exact euro total is shown on hover in its tooltip
+
+#### Scenario: Pie slice labels omit euro amounts
+
+- **WHEN** a monthly chart contains one or more pie slices
+- **THEN** no slice label displays a euro amount, and hovering a slice shows its category name and exact formatted euro total in the tooltip
 
 #### Scenario: Each month's visible category totals show that month's euro amounts
 
@@ -227,7 +232,7 @@ Each year panel SHALL contain one pie chart whose slices group that year's eligi
 
 ### Requirement: Year panels follow the months view presentation
 
-Year panels SHALL follow the months view's visible category total and slice ordering, visible category and amount labels, locale number and currency formatting, and hide-uncategorised behaviour. A year panel whose visible totals are empty SHALL remain present and explain that there is no category data for that year.
+Year panels SHALL follow the months view's visible category total and slice ordering, visible category name labels, euro amounts in visible totals and tooltips, locale number and currency formatting, and hide-uncategorised behaviour. Year pie slice labels SHALL NOT display euro amounts. A year panel whose visible totals are empty SHALL remain present and explain that there is no category data for that year.
 
 #### Scenario: Year totals and slices are sorted by amount
 
@@ -241,7 +246,7 @@ Year panels SHALL follow the months view's visible category total and slice orde
 
 #### Scenario: Year euro totals use the browser locale and preserve exact values
 
-- **WHEN** a displayed yearly total, slice label, or tooltip contains a large euro amount
+- **WHEN** a displayed yearly total or tooltip contains a large euro amount
 - **THEN** it uses the browser's active locale's EUR currency and number formatting, includes locale-appropriate thousands grouping, and does not round the exact total
 
 ### Requirement: Year chart headings link to all transactions from that year

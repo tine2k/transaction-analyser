@@ -124,10 +124,7 @@ function tooltipLabel(parameter: unknown): string {
 
 function sliceLabel(parameter: unknown): string {
   const item = parameter as { data?: Partial<CategoryPieDatum> } | undefined;
-  if (item?.data?.name === undefined || item.data.amount === undefined) {
-    return '';
-  }
-  return `${item.data.name}\n${formatEuroAmount(item.data.amount)}`;
+  return item?.data?.name ?? '';
 }
 
 function categoryFilterValue(key: string): string {

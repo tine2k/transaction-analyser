@@ -1,0 +1,25 @@
+# pnpm settings for a working copy shared by two machines.
+#
+# The Mac and the Linux VM see one node_modules, so a single install has to
+# provide the native packages of both platforms. npm can only target one
+# platform per install and prunes the other; pnpm installs optional
+# dependencies for every listed platform side by side.
+#
+# Do not add `libc` here: pnpm applies a declared libc to every platform and
+# then drops the macOS packages, which declare no libc. The Linux host's own
+# libc is used for the linux arm64 packages.
+supportedArchitectures:
+  os:
+    - darwin
+    - linux
+    - current
+  cpu:
+    - arm64
+
+# A flat, npm-like tree. The tooling in this repository (Nuxt, Nitro,
+# Playwright) is only proven against a hoisted layout.
+nodeLinker: hoisted
+
+# Keep the content-addressable store on the shared volume, so packages linked
+# into node_modules do not cross filesystems.
+storeDir: .pnpm-store

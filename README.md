@@ -4,7 +4,7 @@ Self-hosted web application that imports transactions from a bank export CSV int
 
 ## Quick start
 
-Prerequisites: Docker, Git, and Node.js 24 with npm (Node is needed only for the CSV importer).
+Prerequisites: Docker, Git, and Node.js 24 with pnpm (Node is needed only for the CSV importer). Enable the pinned package manager once with `corepack enable`; `package.json` pins the version.
 
 1. Get the repository; the CSV importer lives here, not in the image, which carries the migrations it applies.
 
@@ -47,9 +47,9 @@ Prerequisites: Docker, Git, and Node.js 24 with npm (Node is needed only for the
 The importer is not part of the image; run it from the repository checkout with Node 24.
 
 ```sh
-npm ci
-npm run import -- /path/to/statement.csv --person Anna --dry-run
-npm run import -- /path/to/statement.csv --person Anna --dsn postgres://analyser:change-me@localhost:5432/transaction_analyser
+pnpm install
+pnpm run import -- /path/to/statement.csv --person Anna --dry-run
+pnpm run import -- /path/to/statement.csv --person Anna --dsn postgres://analyser:change-me@localhost:5432/transaction_analyser
 ```
 
 `--person` is required and names the person the statement belongs to. The person must already exist — create it on the People screen first, or use `Default` — because an import never creates one. The name is matched ignoring letter case and surrounding whitespace.
@@ -90,8 +90,8 @@ To point the sync at a test bank instead of the real Easybank site, set `EASYBAN
 To run the same sync by hand — the way to check the login, the retrieval, and the counts before trusting the night:
 
 ```sh
-npm run sync -- --dry-run --dsn postgres://analyser:change-me@localhost:5432/transaction_analyser
-npm run sync -- --write   --dsn postgres://analyser:change-me@localhost:5432/transaction_analyser
+pnpm run sync -- --dry-run --dsn postgres://analyser:change-me@localhost:5432/transaction_analyser
+pnpm run sync -- --write   --dsn postgres://analyser:change-me@localhost:5432/transaction_analyser
 ```
 
 The window defaults to the first day of the preceding calendar quarter through today, which also recovers a night the server was not running. `--from` and `--to` (both `YYYY-MM-DD`) widen it for a backfill. The sync never imports a transaction whose value date is on or before 2026-09-20, so the history already imported is left alone; a later transaction the bank posts below that floor has to come in through the CSV import. A row already stored is skipped, so a repeated run adds nothing. Above the floor the non-writing run still reports already-stored versus new before anything is written.
@@ -116,6 +116,6 @@ The window defaults to the first day of the preceding calendar quarter through t
 
 ## Development
 
-`npm install` then `npm run dev` serves the app on http://127.0.0.1:3000. The server requires a reachable database: set `DATABASE_URL` in the environment or a gitignored `.env` file, and the pending migrations are applied at startup. It also requires `EASYBANK_PERSON`, the name of an existing person; use `Default` on a fresh database. `npm test` runs the unit, component, and integration suites; see [tests/README.md](tests/README.md) for prerequisites. The full container reference is in [docs/container-image.md](docs/container-image.md).
+`pnpm install` then `pnpm run dev` serves the app on http://127.0.0.1:3000. The server requires a reachable database: set `DATABASE_URL` in the environment or a gitignored `.env` file, and the pending migrations are applied at startup. It also requires `EASYBANK_PERSON`, the name of an existing person; use `Default` on a fresh database. `pnpm test` runs the unit, component, and integration suites; see [tests/README.md](tests/README.md) for prerequisites. The full container reference is in [docs/container-image.md](docs/container-image.md).
 
-The application icon is drawn in `public/icon.svg`, which is the only place its geometry lives. `node tools/render-app-icon.mjs` regenerates the PNGs beside it from that file, using the Playwright Chromium (`npm run test:browser:install` installs it). The PNGs are committed and no build step rasterises the artwork. A home-screen shortcut keeps the icon it was added with, so a changed icon appears only after the shortcut is removed and added again.
+The application icon is drawn in `public/icon.svg`, which is the only place its geometry lives. `node tools/render-app-icon.mjs` regenerates the PNGs beside it from that file, using the Playwright Chromium (`pnpm run test:browser:install` installs it). The PNGs are committed and no build step rasterises the artwork. A home-screen shortcut keeps the icon it was added with, so a changed icon appears only after the shortcut is removed and added again.

@@ -11,6 +11,11 @@
 - Keep explanations proportional to the complexity of the change.
 - Use headless Chromium for browser-based tests and verifications; do not depend on a connected desktop browser.
 
+## Package Manager
+
+- Use pnpm, pinned in `package.json`; run `pnpm install` and `pnpm run <script>`. Do not run `npm install`, `npm ci`, or `npm run`, and do not commit a lockfile from another package manager.
+- The macOS arm64 machine and the Linux arm64 VM share one `node_modules`. `pnpm-workspace.yaml` installs both platforms' native packages in one install, so keep both present: after any install, the darwin and linux arm64 native packages must still be in `node_modules`.
+
 ## Database Tests
 
 - For PostgreSQL-backed tests, use the locally installed PostgreSQL server and create a uniquely named disposable test database. When no server is reachable and no explicit `PGHOST`, `PGPORT`, or `PGHOSTADDR` is set, the test launcher starts a disposable cluster from the locally installed `initdb` and `pg_ctl` binaries and removes it after the run. Seed only with test fixtures; do not use the project's configured database or real transaction data.

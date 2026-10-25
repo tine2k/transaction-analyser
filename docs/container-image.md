@@ -10,7 +10,7 @@ From the repository root, build the image:
 docker build --tag transaction-analyser:local .
 ```
 
-The build uses Node 24 and the checked-in `package-lock.json`. Environment files, PostgreSQL backups, tests, and generated files are excluded from the build context; the migration files under `db/migrations` are included because the image applies them at startup. Do not pass database credentials as build arguments.
+The build uses Node 24 and the checked-in `pnpm-lock.yaml` with pnpm, enabled through the image's Corepack. Environment files, PostgreSQL backups, tests, and generated files are excluded from the build context; the migration files under `db/migrations` are included because the image applies them at startup. Do not pass database credentials as build arguments.
 
 ## Configure PostgreSQL
 

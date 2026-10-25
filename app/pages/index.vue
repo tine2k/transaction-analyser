@@ -543,7 +543,7 @@ const uncategorisedTransactions = computed(() =>
 );
 
 // The category pill uses the same category palette and the same category identity
-// keys as the analytics views, over the categories this screen can show.
+// keys as the analysis views, over the categories this screen can show.
 const categoryColorMap = computed(() => createCategoryColorMap([
   ...categories.value.map(({ id }) => `category:${id}`),
   ...(uncategorisedTransactions.value.length > 0 ? ['uncategorised'] : []),

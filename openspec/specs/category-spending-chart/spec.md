@@ -1,429 +1,372 @@
-# Category Spending Chart Specification
+# Monthly Category Overview Specification
 
 ## Purpose
 
-Defines the browser analytics page that presents a separate category spending pie chart for each of the last 12 calendar months, without changing stored data.
+Defines the browser Monthly screen that presents one selected calendar month's absolute transaction totals by category, its summary figures, and its category table, without changing stored data.
 
 ## Requirements
 
-### Requirement: The analytics route presents twelve monthly category pie charts
+### Requirement: The Monthly route presents one calendar month from the transaction read
 
-The system SHALL provide an analytics page at `/analytics` and SHALL request the same-origin `GET /api/transactions` endpoint once when the route is loaded. The page SHALL use the returned transactions as its only transaction data source. In the months view it SHALL present exactly twelve month-labelled chart panels, ordered newest to oldest: the current calendar month and the eleven preceding calendar months. For each month, the page SHALL include transactions whose booking date falls within that calendar month, through today for the current month. Each panel SHALL contain one pie chart whose slices group only that month's transactions by category and sum the absolute value of their amounts; incoming and outgoing amounts SHALL both contribute positively. A transaction whose category is hidden SHALL NOT contribute to any panel, slice, or visible category total, and a hidden category SHALL NOT appear as a slice or a visible total in any of the twelve months. Transactions without a category SHALL contribute to a distinct `Uncategorised` slice by default. Each month's visible category totals and pie slices SHALL be ordered from the greatest exact absolute total to the least; categories with equal totals SHALL be ordered by category name ascending. Every pie slice SHALL have a visible label that identifies its category by name; slice labels SHALL NOT display euro amounts, and each slice's exact absolute euro total SHALL be available in its tooltip and in the month's visible category totals. All displayed euro totals, including category totals and tooltips, SHALL use the browser's active locale's number and currency conventions, including locale-appropriate thousands grouping, without rounding the exact total. A page-wide control SHALL allow the user to hide or show the `Uncategorised` category; when hidden, uncategorised totals SHALL be omitted from every chart and its visible category totals, without changing stored data. The control SHALL show `Uncategorised` by default. Transactions SHALL NOT be combined across months.
+The system SHALL provide a browser page at `/monthly` that requests the same-origin `GET /api/transactions` endpoint once per page load and uses the returned transactions as its only transaction data source. The page SHALL present one selected calendar month at a time and SHALL NOT combine transactions across months.
 
-#### Scenario: Exactly twelve monthly charts are presented
+#### Scenario: The route loads its data once
 
-- **WHEN** the analytics route is shown on 2026-09-28 with the months view selected
-- **THEN** it presents twelve chart panels, one for each month from October 2025 through September 2026, ordered September 2026 first and October 2025 last
+- **WHEN** the `/monthly` route is shown
+- **THEN** it makes one same-origin `GET /api/transactions` request and derives the page from that response
 
-#### Scenario: Booking dates fall into their calendar-month chart
+#### Scenario: Only the selected month contributes
 
-- **WHEN** a transaction has a booking date in one of the twelve months
-- **THEN** it contributes only to that month's chart, and a booking date before October 2025 or after today contributes to none of the charts
+- **WHEN** returned transactions have booking dates in several calendar months
+- **THEN** only transactions whose booking date falls in the selected month contribute to any figure, bar segment, or table row
 
-#### Scenario: Category totals are separate for each month
+### Requirement: A year and month control selects the displayed month
 
-- **WHEN** the same category has in-period transactions in two different months
-- **THEN** each month's chart shows only the absolute total from that month, without combining the two months' amounts
+The page SHALL offer a year control and twelve month controls for choosing the displayed calendar month. The year control SHALL offer every calendar year represented by a returned transaction and the current calendar year, newest first. The twelve month controls SHALL always be present for the selected year, including months with no transaction.
 
-#### Scenario: Incoming and outgoing amounts both contribute positively
+#### Scenario: The year control offers represented years
 
-- **WHEN** a category has amounts `-12.50` and `4.00` in one month
-- **THEN** that month's chart shows their absolute-value sum, `16.50`
+- **WHEN** returned transactions have booking dates in 2024, 2025, and 2026
+- **THEN** the year control offers 2026, 2025, 2024, and the current year when it differs, newest first
 
-#### Scenario: A hidden category is excluded from every chart
+#### Scenario: Twelve month controls are always present
 
-- **WHEN** a transaction falls in one of the twelve months and its category is hidden
-- **THEN** it contributes to no slice and no visible category total in any of the twelve panels, and its hidden category is absent from every panel
+- **WHEN** the page presents a selected year
+- **THEN** twelve month controls are shown, one for each calendar month of that year
 
-#### Scenario: Hiding a category leaves other totals unchanged
+#### Scenario: An empty month can be selected
 
-- **WHEN** a hidden category has monthly totals and other categories have totals in the same months
-- **THEN** the other categories' slices and visible totals are unchanged, and only the hidden category's amounts are omitted
+- **WHEN** the selected year has no transaction in a month
+- **THEN** that month's control remains available and selecting it shows the empty-month state rather than removing the control
 
-#### Scenario: Uncategorised transactions have a monthly slice by default
+### Requirement: The selected month is linkable and defaults to the current or newest month
 
-- **WHEN** a transaction in a month has no category and the hide control is not selected
-- **THEN** its absolute amount contributes to that month's distinct `Uncategorised` slice and visible category total
+The selected month SHALL be carried in the route query as `month=YYYY-MM`. A supplied well-formed month SHALL be selected on load and its year SHALL be available in the year control. An absent or malformed month SHALL select the current calendar month when a returned transaction falls in it, otherwise the newest calendar month represented by a returned transaction, otherwise the current calendar month. Selecting a month SHALL NOT make another data request.
 
-#### Scenario: Hiding uncategorised removes it from every chart
+#### Scenario: A month link initializes the page
 
-- **WHEN** the user selects the control to hide `Uncategorised`
-- **THEN** uncategorised amounts are omitted from the pie slices and visible category totals in all twelve panels, while named category totals remain unchanged
+- **WHEN** `/monthly` is opened with `month=2025-03`
+- **THEN** March 2025 is selected and its figures and table are shown
 
-#### Scenario: Showing uncategorised restores its monthly totals
+#### Scenario: The current month is the default when it has data
 
-- **WHEN** the user clears the control to hide `Uncategorised`
-- **THEN** each month's `Uncategorised` slice and total are shown again where that month has uncategorised transactions
+- **WHEN** the route carries no month and a returned transaction falls in the current calendar month
+- **THEN** the current month is selected
 
-#### Scenario: Category totals and slices are sorted by amount
+#### Scenario: The newest represented month is the fallback
 
-- **WHEN** a month has visible categories with different exact absolute totals
-- **THEN** its visible category totals and pie slices appear in descending total order, with equal totals ordered by category name ascending
+- **WHEN** the route carries no month and no returned transaction falls in the current calendar month
+- **THEN** the newest calendar month represented by a returned transaction is selected
 
-#### Scenario: Euro totals use the browser locale and preserve exact values
+#### Scenario: No transactions select the current month
 
-- **WHEN** a displayed monthly total or tooltip contains a large euro amount
-- **THEN** it uses the browser's active locale's EUR currency and number formatting, includes locale-appropriate thousands grouping, and does not round the exact total
+- **WHEN** the endpoint returns no transaction and the route carries no month
+- **THEN** the current calendar month is selected and the empty-month state is shown
 
-#### Scenario: Every pie slice has a visible category and amount label
+#### Scenario: Selecting a month does not re-fetch
 
-- **WHEN** a monthly chart contains one or more pie slices
-- **THEN** every slice visibly displays its category name without requiring hover or selection, and its exact euro total is shown on hover in its tooltip
+- **WHEN** the user selects another month or year
+- **THEN** the page recomputes from the already-fetched transactions and makes no additional data request
 
-#### Scenario: Pie slice labels omit euro amounts
+### Requirement: Summary figures count the selected month
 
-- **WHEN** a monthly chart contains one or more pie slices
-- **THEN** no slice label displays a euro amount, and hovering a slice shows its category name and exact formatted euro total in the tooltip
+The page SHALL present two summary figures for the selected month: `Total moved`, the exact sum of the absolute amounts of included transactions, and `Transactions`, the count of included transactions. Both SHALL reflect the person and expense-type selections, SHALL exclude hidden categories and, when selected, uncategorised transactions, and SHALL use exact decimal amounts without floating-point conversion.
 
-#### Scenario: Each month's visible category totals show that month's euro amounts
+#### Scenario: Total moved sums absolute amounts
 
-- **WHEN** a month has visible category totals
-- **THEN** the visible totals identify each category and show its exact absolute total as a locale-formatted euro amount
+- **WHEN** the selected month has amounts `-12.50` and `4.00`
+- **THEN** `Total moved` shows the exact value `16.50`
 
-### Requirement: Monthly chart headings and pie slices link to matching transactions
+#### Scenario: Transactions counts included transactions
 
-Each monthly chart heading SHALL be a link to the transaction list with that month selected, all
-categories selected, and the page's selected person selected. Each pie slice SHALL be an interactive
-link to the transaction list with that slice's month, category, and the page's selected person
-selected. A named category link SHALL identify the category by its returned identity; the
-uncategorised slice SHALL link to the uncategorised filter. When all people are selected, the link
-SHALL carry no person value. The month SHALL be the same calendar month represented by the panel,
-based on booking date. Opening either link SHALL show the transaction list with its filters
-initialized from the link, without changing stored data or making the chart require another
-transaction data source.
+- **WHEN** the selected month has five included transactions and two excluded ones
+- **THEN** `Transactions` shows `5`
 
-#### Scenario: A month heading opens all transactions from that month
+#### Scenario: The figures follow the filters
 
-- **WHEN** the user activates a monthly chart heading
-- **THEN** the transaction list opens with that month, all categories, and the selected person selected
+- **WHEN** the person, expense type, or hide-uncategorised selection changes
+- **THEN** both summary figures recompute from the already-fetched transactions without another request
 
-#### Scenario: A named category slice opens matching monthly transactions
+#### Scenario: A hidden category contributes to neither figure
 
-- **WHEN** the user activates a named category slice in a month's chart
-- **THEN** the transaction list opens filtered to that month, the slice's category, and the selected person
+- **WHEN** a returned transaction in the selected month has a hidden category
+- **THEN** its amount and its transaction are absent from `Total moved` and `Transactions`
 
-#### Scenario: An uncategorised slice opens matching monthly transactions
+#### Scenario: An empty month shows zero figures
 
-- **WHEN** the user activates an uncategorised slice in a month's chart
-- **THEN** the transaction list opens filtered to that month, uncategorised transactions, and the selected person
+- **WHEN** the selected month has no included transaction
+- **THEN** `Total moved` shows zero and `Transactions` shows `0`
+
+### Requirement: Categories are listed with exact absolute totals
+
+The page SHALL list every category represented by an included transaction in the selected month, including a distinct `Uncategorised` entry when an included transaction has no category. Each entry's amount SHALL be the exact sum of the absolute amounts of that category's included transactions. Entries SHALL be ordered from greatest amount to least, with equal amounts ordered by category name ascending, and a zero amount SHALL remain listed with no share bar.
+
+#### Scenario: Both signs contribute positively
+
+- **WHEN** a category has amounts `-12.50` and `4.00` in the selected month
+- **THEN** its entry shows the exact total `16.50`
+
+#### Scenario: Uncategorised is listed separately
+
+- **WHEN** an included transaction in the selected month has no category
+- **THEN** a distinct `Uncategorised` entry is listed
+
+#### Scenario: Entries are ordered by amount
+
+- **WHEN** listed categories have different exact totals
+- **THEN** they appear from greatest to least, and equal totals appear by category name ascending
+
+#### Scenario: A zero amount remains listed
+
+- **WHEN** a represented category's transactions sum to zero
+- **THEN** the category remains in the list with amount zero and no share fill
+
+### Requirement: The stacked bar shows the top eight categories and the rest
+
+The page SHALL present a stacked bar for the selected month whose segments are the eight categories with the greatest amounts, followed by one `Other N` segment aggregating every remaining category, where N is the number of remaining categories. Each segment's width SHALL be proportional to its amount. When eight or fewer categories are listed, no `Other` segment SHALL appear. The bar SHALL have a legend naming each segment and its exact amount.
+
+#### Scenario: More than eight categories produce an Other segment
+
+- **WHEN** the selected month lists ten categories
+- **THEN** the bar shows eight category segments and one `Other 2` segment
+
+#### Scenario: Eight or fewer categories produce no Other segment
+
+- **WHEN** the selected month lists six categories
+- **THEN** the bar shows six category segments and no `Other` segment
+
+#### Scenario: Segment widths follow amounts
+
+- **WHEN** one segment's amount is twice another's
+- **THEN** its width is twice as large
+
+#### Scenario: A month with no amount shows no segments
+
+- **WHEN** no included transaction in the selected month has a nonzero absolute total
+- **THEN** the bar shows no segments
+
+### Requirement: The category table shows share, transactions, and amount
+
+The page SHALL present a table with one row per listed category and the columns Category, Share of top category, Transactions, and Amount. Share SHALL be the category's amount as a percentage of the greatest category amount, with the greatest at 100%. Transactions SHALL be the count of included transactions in that category. Amount SHALL be the exact absolute total in the browser's locale EUR format. When the greatest category amount is zero, no row SHALL show a share fill.
+
+#### Scenario: The largest category is the full share
+
+- **WHEN** the greatest category amount is `100.00`
+- **THEN** that category's share is `100` percent
+
+#### Scenario: Other categories are proportional to the largest
+
+- **WHEN** the greatest category amount is `100.00` and another category's amount is `25.00`
+- **THEN** the second category's share is `25` percent
+
+#### Scenario: The row counts its own transactions
+
+- **WHEN** a category has three included transactions in the selected month
+- **THEN** its Transactions cell shows `3`
+
+#### Scenario: The amount uses locale EUR formatting
+
+- **WHEN** a category's exact total is large or fractional
+- **THEN** its Amount cell shows the exact value with the browser locale's EUR currency and thousands conventions, without rounding
+
+#### Scenario: The table lists every category, not only the top eight
+
+- **WHEN** the selected month lists ten categories
+- **THEN** the table lists all ten rows while only eight appear as separate bar segments
+
+### Requirement: Category rows link to their transactions
+
+Each category table row SHALL link to the transactions screen at `/` with the selected month as `month=YYYY-MM`, the row's category as `category` (the category identity, or `uncategorised`), and the selected person as `person=<id>` when one is selected. When all people are selected, the link SHALL carry no person value. Following a row link SHALL only read existing data.
+
+#### Scenario: A named category row opens matching transactions
+
+- **WHEN** a category row for category identity `7` is activated
+- **THEN** the transactions screen opens with that month, category `7`, and the selected person selected
+
+#### Scenario: The uncategorised row opens uncategorised transactions
+
+- **WHEN** the `Uncategorised` row is activated
+- **THEN** the transactions screen opens with that month, the uncategorised filter, and the selected person selected
 
 #### Scenario: All people omits the person value
 
-- **WHEN** the page has all people selected and a month or slice link is followed
-- **THEN** the transaction list opens with no person filter, showing every person's matching transactions
+- **WHEN** all people are selected and a category row is activated
+- **THEN** the transactions screen opens with no person filter
 
-#### Scenario: Chart navigation remains read-only
+#### Scenario: Row navigation changes no stored data
 
-- **WHEN** the user follows a month or slice link
-- **THEN** navigation only reads the existing transaction data and does not create, alter, or delete stored data
+- **WHEN** a category row link is activated
+- **THEN** no transaction, category, or person is created, altered, or deleted
 
-### Requirement: Category colors are consistent across monthly charts
+### Requirement: The Monthly page offers a person filter
 
-The system SHALL assign each category a consistent color across all twelve monthly pie charts, independent of category ordering, the month in which it appears, or whether `Uncategorised` is hidden. The color shown for a category in a chart SHALL match the color indicator for that category in the month's visible totals. `Uncategorised` SHALL also retain its color when hidden and shown again.
-
-#### Scenario: A category keeps its color between months
-
-- **WHEN** the same category has totals in two or more monthly charts
-- **THEN** its pie slice and visible total indicator use the same color in every such month
-
-#### Scenario: Category colors do not shift with category order
-
-- **WHEN** categories occur in a different order or in different combinations across months
-- **THEN** each category retains the same color in each chart where it appears
-
-#### Scenario: Hiding uncategorised does not change other colors
-
-- **WHEN** the user hides or shows `Uncategorised`
-- **THEN** every named category retains the same color before and after the change
-
-### Requirement: Every month remains represented when it has no chart data
-
-The system SHALL keep all twelve month-labelled chart panels when a month has no eligible transactions. That month's chart SHALL contain no invented slices, and the panel SHALL explain that there is no category data for that month. If all twelve months have no eligible category totals, the page SHALL show the empty state for each month rather than a fabricated chart.
-
-#### Scenario: An empty month keeps its chart panel
-
-- **WHEN** a month has no eligible transactions
-- **THEN** its month-labelled panel remains present, its chart has no slices, and the panel states that there is no category data for that month
-
-#### Scenario: All twelve months are empty
-
-- **WHEN** the request succeeds but no transaction falls in any of the twelve months
-- **THEN** all twelve month panels remain present with empty states and no invented slices
-
-### Requirement: The analytics page distinguishes loading and failed results
-
-The system SHALL show a loading state while transactions are being requested. If the request fails, the page SHALL state that monthly category totals could not be loaded and SHALL NOT present the failure as empty months or display stale totals.
-
-#### Scenario: Transaction loading fails
-
-- **WHEN** the request for transactions fails
-- **THEN** the page reports that monthly category totals could not be loaded and does not represent the result as twelve empty months
-
-### Requirement: The chart page is read-only and does not invent categories
-
-The analytics page SHALL only read transactions through `GET /api/transactions`. It SHALL NOT create, alter, or delete transactions or categories, evaluate category matching expressions, or show transaction or category data that was not returned by the endpoint. The page SHALL NOT issue another data request to populate the charts.
-
-#### Scenario: Chart interaction does not change stored data
-
-- **WHEN** the analytics page is used
-- **THEN** it makes no request that creates, alters, or deletes transaction or category data
-
-#### Scenario: Chart categories come from returned transactions
-
-- **WHEN** a monthly chart displays category totals
-- **THEN** every named category shown comes from a transaction returned for that month, and no category is invented
-
-#### Scenario: The existing transaction endpoint is the only data request
-
-- **WHEN** the analytics page loads its monthly chart data
-- **THEN** its transaction data comes from the single same-origin `GET /api/transactions` request
-
-### Requirement: The analytics page switches between months and years views
-
-The analytics page SHALL offer a control that switches between a months view and a years view, and SHALL present the months view by default. The control SHALL be available once transactions have loaded, SHALL change which chart panels are presented without making another data request, and SHALL NOT change stored data. The page-wide hide-uncategorised control SHALL apply to the panels of the selected view.
-
-#### Scenario: The months view is the default
-
-- **WHEN** the analytics route is shown without the user changing the view
-- **THEN** the months view is selected and the page presents the twelve monthly chart panels
-
-#### Scenario: Switching views changes the panels without another request
-
-- **WHEN** the user switches from the months view to the years view and back
-- **THEN** the page presents the panels of the selected view and makes no additional transaction request
-
-#### Scenario: Hiding uncategorised applies to the selected view
-
-- **WHEN** the user hides `Uncategorised` while the years view is selected
-- **THEN** uncategorised totals are omitted from every year panel, and switching back to the months view still shows them omitted there
-
-### Requirement: The years view presents a panel for every available calendar year
-
-In the years view the page SHALL present exactly one year-labelled chart panel for every calendar year represented by at least one eligible transaction, ordered newest to oldest. It SHALL NOT include a year with no eligible transaction, impose a rolling limit on the years shown, or let a hidden-category transaction represent its year. If no year has an eligible transaction, the years view SHALL present no year panels and explain that there is no category data for any year.
-
-#### Scenario: A panel exists for every year with data
-
-- **WHEN** eligible transactions have booking dates in 2024, 2025, and 2026
-- **THEN** the years view presents three year-labelled panels ordered 2026, 2025, 2024
-
-#### Scenario: A hidden category does not represent its year
-
-- **WHEN** every transaction in 2023 has a hidden category and other years have eligible transactions
-- **THEN** no 2023 panel is presented
-
-#### Scenario: No available years shows an empty years view
-
-- **WHEN** the request succeeds and no returned transaction is eligible
-- **THEN** the years view presents no year panels and states that there is no category data for any year
-
-### Requirement: Year panels sum absolute category totals across the year
-
-Each year panel SHALL contain one pie chart whose slices group that year's eligible transactions by category and sum the absolute value of their amounts; incoming and outgoing amounts SHALL both contribute positively, and transactions SHALL NOT be combined across years. Transactions without a category SHALL contribute to a distinct `Uncategorised` slice by default.
-
-#### Scenario: A year's transactions are summed across its months
-
-- **WHEN** a category has amounts `-12.50` in March 2026 and `4.00` in November 2026
-- **THEN** the 2026 panel shows their exact absolute total `16.50`, and no other year panel includes those amounts
-
-#### Scenario: Incoming and outgoing year amounts both contribute positively
-
-- **WHEN** a category has amounts `-12.50` and `4.00` in one year
-- **THEN** that year's panel shows their absolute-value sum, `16.50`
-
-### Requirement: Year panels follow the months view presentation
-
-Year panels SHALL follow the months view's visible category total and slice ordering, visible category name labels, euro amounts in visible totals and tooltips, locale number and currency formatting, and hide-uncategorised behaviour. Year pie slice labels SHALL NOT display euro amounts. A year panel whose visible totals are empty SHALL remain present and explain that there is no category data for that year.
-
-#### Scenario: Year totals and slices are sorted by amount
-
-- **WHEN** a year has visible categories with different exact absolute totals
-- **THEN** its visible category totals and pie slices appear in descending total order, with equal totals ordered by category name ascending
-
-#### Scenario: Hiding uncategorised empties a year panel
-
-- **WHEN** a year's only visible totals are uncategorised and the user hides `Uncategorised`
-- **THEN** the year panel remains present with no slices and states that there is no category data for that year
-
-#### Scenario: Year euro totals use the browser locale and preserve exact values
-
-- **WHEN** a displayed yearly total or tooltip contains a large euro amount
-- **THEN** it uses the browser's active locale's EUR currency and number formatting, includes locale-appropriate thousands grouping, and does not round the exact total
-
-### Requirement: Year chart headings link to all transactions from that year
-
-Each year chart heading SHALL be a link to the transaction list with that calendar year selected, all
-categories selected, and the page's selected person selected. When all people are selected, the link
-SHALL carry no person value. The year SHALL be the calendar year represented by the panel, based on
-booking date. Opening the link SHALL show the transaction list with its filters initialized from the
-link, without changing stored data or making the chart require another transaction data source.
-
-#### Scenario: A year heading opens all transactions from that year
-
-- **WHEN** the user activates a year chart heading
-- **THEN** the transaction list opens with that year, all categories, and the selected person selected
-
-#### Scenario: Year heading navigation remains read-only
-
-- **WHEN** the user follows a year heading link
-- **THEN** navigation only reads the existing transaction data and does not create, alter, or delete stored data
-
-### Requirement: Year pie slices link to matching transactions
-
-Each pie slice SHALL be an interactive link to the transaction list with that slice's calendar year,
-category, and the page's selected person selected. A named category link SHALL identify the category
-by its returned identity; the uncategorised slice SHALL link to the uncategorised filter. When all
-people are selected, the link SHALL carry no person value. Opening the link SHALL show the
-transaction list with its filters initialized from the link, without changing stored data or making
-the chart require another transaction data source.
-
-#### Scenario: A named category slice opens matching yearly transactions
-
-- **WHEN** the user activates a named category slice in a year's chart
-- **THEN** the transaction list opens filtered to that year, the slice's category, and the selected person
-
-#### Scenario: An uncategorised slice opens matching yearly transactions
-
-- **WHEN** the user activates an uncategorised slice in a year's chart
-- **THEN** the transaction list opens filtered to that year, uncategorised transactions, and the selected person
-
-#### Scenario: All people omits the person value
-
-- **WHEN** the page has all people selected and a year slice link is followed
-- **THEN** the transaction list opens with no person filter, showing every person's matching transactions
-
-### Requirement: Category colors are consistent across yearly charts and between views
-
-The system SHALL assign each category a consistent color across all yearly pie charts and across both analytics views, so a category keeps the same color in every yearly chart where it appears and when the view changes. The color shown for a category in a yearly chart SHALL match the color indicator for that category in the same panel's visible totals. `Uncategorised` SHALL retain its color when hidden and shown again.
-
-#### Scenario: A category keeps its color between years
-
-- **WHEN** the same category has totals in two or more yearly charts
-- **THEN** its pie slice and visible total indicator use the same color in every such year
-
-#### Scenario: A category keeps its color when the view changes
-
-- **WHEN** the user switches between the months view and the years view
-- **THEN** each category keeps the same color in both views
-
-#### Scenario: Hiding uncategorised does not change other colors in the years view
-
-- **WHEN** the user hides or shows `Uncategorised`
-- **THEN** every named category retains the same color in the yearly charts before and after the change
-
-### Requirement: The analytics page offers a page-wide expense-type filter
-
-The analytics page SHALL offer a page-wide control that selects which expense types are shown:
-`All`, `Recurring`, or `One-time`. The control SHALL default to `All` and SHALL apply to the months
-view and the years view alike. Changing the selection SHALL recompute the panels from the
-already-fetched transactions without another data request, and SHALL NOT change stored data. With
-`All` selected the page SHALL present exactly what it presents without the control.
-
-#### Scenario: All is the default
-
-- **WHEN** the analytics page loads
-- **THEN** the expense-type control reads `All`
-
-#### Scenario: All preserves the existing presentation
-
-- **WHEN** `All` is selected
-- **THEN** the same categories, slices, and visible totals are presented as without the control
-
-#### Scenario: The filter applies to both views
-
-- **WHEN** the view is switched between months and years
-- **THEN** the selected expense type stays in effect for the presented panels
-
-#### Scenario: Selecting does not re-fetch
-
-- **WHEN** the selection changes
-- **THEN** every panel is recomputed from the already-fetched transactions and no additional data request is made
-
-### Requirement: The expense-type filter selects which transactions contribute
-
-With `Recurring` or `One-time` selected, only transactions whose category's expense type equals
-the selection SHALL contribute to any panel, slice, or visible total. A transaction whose category
-carries no expense type, and an uncategorised transaction, SHALL contribute only while `All` is
-selected. A hidden-category transaction SHALL contribute under no selection.
-
-#### Scenario: Only the selected type contributes
-
-- **WHEN** `Recurring` is selected and a transaction's category is one-time
-- **THEN** the transaction contributes to no panel, slice, or visible total
-
-#### Scenario: An unset category contributes only under All
-
-- **WHEN** a category carrying no expense type has monthly totals and `One-time` is selected
-- **THEN** its transactions contribute to no panel, slice, or visible total, and under `All` they contribute as before
-
-#### Scenario: Uncategorised contributes only under All
-
-- **WHEN** `Recurring` is selected and a transaction has no category
-- **THEN** it contributes to no `Uncategorised` slice or visible total
-
-#### Scenario: A hidden category stays excluded
-
-- **WHEN** a hidden category's expense type matches the selected choice
-- **THEN** its transactions still contribute to no panel, slice, or visible total
-
-#### Scenario: A filtered month without data is explained
-
-- **WHEN** the selection leaves a month with no eligible transaction
-- **THEN** that month's panel shows no chart data and invents no slice or total
-
-### Requirement: The analytics page offers a page-wide person filter
-
-The analytics page SHALL offer a page-wide person filter selecting `All people` or one person
-represented in the returned transactions. It SHALL default to `All people`, apply to both views, and
-be independent of the expense-type and hide-uncategorised controls. Changing it SHALL recompute every
-panel from the already-fetched transactions without another request. The selection SHALL be carried
-in the route query as `person=<id>`; an absent or unknown person SHALL mean all people.
+The page SHALL offer a page-wide person filter selecting `All people` or one person represented in the returned transactions. It SHALL default to `All people`, be independent of the month and expense-type selections, and carry the selection in the route query as `person=<id>`. An absent or unknown person SHALL mean all people. Changing the person SHALL recompute every figure from the already-fetched transactions without another request.
 
 #### Scenario: All people is the default
 
-- **WHEN** the analytics page loads without a person in its query
+- **WHEN** `/monthly` is shown without a person in its query
 - **THEN** the person control reads `All people` and every returned transaction is eligible
 
-#### Scenario: A named person scopes every panel
+#### Scenario: A named person scopes every figure
 
 - **WHEN** a person is selected
-- **THEN** only the returned transactions that reference that person contribute to any panel, slice, or visible total
-
-#### Scenario: The filter applies to both views
-
-- **WHEN** the view is switched between months and years
-- **THEN** the selected person stays in effect for the presented panels
-
-#### Scenario: The filter is independent of expense type
-
-- **WHEN** the expense type is changed
-- **THEN** the selected person stays in effect, and changing the person leaves the expense type unchanged
-
-#### Scenario: Selecting does not re-fetch
-
-- **WHEN** the person selection changes
-- **THEN** every panel is recomputed from the already-fetched transactions and no additional data request is made
+- **THEN** only that person's transactions contribute to the summary, bar, table, and transaction count
 
 #### Scenario: The selection is linkable
 
-- **WHEN** the analytics route is opened with `person=<id>` naming a represented person
-- **THEN** the person control selects that person and the panels show only that person's transactions
+- **WHEN** `/monthly` is opened with `person=<id>` naming a represented person
+- **THEN** that person is selected and only their transactions contribute
 
 #### Scenario: An unknown person falls back to all
 
 - **WHEN** the route carries a person that no returned transaction represents
-- **THEN** the person control selects all people
+- **THEN** `All people` is selected
+
+#### Scenario: Changing the person does not re-fetch
+
+- **WHEN** the person selection changes
+- **THEN** every figure recomputes from the already-fetched transactions and no additional data request is made
 
 #### Scenario: The person choices come from the response
 
 - **WHEN** the person control is inspected
-- **THEN** it offers all people and each person represented in the returned transactions, and it makes no request other than the existing transaction read
+- **THEN** it offers `All people` and each person represented in the returned transactions, and no other request is made
 
-#### Scenario: A person with no data in a panel is explained
+### Requirement: The Monthly page offers an expense-type filter
 
-- **WHEN** the selected person has no eligible transaction in a month or year
-- **THEN** that panel remains present and explains that there is no category data, without inventing a slice or total
+The page SHALL offer a page-wide expense-type filter with `All`, `Recurring`, and `One-time`, defaulting to `All`. With a typed selection, only transactions whose category carries that expense type SHALL contribute; uncategorised transactions and categories with no expense type SHALL contribute only under `All`. Changing the selection SHALL recompute every figure without another request and SHALL NOT change stored data.
 
-#### Scenario: Hiding uncategorised applies within the person
+#### Scenario: All is the default
 
-- **WHEN** a person is selected and `Uncategorised` is hidden
-- **THEN** only that person's uncategorised amounts are omitted, and other people's transactions do not reappear
+- **WHEN** `/monthly` loads
+- **THEN** the expense-type control reads `All`
+
+#### Scenario: A typed selection excludes other types
+
+- **WHEN** `Recurring` is selected and a transaction's category is one-time
+- **THEN** that transaction contributes to no figure, bar segment, table row, or count
+
+#### Scenario: An unset category contributes only under All
+
+- **WHEN** a category carries no expense type
+- **THEN** it contributes only while `All` is selected
+
+#### Scenario: Uncategorised contributes only under All
+
+- **WHEN** `Recurring` is selected and a transaction has no category
+- **THEN** it contributes to no figure, bar segment, table row, or count
+
+#### Scenario: The filter is independent of the person
+
+- **WHEN** the expense type changes
+- **THEN** the selected person stays in effect, and changing the person leaves the expense type unchanged
+
+#### Scenario: Selecting an expense type does not re-fetch
+
+- **WHEN** the expense-type selection changes
+- **THEN** every figure recomputes from the already-fetched transactions and no additional data request is made
+
+### Requirement: The hide-uncategorised control scopes the whole page
+
+The page SHALL offer a control that hides or shows the `Uncategorised` category, shown by default. When hidden, uncategorised transactions SHALL contribute to no summary figure, bar segment, table row, or transaction count on the page. Clearing the control SHALL restore them. The control SHALL NOT change stored data.
+
+#### Scenario: Uncategorised is shown by default
+
+- **WHEN** `/monthly` loads
+- **THEN** the hide control is cleared and the `Uncategorised` row and amounts are shown where present
+
+#### Scenario: Hiding uncategorised updates every figure
+
+- **WHEN** the hide control is selected
+- **THEN** uncategorised transactions are absent from `Total moved`, `Transactions`, the bar, the table, and the category count
+
+#### Scenario: Showing uncategorised restores every figure
+
+- **WHEN** the hide control is cleared
+- **THEN** uncategorised transactions contribute again everywhere they are represented
+
+#### Scenario: The control changes no stored data
+
+- **WHEN** the hide control is used
+- **THEN** no transaction or category is created, altered, or deleted
+
+### Requirement: The Monthly page distinguishes loading, failure, and empty data
+
+While transactions are requested the page SHALL show a loading state. If the request fails it SHALL state that the monthly data could not be loaded and SHALL NOT present the failure as an empty month or stale figures. If the selected month has no included transaction, the page SHALL show zero summary figures, no bar segments, and explain that there is no category data for that month.
+
+#### Scenario: Loading is distinct from empty data
+
+- **WHEN** the transaction request is pending
+- **THEN** the page shows a loading state and does not present zero figures as an empty result
+
+#### Scenario: A failed request is reported
+
+- **WHEN** the transaction request fails
+- **THEN** the page reports that the monthly data could not be loaded and shows no stale figures
+
+#### Scenario: An empty month is explained
+
+- **WHEN** the selected month has no included transaction
+- **THEN** the page shows zero summary figures, no bar segments, and states that there is no category data for that month
+
+### Requirement: The Monthly page is read-only and invents no categories
+
+The page SHALL only read transactions through its single `GET /api/transactions` request. It SHALL NOT create, alter, or delete transactions or categories, evaluate a category expression, make another data request, or show a category that is not represented by an included returned transaction.
+
+#### Scenario: The page makes no write
+
+- **WHEN** the page is loaded or its controls are used
+- **THEN** no transaction, category, or person is created, altered, or deleted
+
+#### Scenario: No category expression is evaluated
+
+- **WHEN** the page renders categories
+- **THEN** no category's regular expression is evaluated in the browser
+
+#### Scenario: Every category comes from the response
+
+- **WHEN** the table or bar shows a category
+- **THEN** that category is represented by an included returned transaction
+
+#### Scenario: The single read is the only data request
+
+- **WHEN** the page loads and its filters or month change
+- **THEN** its transaction data still comes from the one existing `GET /api/transactions` request
+
+### Requirement: Hidden categories contribute to nothing
+
+Transactions whose category is hidden SHALL contribute to no summary figure, category entry, bar segment, transaction count, or row link on the Monthly page. Hiding a category SHALL NOT change the amounts of visible categories.
+
+#### Scenario: A hidden category is absent from the page
+
+- **WHEN** a returned transaction in the selected month has a hidden category
+- **THEN** its category appears in no bar segment or table row and its amount and transaction are absent from both summary figures
+
+#### Scenario: Visible totals are unchanged by a hidden category
+
+- **WHEN** a hidden category and a visible category both have transactions in the selected month
+- **THEN** the visible category's amount and transaction count are the same as without the hidden category
+
+### Requirement: Category colours are consistent within the Monthly page
+
+The page SHALL assign each category a colour from the application category palette and SHALL use the same colour for that category in the stacked bar and its table row. A category SHALL keep its colour when the selected month, person, expense type, or uncategorised visibility changes. The `Other` segment SHALL use a neutral colour that is not a category colour.
+
+#### Scenario: The bar and table agree
+
+- **WHEN** a category appears in both the stacked bar and the table
+- **THEN** both uses the same colour
+
+#### Scenario: A category keeps its colour across months
+
+- **WHEN** the same category has amounts in two selected months
+- **THEN** it uses the same colour in both months
+
+#### Scenario: Filters do not change a category's colour
+
+- **WHEN** the person, expense type, or uncategorised visibility changes
+- **THEN** every visible category keeps the colour it had before
+
+#### Scenario: Other is neutral
+
+- **WHEN** the bar shows an `Other N` segment
+- **THEN** that segment does not use a category colour

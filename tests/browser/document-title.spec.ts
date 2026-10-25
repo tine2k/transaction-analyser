@@ -8,7 +8,7 @@ const screens = [
   { path: '/', title: 'Transactions · Expenses' },
   { path: '/categories', title: 'Categories · Expenses' },
   { path: '/people', title: 'People · Expenses' },
-  { path: '/analytics', title: 'Analytics · Expenses' },
+  { path: '/monthly', title: 'Monthly · Expenses' },
   { path: '/monthly-totals', title: 'Monthly totals · Expenses' },
   { path: '/monthly-average', title: 'Monthly average · Expenses' },
   { path: '/imports', title: 'Imports · Expenses' },

@@ -4,8 +4,6 @@
    The latin and latin-ext faces are declared here from the self-hosted font
    packages, so no request leaves the application's own origin. */
 @import 'tailwindcss';
-/* Gives Vue ECharts' custom element and its internal host explicit dimensions. */
-@import 'vue-echarts/style.css';
 
 /* Plus Jakarta Sans Variable — masthead, titles, interface, tables, controls. */
 @font-face {

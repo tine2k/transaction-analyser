@@ -466,7 +466,7 @@ test.describe('redesigned transactions screen', () => {
       'Transactions',
       'Categories',
       'People',
-      'Analytics',
+      'Monthly',
       'Monthly totals',
       'Monthly average',
       'Imports',

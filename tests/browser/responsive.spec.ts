@@ -62,7 +62,7 @@ const routes = [
   { path: '/', heading: 'Transactions' },
   { path: '/categories', heading: 'Categories' },
   { path: '/people', heading: 'People' },
-  { path: '/analytics', heading: 'Category spending' },
+  { path: '/monthly', heading: 'Monthly' },
   { path: '/monthly-totals', heading: 'Monthly totals' },
   { path: '/monthly-average', heading: 'Monthly average' },
   { path: '/imports', heading: 'Imports' },
@@ -212,10 +212,18 @@ for (const viewport of viewports) {
           await expectNoPageOverflow(page);
         }
 
-        if (route.path === '/analytics') {
-          await expect(page.getByTestId('month-panel')).toHaveCount(12);
+        if (route.path === '/monthly') {
+          await expect(page.getByTestId('monthly-summary')).toBeVisible();
+          await expect(page.getByTestId('month-pill')).toHaveCount(12);
+          await expect(page.getByTestId('category-bar')).toBeVisible();
+          await expect(page.getByTestId('category-row')).toHaveCount(9);
+
           if (viewport.width <= 390) {
-            await expect(page.getByTestId('monthly-charts')).toHaveCSS('grid-template-columns', /\d+px$/);
+            const region = page.getByRole('region', { name: 'Monthly category table' });
+            await expect(region).toBeVisible();
+            await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
+              .toBe(true);
+            await expectNoPageOverflow(page);
           }
         }
 

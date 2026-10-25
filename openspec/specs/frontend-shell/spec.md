@@ -62,8 +62,6 @@ volume names, database name, and package name SHALL keep the project name.
 - **WHEN** the repository, container image, container names, database name, or package name is inspected
 - **THEN** it carries the project name rather than `Expenses`
 
-
-
 ### Requirement: The document carries the application's installable identity
 
 The system SHALL serve an installable identity from its own origin: an opaque 180×180 PNG icon at
@@ -108,12 +106,10 @@ full-bleed brand-gradient ground.
 - **WHEN** the delivered document and its assets are inspected, and the page is used
 - **THEN** the icon, manifest, theme colour, and favicon requests are served by the application itself, with no request to another origin
 
-
-
 ### Requirement: Every route names itself in the browser tab
 
 The document title SHALL name the screen shown, then the application: `Transactions · Expenses` for
-`/`, `Categories · Expenses`, `People · Expenses`, `Analytics · Expenses`,
+`/`, `Categories · Expenses`, `People · Expenses`, `Monthly · Expenses`,
 `Monthly totals · Expenses`, `Monthly average · Expenses`, and `Imports · Expenses`. A page that
 names no screen SHALL show `Expenses` alone.
 
@@ -124,7 +120,7 @@ names no screen SHALL show `Expenses` alone.
 
 #### Scenario: Each named route names itself
 
-- **WHEN** `/categories`, `/people`, `/analytics`, `/monthly-totals`, `/monthly-average`, or `/imports` is shown
+- **WHEN** `/categories`, `/people`, `/monthly`, `/monthly-totals`, `/monthly-average`, or `/imports` is shown
 - **THEN** the document title is that screen's name followed by ` · Expenses`
 
 #### Scenario: A page without a screen name falls back to the application name
@@ -142,47 +138,14 @@ names no screen SHALL show `Expenses` alone.
 - **WHEN** any route's document title is read
 - **THEN** it contains `Expenses` exactly once
 
+### Requirement: The application serves the seven browser routes
 
-
-### Requirement: The browser routes are rendered by the browser and reached from the menu bar
-
-The system SHALL provide a browser route at `/` that presents the transactions table defined by
-the `transaction-table` capability, a browser route that presents the category management screen
-defined by the `category-management-screen` capability, a browser route at `/people` that presents
-the people management screen defined by the `person-management-screen` capability, and a browser
-route at `/analytics` that presents the category spending chart defined by the
-`category-spending-chart` capability, a browser route at `/monthly-totals` that presents the monthly
-category totals table defined by the `monthly-category-totals-table` capability, a browser route at
-`/monthly-average` that presents the per-category monthly average defined by the
-`monthly-category-average` capability, and a browser route at `/imports` that presents the import
-log defined by the `import-log` capability. The layout SHALL carry a menu bar, as
-`category-management-screen` defines, through which all seven routes are reached. Neither route
-SHALL show invented data presented as though it were the user's own. All routes SHALL be rendered by
-the browser rather than by the server, so the document delivered first carries the application shell
-and each screen's content is assembled by the browser afterwards. The server SHALL serve the
-application shell for any path, including a path no route matches, and SHALL NOT answer an unknown
-path as a missing resource; the browser SHALL render the failure page for a path its router cannot
-match.
+The system SHALL provide browser routes at `/` for the transactions table, a category management route, `/people`, `/monthly` for the monthly category overview, `/monthly-totals`, `/monthly-average`, and `/imports` for the import log, each presenting the screen defined by its capability. The layout SHALL carry a menu bar through which all seven routes are reached. All routes SHALL be rendered by the browser rather than by the server.
 
 #### Scenario: The index route presents the table
 
 - **WHEN** the index route is requested
 - **THEN** a page is delivered that presents the transactions table
-
-#### Scenario: Nothing is invented to fill the page
-
-- **WHEN** a route is rendered
-- **THEN** only data the read endpoints returned is shown, and no transaction, person, category, amount, or import run is shown as an example
-
-#### Scenario: An unknown route is the failure page
-
-- **WHEN** a path other than a defined route is requested
-- **THEN** the application shell is delivered for that path, and the browser renders the failure page because its router matches no route, without the server reporting the path as missing
-
-#### Scenario: The browser assembles the rows
-
-- **WHEN** a route is requested and its endpoint returns data
-- **THEN** the delivered document carries the application shell rather than the data, and the screen is assembled by the browser once it has run, so the browser has to run the application to reveal it
 
 #### Scenario: The category route presents the management screen
 
@@ -194,10 +157,10 @@ match.
 - **WHEN** the `/people` route is requested
 - **THEN** a page is delivered that presents the people management screen
 
-#### Scenario: The analytics route presents the category spending chart
+#### Scenario: The monthly route presents the category overview
 
-- **WHEN** the `/analytics` route is requested
-- **THEN** a page is delivered that presents the category spending chart
+- **WHEN** the `/monthly` route is requested
+- **THEN** a page is delivered that presents the monthly category overview
 
 #### Scenario: The monthly totals route presents the category-by-month table
 
@@ -217,9 +180,35 @@ match.
 #### Scenario: Each route is reached from the menu bar
 
 - **WHEN** the application is shown
-- **THEN** the menu bar links to the transactions route, the category management route, the people management route, the analytics route, the monthly totals route, the monthly average route, and the imports route, and following each link reaches that screen
+- **THEN** the menu bar links to the transactions route, the category management route, the people management route, the monthly route, the monthly totals route, the monthly average route, and the imports route, and following each link reaches that screen
 
+### Requirement: The server delivers the application shell for every path
 
+The server SHALL serve the application shell for any path, including a path no route matches, and SHALL NOT answer an unknown path as a missing resource. The browser SHALL render the failure page for a path its router cannot match. The former `/analytics` path SHALL redirect to `/monthly` so an existing link reaches the replacement screen.
+
+#### Scenario: An unknown route is the failure page
+
+- **WHEN** a path other than a defined route is requested
+- **THEN** the application shell is delivered for that path, and the browser renders the failure page because its router matches no route, without the server reporting the path as missing
+
+#### Scenario: The former analytics route redirects
+
+- **WHEN** the `/analytics` path is requested
+- **THEN** the browser reaches `/monthly` and presents the monthly category overview
+
+### Requirement: The browser assembles every route's content
+
+The delivered document SHALL carry the application shell rather than the data, and each screen's content SHALL be assembled by the browser once it has run. A route SHALL NOT show invented data presented as though it were the user's own.
+
+#### Scenario: The browser assembles the rows
+
+- **WHEN** a route is requested and its endpoint returns data
+- **THEN** the delivered document carries the application shell rather than the data, and the screen is assembled by the browser once it has run, so the browser has to run the application to reveal it
+
+#### Scenario: Nothing is invented to fill the page
+
+- **WHEN** a route is rendered
+- **THEN** only data the read endpoints returned is shown, and no transaction, person, category, amount, or import run is shown as an example
 
 ### Requirement: Styling arrives through one stylesheet, with no component library
 
@@ -272,8 +261,6 @@ visualization.
 - **WHEN** the delivered page and its assets are inspected, and the page is used
 - **THEN** icons are delivered by the application itself, with no request to another origin for an icon
 
-
-
 ### Requirement: The application renders with one themed palette
 
 The system SHALL define the application's palette once as theme tokens with explicit roles: a paper ground, a surface, ink and muted text, rules, a failure color, and a brand color with a soft companion. Every route, including the failure page, SHALL render with those roles. The brand role SHALL identify the shared menu bar, the current navigation link, primary actions, and selection controls. Colour in content SHALL identify categories, mark failures, or mark destructive actions: the system SHALL NOT apply decorative accent colours to content controls beyond the brand roles named above, and the failure color SHALL be used only for failures and destructive actions.
@@ -302,8 +289,6 @@ The system SHALL define the application's palette once as theme tokens with expl
 
 - **WHEN** a button, link, filter, or select that is not the shared navigation, a primary action, or a selection control is rendered
 - **THEN** its resting, hover, and focus states use the theme's ink, muted, and rule values rather than the brand hue
-
-
 
 ### Requirement: Type is set in three roles
 
@@ -334,8 +319,6 @@ The system SHALL set the application masthead and page titles in a display weigh
 - **WHEN** the delivered page and its assets are inspected
 - **THEN** the typefaces are served by the application itself, with no request to another origin
 
-
-
 ### Requirement: The interface and display face is Plus Jakarta Sans
 
 The system SHALL self-host Plus Jakarta Sans and use it for the masthead, page titles, interface text, tables, and controls, with display text using the family's heavier weights up to 800. Machine-generated strings — category patterns, counterparty accounts, and import timestamps — SHALL remain in the monospaced face. No request for these faces SHALL leave the application's origin.
@@ -360,8 +343,6 @@ The system SHALL self-host Plus Jakarta Sans and use it for the masthead, page t
 - **WHEN** the delivered page and its assets are inspected
 - **THEN** the Plus Jakarta Sans faces are served by the application itself, cover weights 400 through 800, and make no request to another origin
 
-
-
 ### Requirement: Amounts are never distinguished by color
 
 The system SHALL present every euro amount in the theme's ink color. It SHALL NOT encode an amount's sign, magnitude, or category membership as a color: a negative amount SHALL be distinguished only by the sign that `euro-value-display` requires it to be shown with, and the failure color SHALL NOT be applied to an amount.
@@ -380,8 +361,6 @@ The system SHALL present every euro amount in the theme's ink color. It SHALL NO
 
 - **WHEN** any amount, including a large negative sum, is displayed
 - **THEN** it does not use the failure color
-
-
 
 ### Requirement: Content surfaces are sheets separated by rules
 
@@ -407,8 +386,6 @@ The system SHALL separate content with the surface color over the paper ground. 
 - **WHEN** the transactions screen shows its fixed action bars
 - **THEN** those bars may carry a stronger shadow because they float above the table
 
-
-
 ### Requirement: The browser is never given a database address
 
 The system SHALL NOT deliver the database address, a user name, a password, or any part of a connection string to the browser, whether in a rendered document, in a delivered client asset, or in any response. The system SHALL NOT deliver any configuration value intended for the server alone. The browser SHALL reach the server's functionality only through same-origin requests to the API, and the system SHALL NOT require a cross-origin request from the page.
@@ -427,8 +404,6 @@ The system SHALL NOT deliver the database address, a user name, a password, or a
 
 - **WHEN** the page makes a request for data or for a status
 - **THEN** the request is a same-origin request to the API, and no request to another origin is required or made
-
-
 
 ### Requirement: The browser holds no identity and no credential
 
@@ -449,21 +424,20 @@ The system SHALL present no login, no account, no sign-in control, and no user i
 - **WHEN** the page makes a request to the API
 - **THEN** the request carries no token and no authorization header of the application's own
 
-
-
 ### Requirement: The shell performs no domain work
 
 The system SHALL NOT compute, derive, aggregate, or infer values about transactions or categories
 except for the transaction page's filter counts: the total number of transactions returned by its
-one read request and the number of those transactions whose category is null; the category
-spending chart's per-category sums of absolute transaction amounts grouped into twelve calendar
-months by booking date: the current month and the eleven preceding months; the monthly category
+one read request and the number of those transactions whose category is null; the monthly category
+overview's per-category sums of absolute transaction amounts for one selected calendar month, the
+selected month's total of those absolute amounts, the selected month's included transaction count,
+and the eight largest categories plus the remainder used by its stacked bar; the monthly category
 totals table's per-category sums of absolute transaction amounts grouped by booking month for every
 month represented by a transaction returned from the endpoint; and the monthly average page's
 per-category average of absolute transaction amounts over a configurable rolling window of recent
 booking months. The transaction page MAY use category presence to select which returned rows to
 display, but SHALL NOT alter the returned data or evaluate any category's regular expression. The
-category spending chart, monthly category totals table, and monthly average page MAY group and
+monthly category overview, monthly category totals table, and monthly average page MAY group and
 aggregate the transactions returned by their single read request as their capabilities define. The
 imports screen MAY display the run records the import log returns, without deriving a transaction
 value from them. The browser SHALL NOT create, alter, or delete any stored data itself, and SHALL
@@ -475,7 +449,7 @@ stored data is read through read-only requests, and a write is requested through
 management surface or the sync-start endpoint and is performed by the server, never by the browser
 itself. The transaction table SHALL present
 transaction values exactly as the endpoint returned them. Apart from the two transaction filter
-counts, the selected view of returned transactions, the monthly aggregations defined by
+counts, the selected view of returned transactions, the monthly figures defined by
 `category-spending-chart`, `monthly-category-totals-table`, and `monthly-category-average`, and
 the run records the import log returns, the shell SHALL NOT total, average, group, or otherwise
 derive a value from transaction data for display.
@@ -487,8 +461,8 @@ derive a value from transaction data for display.
 
 #### Scenario: Only the filter counts are derived from transactions
 
-- **WHEN** the index route or an analytics route renders its transaction-derived values
-- **THEN** the index route displays only the total returned transaction count and count with a null category, the analytics route displays only the twelve per-month category absolute totals defined by its capability, the monthly totals route displays only the per-month category absolute totals defined by its capability for months represented in returned transactions, and the monthly average route displays only the per-category average absolute totals defined by its capability for the configured window
+- **WHEN** the index route or the monthly route renders its transaction-derived values
+- **THEN** the index route displays only the total returned transaction count and count with a null category, the monthly route displays only the selected month's absolute total, included transaction count, per-category absolute totals, and top-eight grouping defined by its capability, the monthly totals route displays only the per-month category absolute totals defined by its capability for months represented in returned transactions, and the monthly average route displays only the per-category average absolute totals defined by its capability for the configured window
 
 #### Scenario: Filtering does not alter returned values or data
 
@@ -520,8 +494,6 @@ derive a value from transaction data for display.
 - **WHEN** a sync run writes
 - **THEN** it writes through the server process, not through the browser, and the browser cannot change what it writes
 
-
-
 ### Requirement: The menu bar carries the application's identity and the current screen
 
 The shared menu bar SHALL present the application's logo mark immediately to the left of the application name `Expenses`, and one visibly labelled link for each of the seven routes. The mark SHALL be decorative: it SHALL NOT be a link or a control, SHALL NOT carry an accessible name of its own, and SHALL NOT change the name a screen reader reads for the application. The link for the current route SHALL be distinguishable without relying on colour alone. The bar SHALL NOT introduce a destination beyond the seven routes. On narrow viewports the bar SHALL keep a labelled disclosure control for the same links and SHALL keep the mark beside the name.
@@ -544,7 +516,7 @@ The shared menu bar SHALL present the application's logo mark immediately to the
 #### Scenario: Every route has a labelled link
 
 - **WHEN** the shared menu bar is rendered
-- **THEN** it shows one link each for Transactions, Categories, People, Analytics, Monthly totals, Monthly average, and Imports, and no other destination
+- **THEN** it shows one link each for Transactions, Categories, People, Monthly, Monthly totals, Monthly average, and Imports, and no other destination
 
 #### Scenario: The current screen is distinguishable
 
@@ -561,8 +533,6 @@ The shared menu bar SHALL present the application's logo mark immediately to the
 - **WHEN** the menu bar is rendered at a narrow viewport width
 - **THEN** the labelled disclosure control remains available, exposes the same seven links, and keeps its expanded state available to assistive technology
 
-
-
 ### Requirement: The shared masthead uses the design's type and size scale
 
 The system SHALL render the masthead wordmark at 20px and weight 800, desktop navigation links at 14px and weight 600 with 10px vertical and 16px horizontal padding, and mobile navigation links at 15px and weight 600 with a 12px corner radius and a hit area at least 48px high. The menu bar SHALL use 14px vertical padding on desktop and 14px top with 12px bottom padding on mobile.
@@ -576,5 +546,3 @@ The system SHALL render the masthead wordmark at 20px and weight 800, desktop na
 
 - **WHEN** the menu bar is rendered at a mobile width
 - **THEN** the wordmark remains 20px and 800 weight, each navigation link computes to 15px and 600 weight, and each link is at least 48px high with 12px corners
-
-

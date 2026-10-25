@@ -41,7 +41,7 @@ describe('default layout navigation', () => {
       ['Transactions', '/'],
       ['Categories', '/categories'],
       ['People', '/people'],
-      ['Analytics', '/analytics'],
+      ['Monthly', '/monthly'],
       ['Monthly totals', '/monthly-totals'],
       ['Monthly average', '/monthly-average'],
       ['Imports', '/imports'],
@@ -52,11 +52,11 @@ describe('default layout navigation', () => {
     expect(links[1]?.classes()).toContain('bg-white/10');
     await transactions.unmount();
 
-    route.path = '/analytics';
-    const analytics = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(analytics.findAll('nav a')[3]?.attributes('aria-current')).toBe('page');
-    expect(analytics.findAll('nav a')[3]?.classes()).toContain('bg-surface');
-    await analytics.unmount();
+    route.path = '/monthly';
+    const monthly = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
+    expect(monthly.findAll('nav a')[3]?.attributes('aria-current')).toBe('page');
+    expect(monthly.findAll('nav a')[3]?.classes()).toContain('bg-surface');
+    await monthly.unmount();
 
     route.path = '/people';
     const people = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });

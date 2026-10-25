@@ -22,7 +22,7 @@ const screens = [
   { to: '/', label: 'Transactions' },
   { to: '/categories', label: 'Categories' },
   { to: '/people', label: 'People' },
-  { to: '/analytics', label: 'Analytics' },
+  { to: '/monthly', label: 'Monthly' },
   { to: '/monthly-totals', label: 'Monthly totals' },
   { to: '/monthly-average', label: 'Monthly average' },
   { to: '/imports', label: 'Imports' },

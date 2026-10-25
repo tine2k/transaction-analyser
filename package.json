@@ -31,11 +31,9 @@
     "@tabler/icons-vue": "^3.49.0",
     "cheerio": "^1.2.0",
     "csv-parse": "^7.0.3",
-    "echarts": "^6.1.0",
     "node-pg-migrate": "^9.0.0",
     "ocx": "^2.0.15",
-    "pg": "^8.23.0",
-    "vue-echarts": "^8.3.1"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@nuxt/test-utils": "^4.3.2",

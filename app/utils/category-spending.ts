@@ -27,16 +27,19 @@ export type CategorySpendingTotal = {
   amount: string;
 };
 
-export type CategoryPieDatum = CategorySpendingTotal & { value: number };
-
-export type CalendarMonth = {
-  key: string;
-  label: string;
-  startDate: string;
-  endDate: string;
+export type CategoryBreakdownEntry = CategorySpendingTotal & {
+  transactions: number;
 };
 
-export type CalendarYear = {
+export type CategoryBreakdown = {
+  entries: CategoryBreakdownEntry[];
+  top: CategoryBreakdownEntry[];
+  other: CategoryBreakdownEntry | null;
+  total: string;
+  transactionCount: number;
+};
+
+export type CalendarMonth = {
   key: string;
   label: string;
   startDate: string;
@@ -47,29 +50,9 @@ export type MonthlyCategoryGroups = CalendarMonth & {
   groups: CategoryTransactionGroup[];
 };
 
-export type MonthlyCategoryTotals = CalendarMonth & {
-  totals: CategorySpendingTotal[];
-};
-
-export type YearlyCategoryGroups = CalendarYear & {
-  groups: CategoryTransactionGroup[];
-};
-
-export type YearlyCategoryTotals = CalendarYear & {
-  totals: CategorySpendingTotal[];
-};
-
 export type MonthlyCategoryMatrixData = {
   categories: Array<Pick<CategorySpendingTotal, 'key' | 'name'>>;
   months: Array<CalendarMonth & { totals: Map<string, string> }>;
-};
-
-export type MonthlyCategoryChartData = MonthlyCategoryTotals & {
-  pieData: CategoryPieDatum[];
-};
-
-export type YearlyCategoryChartData = YearlyCategoryTotals & {
-  pieData: CategoryPieDatum[];
 };
 
 export type CategoryMonthlyAverage = {
@@ -245,24 +228,6 @@ export function filterTransactionsByExpenseType(
   return transactions.filter(({ category }) => category?.expenseType === choice);
 }
 
-export function getMonthlyCategorySpendingTotals(
-  months: MonthlyCategoryGroups[],
-): MonthlyCategoryTotals[] {
-  return months.map(({ groups, ...month }) => ({
-    ...month,
-    totals: getCategorySpendingTotals(groups),
-  }));
-}
-
-export function getYearlyCategorySpendingTotals(
-  years: YearlyCategoryGroups[],
-): YearlyCategoryTotals[] {
-  return years.map(({ groups, ...year }) => ({
-    ...year,
-    totals: getCategorySpendingTotals(groups),
-  }));
-}
-
 function compareCategoryEntries(
   left: Pick<CategorySpendingTotal, 'key' | 'name'>,
   right: Pick<CategorySpendingTotal, 'key' | 'name'>,
@@ -287,7 +252,10 @@ function compareCategoryEntries(
 export function createMonthlyCategoryMatrixData(
   months: MonthlyCategoryGroups[],
 ): MonthlyCategoryMatrixData {
-  const monthlyTotals = getMonthlyCategorySpendingTotals(months);
+  const monthlyTotals = months.map(({ groups, ...month }) => ({
+    ...month,
+    totals: getCategorySpendingTotals(groups),
+  }));
   const categoriesByKey = new Map<string, Pick<CategorySpendingTotal, 'key' | 'name'>>();
 
   for (const { totals } of monthlyTotals) {
@@ -308,52 +276,6 @@ export function createMonthlyCategoryMatrixData(
       return { ...month, totals: monthTotals };
     }),
   };
-}
-
-export function createCategoryPieData(totals: CategorySpendingTotal[]): CategoryPieDatum[] {
-  const positiveTotals = totals
-    .map((total) => ({ total, decimal: parseDecimal(total.amount) }))
-    .filter(({ decimal }) => decimal.coefficient > 0n);
-  if (positiveTotals.length === 0) {
-    return [];
-  }
-
-  const commonScale = Math.max(...positiveTotals.map(({ decimal }) => decimal.scale));
-  const aligned = positiveTotals.map(({ total, decimal }) => ({
-    total,
-    coefficient: decimal.coefficient * powerOfTen(commonScale - decimal.scale),
-  }));
-  const largest = aligned.reduce(
-    (max, item) => item.coefficient > max ? item.coefficient : max,
-    0n,
-  );
-  const precision = 1_000_000_000_000_000n;
-
-  return aligned.map(({ total, coefficient }) => {
-    const roundedRatio = (coefficient * precision + largest / 2n) / largest;
-    return {
-      ...total,
-      value: roundedRatio === 0n ? Number.MIN_VALUE : Number(roundedRatio) / Number(precision),
-    };
-  });
-}
-
-export function createMonthlyCategoryChartData(
-  months: MonthlyCategoryTotals[],
-): MonthlyCategoryChartData[] {
-  return months.map((month) => ({
-    ...month,
-    pieData: createCategoryPieData(month.totals),
-  }));
-}
-
-export function createYearlyCategoryChartData(
-  years: YearlyCategoryTotals[],
-): YearlyCategoryChartData[] {
-  return years.map((year) => ({
-    ...year,
-    pieData: createCategoryPieData(year.totals),
-  }));
 }
 
 export function formatEuroAmount(amount: string, locale?: string): string {
@@ -435,10 +357,6 @@ export function getLastCalendarMonths(today: string, count: number): CalendarMon
   });
 }
 
-export function getLastTwelveCalendarMonths(today: string): CalendarMonth[] {
-  return getLastCalendarMonths(today, 12);
-}
-
 export function averageDecimalString(sum: string, count: number): string {
   if (!Number.isInteger(count) || count <= 0) {
     throw new Error('month count must be a positive integer');
@@ -498,42 +416,6 @@ export function getCategoryMonthlyAverages(
     .sort(compareCategoryEntries);
 }
 
-export function groupTransactionsByMonth(
-  transactions: CategorySpendingTransaction[],
-  today: string,
-): MonthlyCategoryGroups[] {
-  const months = getLastTwelveCalendarMonths(today).map((month) => ({
-    ...month,
-    groupsByKey: new Map<string, CategoryTransactionGroup>(),
-  }));
-
-  for (const transaction of excludeHiddenCategoryTransactions(transactions)) {
-    const month = months.find(({ startDate, endDate }) =>
-      transaction.bookingDate >= startDate && transaction.bookingDate <= endDate,
-    );
-    if (month === undefined) {
-      continue;
-    }
-
-    const key = transaction.category === null ? 'uncategorised' : `category:${transaction.category.id}`;
-    let group = month.groupsByKey.get(key);
-    if (group === undefined) {
-      group = {
-        key,
-        name: transaction.category?.name ?? 'Uncategorised',
-        transactions: [],
-      };
-      month.groupsByKey.set(key, group);
-    }
-    group.transactions.push(transaction);
-  }
-
-  return months.map(({ groupsByKey, ...month }) => ({
-    ...month,
-    groups: [...groupsByKey.values()],
-  }));
-}
-
 export function groupTransactionsByAvailableMonth(
   transactions: CategorySpendingTransaction[],
 ): MonthlyCategoryGroups[] {
@@ -589,49 +471,188 @@ export function groupTransactionsByAvailableMonth(
     }));
 }
 
-export function groupTransactionsByAvailableYear(
+const MONTH_KEY_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function isMonthKey(value: string): boolean {
+  return MONTH_KEY_PATTERN.test(value);
+}
+
+// The twelve calendar months of a year, oldest first. The keys are the
+// `YYYY-MM` values the page carries in its query.
+export function getCalendarYearMonths(year: number): CalendarMonth[] {
+  if (!Number.isInteger(year)) {
+    throw new Error('calendar year must be an integer');
+  }
+
+  return Array.from({ length: 12 }, (_, index) => {
+    const monthNumber = index + 1;
+    const key = `${String(year).padStart(4, '0')}-${String(monthNumber).padStart(2, '0')}`;
+    const date = new Date(Date.UTC(year, index, 1));
+    const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+
+    return {
+      key,
+      label: new Intl.DateTimeFormat('en', {
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC',
+      }).format(date),
+      startDate: `${key}-01`,
+      endDate: `${key}-${String(lastDay).padStart(2, '0')}`,
+    };
+  });
+}
+
+// The years the year control offers: every year represented by an included
+// returned transaction, the current year, and the supplied month's year when it
+// is well formed. Hidden-category transactions do not represent a year.
+export function getAvailableYears(
   transactions: CategorySpendingTransaction[],
-): YearlyCategoryGroups[] {
-  const yearsByKey = new Map<string, {
-    year: CalendarYear;
-    groupsByKey: Map<string, CategoryTransactionGroup>;
+  today: string,
+  selectedMonth?: string,
+): number[] {
+  const years = new Set<number>();
+  const currentYear = Number(today.slice(0, 4));
+  if (Number.isInteger(currentYear)) {
+    years.add(currentYear);
+  }
+
+  for (const { bookingDate } of excludeHiddenCategoryTransactions(transactions)) {
+    const year = Number(bookingDate.slice(0, 4));
+    if (Number.isInteger(year)) {
+      years.add(year);
+    }
+  }
+
+  if (selectedMonth !== undefined && isMonthKey(selectedMonth)) {
+    years.add(Number(selectedMonth.slice(0, 4)));
+  }
+
+  return [...years].sort((left, right) => right - left);
+}
+
+// The selected month is the query value when it is a well-formed `YYYY-MM`.
+// Otherwise the current month wins when the returned transactions include it,
+// then the newest represented month, then the current month.
+export function resolveSelectedMonth(
+  value: unknown,
+  transactions: CategorySpendingTransaction[],
+  today: string,
+): string {
+  if (typeof value === 'string' && isMonthKey(value)) {
+    return value;
+  }
+
+  const currentMonth = today.slice(0, 7);
+  const visible = excludeHiddenCategoryTransactions(transactions);
+  if (visible.some(({ bookingDate }) => bookingDate.slice(0, 7) === currentMonth)) {
+    return currentMonth;
+  }
+
+  const representedMonths = visible
+    .map(({ bookingDate }) => bookingDate.slice(0, 7))
+    .filter(isMonthKey)
+    .sort();
+  return representedMonths[representedMonths.length - 1] ?? currentMonth;
+}
+
+export function filterTransactionsByMonth(
+  transactions: CategorySpendingTransaction[],
+  month: string,
+): CategorySpendingTransaction[] {
+  return transactions.filter(({ bookingDate }) => bookingDate.slice(0, 7) === month);
+}
+
+function compareBreakdownEntries(
+  left: CategorySpendingTotal,
+  right: CategorySpendingTotal,
+): number {
+  const byAmount = compareDecimalStrings(right.amount, left.amount);
+  if (byAmount !== 0) {
+    return byAmount;
+  }
+
+  const byName = left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+  if (byName !== 0) {
+    return byName;
+  }
+
+  return left.key < right.key ? -1 : left.key > right.key ? 1 : 0;
+}
+
+// The selected month's categories after hidden-category exclusion. Every
+// category keeps its exact absolute total and its transaction count; the eight
+// largest stay separate for the stacked bar and the rest aggregate into one
+// `Other N` entry. The table uses `entries`, not `top`.
+export function getCategoryBreakdown(
+  transactions: CategorySpendingTransaction[],
+): CategoryBreakdown {
+  const groups = new Map<string, {
+    name: string;
+    transactionCount: number;
+    amounts: string[];
   }>();
 
   for (const transaction of excludeHiddenCategoryTransactions(transactions)) {
-    const key = transaction.bookingDate.slice(0, 4);
-    let year = yearsByKey.get(key);
-    if (year === undefined) {
-      year = {
-        year: {
-          key,
-          label: key,
-          startDate: `${key}-01-01`,
-          endDate: `${key}-12-31`,
-        },
-        groupsByKey: new Map(),
-      };
-      yearsByKey.set(key, year);
-    }
-
-    const categoryKey = transaction.category === null ? 'uncategorised' : `category:${transaction.category.id}`;
-    let group = year.groupsByKey.get(categoryKey);
+    const key = transaction.category === null ? 'uncategorised' : `category:${transaction.category.id}`;
+    let group = groups.get(key);
     if (group === undefined) {
       group = {
-        key: categoryKey,
         name: transaction.category?.name ?? 'Uncategorised',
-        transactions: [],
+        transactionCount: 0,
+        amounts: [],
       };
-      year.groupsByKey.set(categoryKey, group);
+      groups.set(key, group);
     }
-    group.transactions.push(transaction);
+    group.transactionCount += 1;
+    group.amounts.push(transaction.amount);
   }
 
-  return [...yearsByKey.values()]
-    .sort((left, right) => right.year.key.localeCompare(left.year.key))
-    .map(({ year, groupsByKey }) => ({
-      ...year,
-      groups: [...groupsByKey.values()],
-    }));
+  const entries = [...groups.entries()]
+    .map(([key, group]) => ({
+      key,
+      name: group.name,
+      amount: sumAbsoluteAmountStrings(group.amounts),
+      transactions: group.transactionCount,
+    }))
+    .sort(compareBreakdownEntries);
+
+  const top = entries.slice(0, 8);
+  const remaining = entries.slice(8);
+  const other = remaining.length === 0
+    ? null
+    : {
+      key: 'other',
+      name: `Other ${remaining.length}`,
+      amount: sumAbsoluteAmountStrings(remaining.map(({ amount }) => amount)),
+      transactions: remaining.reduce((count, entry) => count + entry.transactions, 0),
+    };
+
+  return {
+    entries,
+    top,
+    other,
+    total: sumAbsoluteAmountStrings(entries.map(({ amount }) => amount)),
+    transactionCount: entries.reduce((count, entry) => count + entry.transactions, 0),
+  };
+}
+
+// A percentage of the largest category amount, used only for the share bar.
+// Displayed amounts stay exact strings; this value only controls a width.
+export function getCategorySharePercent(amount: string, largestAmount: string): number {
+  const amountDecimal = parseDecimal(amount);
+  const largestDecimal = parseDecimal(largestAmount);
+  if (amountDecimal.coefficient <= 0n || largestDecimal.coefficient <= 0n) {
+    return 0;
+  }
+
+  const commonScale = Math.max(amountDecimal.scale, largestDecimal.scale);
+  const amountCoefficient = amountDecimal.coefficient * powerOfTen(commonScale - amountDecimal.scale);
+  const largestCoefficient = largestDecimal.coefficient * powerOfTen(commonScale - largestDecimal.scale);
+  const precision = 1_000_000n;
+  const ratio = (amountCoefficient * precision + largestCoefficient / 2n) / largestCoefficient;
+
+  return Math.min(100, Math.round(Number(ratio) / 100) / 100);
 }
 
 export function getLocalDateString(date: Date): string {

@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// The expense-type filter on the three analysis screens. The API is intercepted,
-// so the checks exercise the controls and the rendered output rather than live
+// The expense-type filter on the analysis screens. The API is intercepted, so
+// the checks exercise the controls and the rendered output rather than live
 // transaction data.
 //
-// See openspec/changes/add-category-expense-type/specs/category-spending-chart/spec.md
-// and openspec/changes/add-category-expense-type/specs/monthly-category-totals-table/spec.md
-// and openspec/changes/add-category-expense-type/specs/monthly-category-average/spec.md
+// See openspec/changes/replace-analytics-with-monthly-screen/specs/category-spending-chart/spec.md
+// and openspec/specs/monthly-category-totals-table/spec.md
+// and openspec/specs/monthly-category-average/spec.md
 
 const today = new Date();
 const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -51,23 +51,39 @@ async function interceptTransactions(page: Page): Promise<void> {
   });
 }
 
-test('the analytics filter defaults to all and narrows the charts', async ({ page }) => {
+test('the monthly filter defaults to all and narrows the summary, bar, and table', async ({ page }) => {
+  let transactionRequests = 0;
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/transactions') {
+      transactionRequests += 1;
+    }
+  });
+
   await interceptTransactions(page);
-  await page.goto('/analytics', { waitUntil: 'networkidle' });
+  await page.goto('/monthly', { waitUntil: 'networkidle' });
 
   await expect(page.getByTestId('expense-type-all')).toBeChecked();
-  const currentPanel = page.locator(`[data-testid="month-panel"][data-month-key="${currentMonth}"]`);
-  await expect(currentPanel.getByTestId('category-total')).toHaveCount(3);
+  await expect(page.getByTestId('total-moved-value')).toHaveText('€60.00');
+  await expect(page.getByTestId('transaction-count-value')).toHaveText('3');
+  await expect(page.getByTestId('category-row')).toHaveCount(3);
+  await expect(page.getByTestId('bar-legend')).toContainText('Groceries');
 
   await page.getByTestId('expense-type-recurring').check();
-  await expect(currentPanel.getByTestId('category-total')).toHaveCount(1);
-  await expect(currentPanel).toContainText('Groceries');
-  await expect(currentPanel).not.toContainText('New car');
-  await expect(currentPanel).not.toContainText('Internal');
+  await expect(page.getByTestId('total-moved-value')).toHaveText('€10.00');
+  await expect(page.getByTestId('transaction-count-value')).toHaveText('1');
+  await expect(page.getByTestId('category-row')).toHaveCount(1);
+  await expect(page.getByTestId('bar-legend')).toContainText('Groceries');
+  await expect(page.getByTestId('bar-legend')).not.toContainText('New car');
+  await expect(page.getByTestId('bar-legend')).not.toContainText('Internal');
 
   await page.getByTestId('expense-type-one-time').check();
-  await expect(currentPanel.getByTestId('category-total')).toHaveCount(1);
-  await expect(currentPanel).toContainText('New car');
+  await expect(page.getByTestId('total-moved-value')).toHaveText('€20.00');
+  await expect(page.getByTestId('transaction-count-value')).toHaveText('1');
+  await expect(page.getByTestId('category-row')).toHaveCount(1);
+  await expect(page.getByTestId('bar-legend')).toContainText('New car');
+  await expect(page.getByTestId('bar-legend')).not.toContainText('Groceries');
+
+  expect(transactionRequests).toBe(1);
 });
 
 test('the monthly totals filter narrows the table', async ({ page }) => {

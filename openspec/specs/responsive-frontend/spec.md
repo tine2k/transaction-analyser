@@ -25,8 +25,6 @@ The system SHALL render the shared frame, its navigation, and each existing scre
 - **WHEN** the user zooms the page on a phone
 - **THEN** text and controls scale normally, and the application does not lock the viewport against user scaling
 
-
-
 ### Requirement: All application destinations remain reachable from mobile navigation
 
 The shared navigation SHALL keep links to all seven existing routes available on narrow and wide viewports. On narrow viewports it SHALL use a compact disclosure control rather than allowing the link row to overflow. The control SHALL expose its expanded state to assistive technology, support keyboard activation, and keep the current route distinguishable. Activating a destination SHALL navigate to the same route as the corresponding wide-screen link.
@@ -51,11 +49,9 @@ The shared navigation SHALL keep links to all seven existing routes available on
 - **WHEN** a route is rendered at a wide viewport
 - **THEN** all seven route links are directly visible and the current route remains distinguishable
 
+### Requirement: Controls and forms reflow for mobile use
 
-
-### Requirement: Screen controls and visualizations reflow for mobile use
-
-The system SHALL adapt each screen's filters, category forms, people forms, action groups, summary lists, and analytics panels to narrow widths without hiding existing information or changing their behavior. Controls SHALL fit their available space, remain operable without precision pointer input, and retain readable labels. Buttons, navigation links, and form controls SHALL provide a touch hit area at least 44 CSS pixels high, and standalone icon or disclosure controls SHALL provide a hit area at least 44 CSS pixels in both dimensions. Analytics panels SHALL stack at narrow widths and their charts SHALL resize to the panel; category names and exact totals SHALL remain available in the existing textual totals list. At wider widths, panels and control groups MAY use additional columns when space permits.
+The system SHALL adapt each screen's filters, forms, action groups, and summary lists to narrow widths without hiding information or changing behavior. Controls SHALL fit their available space, remain operable without precision pointer input, and keep readable labels. Buttons, navigation links, and form controls SHALL provide a touch hit area at least 44 CSS pixels high, and standalone disclosure controls at least 44 CSS pixels in both dimensions.
 
 #### Scenario: Transaction filters fit a phone viewport
 
@@ -72,21 +68,33 @@ The system SHALL adapt each screen's filters, category forms, people forms, acti
 - **WHEN** the category form contains expression or date-window rows at a 320 CSS-pixel viewport width
 - **THEN** each field, label, add/remove action, and submit action remains visible and operable without forcing page-level horizontal scrolling
 
-#### Scenario: Analytics panels stack and resize on a phone
-
-- **WHEN** the analytics route is shown at a narrow viewport
-- **THEN** month panels are arranged in one column, each chart fits its panel without clipping, and its category names and exact totals remain available in the text list
-
 #### Scenario: Controls remain usable by touch and keyboard
 
 - **WHEN** a user operates navigation, form actions, or filters on a phone
 - **THEN** buttons, navigation links, and form controls have hit areas at least 44 CSS pixels high, standalone disclosure controls have hit areas at least 44 CSS pixels wide and high, keyboard focus is visible, and existing labels and behavior are retained
 
+### Requirement: The Monthly screen reflows its figures and bar
 
+On the Monthly screen at narrow widths, the summary figures SHALL stack or share a row according to the available width, the year and month controls SHALL remain reachable without page-level horizontal overflow, and the stacked bar SHALL fit its container. Category names and exact amounts SHALL remain present in the table's own scroll region.
+
+#### Scenario: The Monthly screen reflows on a phone
+
+- **WHEN** the `/monthly` route is shown at a 320 CSS-pixel viewport width
+- **THEN** the summary figures fit the page, the year and month controls remain reachable, the stacked bar fits its container, the category table scrolls within its own region, every category name and exact amount remains available, and the page has no horizontal overflow
+
+#### Scenario: The month controls remain reachable
+
+- **WHEN** the twelve month controls do not fit on one line
+- **THEN** they wrap or scroll within their own region without widening the page or hiding a month
+
+#### Scenario: The bar fits its container
+
+- **WHEN** the stacked bar is shown at a narrow width
+- **THEN** its segments stay within the bar's width and every legend entry remains readable
 
 ### Requirement: Wide tables scroll within their own region on narrow screens
 
-The system SHALL preserve the semantic table structure and all columns, rows, and cell values for categories, people, and monthly totals. The transactions table SHALL remain a semantic table from the `sm` breakpoint up and SHALL preserve its columns and values there. Below `sm`, transactions SHALL be presented as the card list defined by `transaction-table` rather than as a horizontally scrolling table, and every transaction value SHALL remain present in its card. When a table is wider than the viewport, its containing region SHALL provide horizontal scrolling without making the page itself wider. The scrollable region SHALL be reachable and operable by touch and keyboard, and it SHALL NOT change sorting, filtering, row order, or displayed values.
+The system SHALL preserve the semantic table structure and all columns, rows, and cell values for categories, people, monthly totals, and the Monthly category table. The transactions table SHALL remain a semantic table from the `sm` breakpoint up and SHALL preserve its columns and values there. Below `sm`, transactions SHALL be presented as the card list defined by `transaction-table` rather than as a horizontally scrolling table, and every transaction value SHALL remain present in its card. When a table is wider than the viewport, its containing region SHALL provide horizontal scrolling without making the page itself wider. The scrollable region SHALL be reachable and operable by touch and keyboard, and it SHALL NOT change sorting, filtering, row order, or displayed values.
 
 #### Scenario: The transactions table is browsable on a phone
 
@@ -102,6 +110,11 @@ The system SHALL preserve the semantic table structure and all columns, rows, an
 
 - **WHEN** the monthly totals table has more category columns than fit in the viewport
 - **THEN** every month, category heading, and cell remains present in the semantic table and can be reached by scrolling its containing region
+
+#### Scenario: The Monthly category table retains its data
+
+- **WHEN** the Monthly category table is wider than the viewport
+- **THEN** every category, share, transaction count, and amount remains present in the semantic table and can be reached by scrolling its containing region, without page-level horizontal overflow
 
 #### Scenario: The category table and actions remain available
 

@@ -2,25 +2,23 @@ import { describe, expect, it } from 'vitest';
 import {
   CATEGORY_COLOR_PALETTE,
   averageDecimalString,
-  createCategoryPieData,
   createCategoryColorMap,
   createMonthlyCategoryMatrixData,
-  createMonthlyCategoryChartData,
-  createYearlyCategoryChartData,
   filterTransactionsByExpenseType,
+  filterTransactionsByMonth,
   filterTransactionsByPerson,
   formatEuroAmount,
+  getAvailableYears,
+  getCalendarYearMonths,
+  getCategoryBreakdown,
   getCategoryMonthlyAverages,
+  getCategorySharePercent,
   getLastCalendarMonths,
-  getLastTwelveCalendarMonths,
-  getMonthlyCategorySpendingTotals,
   getPersonChoices,
-  getYearlyCategorySpendingTotals,
   groupTransactionsByAvailableMonth,
-  groupTransactionsByAvailableYear,
-  groupTransactionsByMonth,
   isZeroAmountString,
   resolvePersonChoice,
+  resolveSelectedMonth,
   sumAbsoluteAmountStrings,
   sumSignedAmountStrings,
   type CategorySpendingTransaction,
@@ -54,11 +52,9 @@ describe('decimal-safe category totals', () => {
       { bookingDate: '2026-09-01', amount: '5.00', person: { id: '1', name: 'Default' }, category: { id: '5', name: 'Alpha', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-01', amount: '10.00', person: { id: '1', name: 'Default' }, category: { id: '6', name: 'Ten', hidden: false, expenseType: null } },
     ];
-    const [month] = getMonthlyCategorySpendingTotals(
-      groupTransactionsByMonth(transactions, '2026-09-28'),
-    );
+    const breakdown = getCategoryBreakdown(transactions);
 
-    expect(month?.totals.map(({ name, amount }) => [name, amount])).toEqual([
+    expect(breakdown.entries.map(({ name, amount }) => [name, amount])).toEqual([
       ['Largest', '9007199254740993.1'],
       ['Large lower', '9007199254740993.02'],
       ['Ten', '10.00'],
@@ -73,10 +69,7 @@ describe('decimal-safe category totals', () => {
       { bookingDate: '2026-09-01', amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-02', amount: '4.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
     ];
-    const [month] = getMonthlyCategorySpendingTotals(
-      groupTransactionsByMonth(transactions, '2026-09-28'),
-    );
-    const [total] = month?.totals ?? [];
+    const [total] = getCategoryBreakdown(transactions).entries;
 
     expect(total?.amount).toBe('16.50');
     expect(formatEuroAmount(total?.amount ?? '')).toBe(new Intl.NumberFormat(undefined, {
@@ -112,18 +105,6 @@ describe('decimal-safe category totals', () => {
     expect(sum).toBe('-9007199254740993.022');
     expect(formatEuroAmount(sum, locale)).toBe('-9.007.199.254.740.993,022\u00a0€');
   });
-
-  it('builds positive pie values only for completed category totals', () => {
-    expect(createCategoryPieData([
-      { key: 'category:1', name: 'Groceries', amount: '100.00' },
-      { key: 'category:2', name: 'Transport', amount: '25.00' },
-      { key: 'category:3', name: 'Empty', amount: '0.00' },
-    ])).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '100.00', value: 1 },
-      { key: 'category:2', name: 'Transport', amount: '25.00', value: 0.25 },
-    ]);
-    expect(createCategoryPieData([])).toEqual([]);
-  });
 });
 
 describe('decimal-safe signed transaction totals', () => {
@@ -153,27 +134,7 @@ describe('stable category colors', () => {
   });
 });
 
-describe('calendar-month transaction buckets', () => {
-  it('creates twelve months from the current partial month back through the oldest month', () => {
-    const months = getLastTwelveCalendarMonths('2026-09-28');
-
-    expect(months).toHaveLength(12);
-    expect(months.map(({ key }) => key)).toEqual([
-      '2026-09', '2026-08', '2026-07', '2026-06', '2026-05', '2026-04',
-      '2026-03', '2026-02', '2026-01', '2025-12', '2025-11', '2025-10',
-    ]);
-    expect(months[0]).toMatchObject({
-      label: 'September 2026',
-      startDate: '2026-09-01',
-      endDate: '2026-09-28',
-    });
-    expect(months[11]).toMatchObject({
-      label: 'October 2025',
-      startDate: '2025-10-01',
-      endDate: '2025-10-31',
-    });
-  });
-
+describe('available-month transaction buckets', () => {
   it('creates a configurable window of months from the current partial month backwards', () => {
     const months = getLastCalendarMonths('2026-09-28', 3);
 
@@ -188,21 +149,6 @@ describe('calendar-month transaction buckets', () => {
       startDate: '2026-07-01',
       endDate: '2026-07-31',
     });
-    expect(getLastTwelveCalendarMonths('2026-09-28')).toEqual(getLastCalendarMonths('2026-09-28', 12));
-  });
-
-  it('assigns eligible bookings to their month and excludes dates outside the range', () => {
-    const monthlyGroups = groupTransactionsByMonth([
-      { bookingDate: '2025-09-30', amount: '-1.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Too old', hidden: false, expenseType: null } },
-      { bookingDate: '2025-10-01', amount: '-2.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Earliest', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-28', amount: '-3.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Today', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-29', amount: '-4.00', person: { id: '1', name: 'Default' }, category: { id: '4', name: 'Future', hidden: false, expenseType: null } },
-    ], '2026-09-28');
-
-    expect(monthlyGroups).toHaveLength(12);
-    expect(monthlyGroups[0]?.groups.map((group) => group.name)).toEqual(['Today']);
-    expect(monthlyGroups[11]?.groups.map((group) => group.name)).toEqual(['Earliest']);
-    expect(monthlyGroups.slice(1, 11).every((month) => month.groups.length === 0)).toBe(true);
   });
 
   it('groups every represented booking month newest-first without adding empty months', () => {
@@ -222,20 +168,6 @@ describe('calendar-month transaction buckets', () => {
     expect(months[2]?.groups[0]?.name).toBe('Old');
   });
 
-  it('drops hidden-category transactions from month groups while keeping visible and uncategorised ones', () => {
-    const groups = groupTransactionsByMonth([
-      { bookingDate: '2026-09-01', amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-99.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '-3.25', person: { id: '1', name: 'Default' }, category: null },
-    ], '2026-09-28');
-    const totals = getMonthlyCategorySpendingTotals(groups);
-
-    expect(totals[0]?.totals).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '12.50' },
-      { key: 'uncategorised', name: 'Uncategorised', amount: '3.25' },
-    ]);
-  });
-
   it('drops hidden-category transactions from the available-month matrix while keeping visible ones', () => {
     const matrix = createMonthlyCategoryMatrixData(groupTransactionsByAvailableMonth([
       { bookingDate: '2026-09-01', amount: '-7.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
@@ -246,27 +178,6 @@ describe('calendar-month transaction buckets', () => {
     expect(matrix.categories).toEqual([{ key: 'category:1', name: 'Groceries' }]);
     expect(matrix.months.map(({ key }) => key)).toEqual(['2026-09']);
     expect(matrix.months[0]?.totals).toEqual(new Map([['category:1', '7.00']]));
-  });
-
-  it('keeps exact absolute category totals separate by month, including uncategorised amounts', () => {
-    const transactions: CategorySpendingTransaction[] = [
-      { bookingDate: '2026-09-01', amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '4.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-03', amount: '-0.01', person: { id: '1', name: 'Default' }, category: null },
-      { bookingDate: '2026-08-01', amount: '9007199254740993.01', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-02', amount: '-0.01', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-    ];
-    const totals = getMonthlyCategorySpendingTotals(
-      groupTransactionsByMonth(transactions, '2026-09-28'),
-    );
-
-    expect(totals[0]?.totals).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '16.50' },
-      { key: 'uncategorised', name: 'Uncategorised', amount: '0.01' },
-    ]);
-    expect(totals[1]?.totals).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '9007199254740993.02' },
-    ]);
   });
 
   it('builds a zero-filled category-by-month matrix with stable category columns and exact amounts', () => {
@@ -305,90 +216,6 @@ describe('calendar-month transaction buckets', () => {
       ['category:3', '5.00'],
       ['uncategorised', '0'],
     ]));
-  });
-
-  it('creates twelve chart datasets and retains empty months without fake slices', () => {
-    const months = getMonthlyCategorySpendingTotals(
-      groupTransactionsByMonth([
-        { bookingDate: '2026-09-02', amount: '-5.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      ], '2026-09-28'),
-    );
-    const charts = createMonthlyCategoryChartData(months);
-
-    expect(charts).toHaveLength(12);
-    expect(charts[0]?.pieData).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '5.00', value: 1 },
-    ]);
-    expect(charts.slice(1).every(({ totals, pieData }) => totals.length === 0 && pieData.length === 0))
-      .toBe(true);
-  });
-});
-
-describe('available-year transaction buckets', () => {
-  it('groups every represented booking year newest-first with calendar-year bounds and no empty years', () => {
-    const years = groupTransactionsByAvailableYear([
-      { bookingDate: '2020-01-31', amount: '-1.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Old', hidden: false, expenseType: null } },
-      { bookingDate: '2026-08-03', amount: '-2.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Recent', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-4.00', person: { id: '1', name: 'Default' }, category: null },
-    ]);
-
-    expect(years.map(({ key, label }) => [key, label])).toEqual([
-      ['2026', '2026'],
-      ['2020', '2020'],
-    ]);
-    expect(years[0]).toMatchObject({ startDate: '2026-01-01', endDate: '2026-12-31' });
-    expect(years[1]).toMatchObject({ startDate: '2020-01-01', endDate: '2020-12-31' });
-    expect(years[0]?.groups.map((group) => group.name)).toEqual(['Recent', 'Uncategorised']);
-    expect(years[1]?.groups.map((group) => group.name)).toEqual(['Old']);
-  });
-
-  it('drops hidden-category transactions and years represented only by them', () => {
-    const years = groupTransactionsByAvailableYear([
-      { bookingDate: '2023-05-01', amount: '-9.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
-      { bookingDate: '2026-09-01', amount: '-7.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-09-02', amount: '-9.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
-    ]);
-
-    expect(years.map(({ key }) => key)).toEqual(['2026']);
-    expect(years[0]?.groups).toEqual([
-      {
-        key: 'category:1',
-        name: 'Groceries',
-        transactions: [
-          { bookingDate: '2026-09-01', amount: '-7.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-        ],
-      },
-    ]);
-  });
-
-  it('returns no years for empty input or input whose categories are all hidden', () => {
-    expect(groupTransactionsByAvailableYear([])).toEqual([]);
-    expect(groupTransactionsByAvailableYear([
-      { bookingDate: '2024-01-01', amount: '-1.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Internal', hidden: true, expenseType: null } },
-    ])).toEqual([]);
-  });
-
-  it('sums absolute category totals across a whole year and builds year chart data', () => {
-    const years = getYearlyCategorySpendingTotals(groupTransactionsByAvailableYear([
-      { bookingDate: '2026-03-01', amount: '-12.50', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-11-01', amount: '4.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-      { bookingDate: '2026-03-02', amount: '-8.25', person: { id: '1', name: 'Default' }, category: null },
-      { bookingDate: '2025-11-01', amount: '-8.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
-    ]));
-    const charts = createYearlyCategoryChartData(years);
-
-    expect(charts.map(({ key }) => key)).toEqual(['2026', '2025']);
-    expect(charts[0]?.totals).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '16.50' },
-      { key: 'uncategorised', name: 'Uncategorised', amount: '8.25' },
-    ]);
-    expect(charts[0]?.pieData).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '16.50', value: 1 },
-      { key: 'uncategorised', name: 'Uncategorised', amount: '8.25', value: 0.5 },
-    ]);
-    expect(charts[1]?.totals).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '8.00' },
-    ]);
   });
 });
 
@@ -492,5 +319,203 @@ describe('expense-type selection', () => {
     filterTransactionsByExpenseType(transactions, 'recurring');
 
     expect(transactions).toEqual(copy);
+  });
+});
+
+function transaction(
+  bookingDate: string,
+  amount: string,
+  category: { id: string; name: string; hidden?: boolean; expenseType?: 'recurring' | 'one-time' | null } | null,
+): CategorySpendingTransaction {
+  return {
+    bookingDate,
+    amount,
+    person: { id: '1', name: 'Default' },
+    category: category === null
+      ? null
+      : { hidden: false, expenseType: null, ...category },
+  };
+}
+
+describe('calendar-year month selection', () => {
+  it('builds twelve month options with exact bounds', () => {
+    const months = getCalendarYearMonths(2024);
+
+    expect(months).toHaveLength(12);
+    expect(months[0]).toMatchObject({
+      key: '2024-01',
+      label: 'January 2024',
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+    });
+    expect(months[1]).toMatchObject({
+      key: '2024-02',
+      startDate: '2024-02-01',
+      endDate: '2024-02-29',
+    });
+    expect(months[11]).toMatchObject({
+      key: '2024-12',
+      label: 'December 2024',
+      startDate: '2024-12-01',
+      endDate: '2024-12-31',
+    });
+  });
+
+  it('selects a well-formed month from the query before applying defaults', () => {
+    expect(resolveSelectedMonth('2025-03', [], '2026-09-28')).toBe('2025-03');
+    expect(resolveSelectedMonth('2025-3', [], '2026-09-28')).toBe('2026-09');
+    expect(resolveSelectedMonth('2025-13', [], '2026-09-28')).toBe('2026-09');
+  });
+
+  it('defaults to the current month when the transactions represent it', () => {
+    const transactions = [
+      transaction('2026-09-02', '-1.00', { id: '1', name: 'Groceries' }),
+      transaction('2026-08-02', '-1.00', { id: '1', name: 'Groceries' }),
+    ];
+
+    expect(resolveSelectedMonth(undefined, transactions, '2026-09-28')).toBe('2026-09');
+  });
+
+  it('falls back to the newest represented month when the current month is empty', () => {
+    const transactions = [
+      transaction('2026-07-02', '-1.00', { id: '1', name: 'Groceries' }),
+      transaction('2026-08-02', '-1.00', { id: '1', name: 'Groceries' }),
+    ];
+
+    expect(resolveSelectedMonth(undefined, transactions, '2026-09-28')).toBe('2026-08');
+  });
+
+  it('does not let a hidden-only current month win the default', () => {
+    const transactions = [
+      transaction('2026-09-02', '-1.00', { id: '2', name: 'Internal', hidden: true }),
+      transaction('2026-07-02', '-1.00', { id: '1', name: 'Groceries' }),
+    ];
+
+    expect(resolveSelectedMonth(undefined, transactions, '2026-09-28')).toBe('2026-07');
+  });
+
+  it('falls back to the current month when there are no transactions', () => {
+    expect(resolveSelectedMonth(undefined, [], '2026-09-28')).toBe('2026-09');
+  });
+
+  it('offers represented years, the current year, and the selected month year newest first', () => {
+    const transactions = [
+      transaction('2024-01-02', '-1.00', { id: '1', name: 'Old' }),
+      transaction('2026-05-02', '-1.00', { id: '1', name: 'Recent' }),
+      transaction('2023-05-02', '-1.00', { id: '2', name: 'Hidden', hidden: true }),
+    ];
+
+    expect(getAvailableYears(transactions, '2026-09-28')).toEqual([2026, 2024]);
+    expect(getAvailableYears(transactions, '2026-09-28', '2020-05')).toEqual([2026, 2024, 2020]);
+  });
+
+  it('filters transactions to exactly one calendar month', () => {
+    const transactions = [
+      transaction('2026-08-31', '-1.00', { id: '1', name: 'August' }),
+      transaction('2026-09-01', '-2.00', { id: '1', name: 'September' }),
+      transaction('2026-09-30', '-3.00', { id: '1', name: 'September' }),
+    ];
+
+    expect(filterTransactionsByMonth(transactions, '2026-09').map(({ amount }) => amount))
+      .toEqual(['-2.00', '-3.00']);
+  });
+});
+
+describe('selected-month category breakdown', () => {
+  const transactions = [
+    transaction('2026-09-01', '-12.50', { id: '1', name: 'Groceries' }),
+    transaction('2026-09-02', '4.00', { id: '1', name: 'Groceries' }),
+    transaction('2026-09-03', '-3.25', null),
+    transaction('2026-09-04', '-99.00', { id: '2', name: 'Internal', hidden: true }),
+    transaction('2026-09-05', '5.00', { id: '3', name: 'Alpha' }),
+    transaction('2026-09-06', '5.00', { id: '4', name: 'alpha' }),
+    transaction('2026-09-07', '0.01', { id: '5', name: 'Almost' }),
+    transaction('2026-09-08', '-0.01', { id: '5', name: 'Almost' }),
+    transaction('2026-08-01', '-100.00', { id: '1', name: 'Groceries' }),
+  ];
+
+  it('sums both signs, counts transactions, and excludes hidden categories', () => {
+    const breakdown = getCategoryBreakdown(filterTransactionsByMonth(transactions, '2026-09'));
+
+    expect(breakdown.entries.map(({ name, amount, transactions: count }) => [name, amount, count])).toEqual([
+      ['Groceries', '16.50', 2],
+      ['Alpha', '5.00', 1],
+      ['alpha', '5.00', 1],
+      ['Uncategorised', '3.25', 1],
+      ['Almost', '0.02', 2],
+    ]);
+    expect(breakdown.total).toBe('29.77');
+    expect(breakdown.transactionCount).toBe(7);
+    expect(breakdown.entries.some(({ name }) => name === 'Internal')).toBe(false);
+  });
+
+  it('keeps a zero-amount category listed', () => {
+    const breakdown = getCategoryBreakdown([
+      transaction('2026-09-01', '0', { id: '6', name: 'Zero' }),
+      transaction('2026-09-02', '-0.00', { id: '6', name: 'Zero' }),
+    ]);
+
+    expect(breakdown.entries).toEqual([
+      { key: 'category:6', name: 'Zero', amount: '0.00', transactions: 2 },
+    ]);
+    expect(breakdown.other).toBeNull();
+  });
+
+  it('splits the eight largest categories from one Other segment', () => {
+    const many = Array.from({ length: 10 }, (_, index) =>
+      transaction('2026-09-01', String(10 - index), {
+        id: String(index + 1),
+        name: `Category ${String(index + 1).padStart(2, '0')}`,
+      }));
+
+    const breakdown = getCategoryBreakdown(many);
+
+    expect(breakdown.entries).toHaveLength(10);
+    expect(breakdown.top).toHaveLength(8);
+    expect(breakdown.other).toEqual({
+      key: 'other',
+      name: 'Other 2',
+      amount: '3',
+      transactions: 2,
+    });
+    expect(breakdown.total).toBe('55');
+    expect(breakdown.transactionCount).toBe(10);
+  });
+
+  it('omits Other when eight or fewer categories are listed', () => {
+    const six = Array.from({ length: 6 }, (_, index) =>
+      transaction('2026-09-01', String(6 - index), {
+        id: String(index + 1),
+        name: `Category ${index + 1}`,
+      }));
+
+    const breakdown = getCategoryBreakdown(six);
+
+    expect(breakdown.top).toHaveLength(6);
+    expect(breakdown.other).toBeNull();
+  });
+
+  it('returns an empty breakdown for no transactions', () => {
+    expect(getCategoryBreakdown([])).toEqual({
+      entries: [],
+      top: [],
+      other: null,
+      total: '0',
+      transactionCount: 0,
+    });
+  });
+});
+
+describe('share of the largest category', () => {
+  it('reports the largest at 100 and smaller amounts proportionally', () => {
+    expect(getCategorySharePercent('100.00', '100.00')).toBe(100);
+    expect(getCategorySharePercent('25.00', '100.00')).toBe(25);
+    expect(getCategorySharePercent('1.00', '3.00')).toBe(33.33);
+  });
+
+  it('handles zero amounts and large exact values', () => {
+    expect(getCategorySharePercent('0.00', '100.00')).toBe(0);
+    expect(getCategorySharePercent('100.00', '0.00')).toBe(0);
+    expect(getCategorySharePercent('9007199254740993.01', '18014398509481986.02')).toBe(50);
   });
 });

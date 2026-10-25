@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Summary hierarchy on the transactions table. The API is intercepted, so the
-// checks exercise the rendered emphasis: the visible count is the primary
-// figure, the sum is secondary, and both stay tied to the visible rows.
+// The summary line beneath the page title carries the visible count first and
+// the visible-row sum second, both at the interface size. The API is intercepted,
+// so the checks exercise the rendered hierarchy and its zero state.
 //
-// See openspec/changes/reduce-transaction-count-size/specs/transaction-table/spec.md
+// See openspec/changes/redesign-transactions-screen/specs/transaction-table/spec.md
 
 const currentYear = new Date().getFullYear();
 
@@ -69,32 +69,10 @@ async function interceptApi(page: Page): Promise<void> {
   });
 }
 
-async function readSummaryType(page: Page): Promise<{ countFontSize: number; sumFontSize: number }> {
+async function readSummary(page: Page) {
   return page.getByTestId('visible-total').evaluate((summaryElement) => {
     const countElement = summaryElement.querySelector('[data-testid="visible-count"]') as HTMLElement;
-    const sumElement = summaryElement.querySelector('p:last-child') as HTMLElement;
-
-    return {
-      countFontSize: Number.parseFloat(window.getComputedStyle(countElement).fontSize),
-      sumFontSize: Number.parseFloat(window.getComputedStyle(sumElement).fontSize),
-    };
-  });
-}
-
-test('the visible count leads the summary and the sum follows it', async ({ page }) => {
-  await interceptApi(page);
-  await page.goto('/', { waitUntil: 'networkidle' });
-
-  const summary = page.getByTestId('visible-total');
-  const count = page.getByTestId('visible-count');
-  const sum = summary.locator('p').last();
-
-  await expect(count).toHaveText('2 transactions');
-  await expect(sum).toContainText('Sum of displayed transactions:');
-
-  const hierarchy = await summary.evaluate((summaryElement) => {
-    const countElement = summaryElement.querySelector('[data-testid="visible-count"]') as HTMLElement;
-    const sumElement = summaryElement.querySelector('p:last-child') as HTMLElement;
+    const sumElement = summaryElement.querySelector('.tabular-nums') as HTMLElement;
     const countStyle = window.getComputedStyle(countElement);
     const sumStyle = window.getComputedStyle(sumElement);
 
@@ -108,14 +86,46 @@ test('the visible count leads the summary and the sum follows it', async ({ page
       ),
     };
   });
+}
 
-  expect(hierarchy.countFontSize).toBeGreaterThan(hierarchy.sumFontSize);
-  expect(hierarchy.countColor).toBe('rgb(32, 36, 43)');
-  expect(hierarchy.sumColor).toBe('rgb(90, 96, 104)');
+test('the summary sits beneath the title with the count before the sum', async ({ page }) => {
+  await interceptApi(page);
+  await page.goto('/', { waitUntil: 'networkidle' });
+
+  const summary = page.getByTestId('visible-total');
+  const count = page.getByTestId('visible-count');
+
+  await expect(count).toHaveText('2 transactions');
+  await expect(summary).toContainText('Sum of displayed transactions:');
+
+  const order = await page.evaluate(() => {
+    const heading = document.querySelector('h1');
+    const summaryElement = document.querySelector('[data-testid="visible-total"]');
+    const filters = document.querySelector('[data-testid="transaction-search"]');
+    if (heading === null || summaryElement === null || filters === null) {
+      return { headingBeforeSummary: false, summaryBeforeFilters: false };
+    }
+    return {
+      headingBeforeSummary: Boolean(
+        heading.compareDocumentPosition(summaryElement) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+      summaryBeforeFilters: Boolean(
+        summaryElement.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    };
+  });
+  expect(order.headingBeforeSummary).toBe(true);
+  expect(order.summaryBeforeFilters).toBe(true);
+
+  const hierarchy = await readSummary(page);
+  expect(hierarchy.countFontSize).toBe(14);
+  expect(hierarchy.sumFontSize).toBe(14);
+  expect(hierarchy.countColor).toBe('rgb(32, 30, 62)');
+  expect(hierarchy.sumColor).toBe('rgb(95, 92, 120)');
   expect(hierarchy.countBeforeSum).toBe(true);
 });
 
-test('the visible count keeps the compact text-xl size at every viewport', async ({ page }) => {
+test('the summary keeps the interface size at every viewport', async ({ page }) => {
   await interceptApi(page);
 
   for (const viewport of [
@@ -125,13 +135,13 @@ test('the visible count keeps the compact text-xl size at every viewport', async
     await page.setViewportSize(viewport);
     await page.goto('/', { waitUntil: 'networkidle' });
 
-    const { countFontSize, sumFontSize } = await readSummaryType(page);
-    expect(countFontSize).toBe(20);
-    expect(sumFontSize).toBeLessThan(countFontSize);
+    const { countFontSize, sumFontSize } = await readSummary(page);
+    expect(countFontSize).toBe(14);
+    expect(sumFontSize).toBe(14);
   }
 });
 
-test('a zero-match search keeps the zero count and euro zero', async ({ page }) => {
+test('a zero-match search keeps the zero count and euro zero on the summary line', async ({ page }) => {
   await interceptApi(page);
   await page.goto('/', { waitUntil: 'networkidle' });
 
@@ -140,6 +150,6 @@ test('a zero-match search keeps the zero count and euro zero', async ({ page }) 
 
   const summary = page.getByTestId('visible-total');
   await expect(page.getByTestId('visible-count')).toHaveText('0 transactions');
-  await expect(summary.locator('p').last()).toContainText(/€\s*0|0\s*€/);
+  await expect(summary.locator('.tabular-nums')).toContainText(/€\s*0|0\s*€/);
   await expect(page.getByText(/There are no transactions matching/)).toBeVisible();
 });

@@ -225,11 +225,11 @@ function clearSelection(): void {
 }
 
 function purposeNode(wrapper: Awaited<ReturnType<typeof mountTransactions>>, transactionId: string): Node {
-  return wrapper.get(`[data-transaction-id="${transactionId}"] td:nth-child(5)`).element.firstChild as Node;
+  return wrapper.get(`[data-transaction-id="${transactionId}"] td:nth-child(4)`).element.firstChild as Node;
 }
 
 function counterpartyNode(wrapper: Awaited<ReturnType<typeof mountTransactions>>, transactionId: string): Node {
-  return wrapper.get(`[data-transaction-id="${transactionId}"] td:nth-child(6)`).element.firstChild as Node;
+  return wrapper.get(`[data-transaction-id="${transactionId}"] td:nth-child(5)`).element.firstChild as Node;
 }
 
 function wait(ms: number): Promise<void> {
@@ -256,7 +256,7 @@ function expectCountBeforeSum(
 ): void {
   const summary = wrapper.get('[data-testid="visible-total"]');
   const count = summary.get('[data-testid="visible-count"]');
-  const sumLine = summary.get('p:last-child');
+  const sumLine = summary.get('.tabular-nums');
   const normalize = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
   expect(count.text()).toBe(expectedCount);
@@ -438,7 +438,7 @@ describe('transaction list filters', () => {
       const filter = wrapper.get(selector);
       expect(filter.classes()).toContain('min-h-11');
       expect(filter.classes()).toContain('w-full');
-      expect(filter.classes()).toContain('sm:w-auto');
+      expect(filter.classes()).toContain('min-w-0');
     }
   });
 
@@ -479,7 +479,7 @@ describe('transaction list filters', () => {
       .toEqual(['2']);
     expect(wrapper.get('[data-testid="visible-total"]').text()).toContain(formatEuroAmount('-12.50'));
     expect(wrapper.get('[data-testid="visible-count"]').text()).toBe('1 transaction');
-    expect(wrapper.findAll('tbody tr')[0]?.findAll('td')[3]?.text()).toBe('-12.50');
+    expect(wrapper.findAll('tbody tr')[0]?.findAll('td').at(-1)?.text()).toBe('-12.50');
     expect(mocks.useFetch).toHaveBeenCalledTimes(2);
   });
 
@@ -613,6 +613,50 @@ describe('transaction list filters', () => {
       .toBe('2026-02');
     expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
       .toEqual(['2']);
+  });
+
+  it('orders the columns for scanning and closes the row with the amount', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=all&month=2026-02' });
+
+    expect(wrapper.findAll('thead th button').map((heading) => heading.text().replace(/\s+/g, ' ').trim()))
+      .toEqual([
+        'Booking date',
+        'Value date',
+        'Purpose',
+        'Counterparty',
+        'Account',
+        'Person',
+        'Category',
+        'Amount',
+      ]);
+    expect(wrapper.get('thead th:last-child button').text()).toBe('Amount');
+
+    const row = wrapper.get('[data-transaction-id="2"]');
+    const cells = row.findAll('td');
+    expect(cells[1]?.text()).toBe('15 Feb 2026');
+    expect(cells[1]?.get('time').attributes('datetime')).toBe('2026-02-15');
+    expect(cells.at(-1)?.text()).toBe('-12.50');
+    expect(cells.at(-1)?.classes()).toContain('text-right');
+  });
+
+  it('presents each category as a tinted pill while keeping the assignment control', async () => {
+    const wrapper = await mountTransactions({ route: '/?category=all&month=2026-02' });
+
+    const groceries = wrapper.get('[data-transaction-id="2"] [data-testid="row-category-select"]');
+    expect(groceries.classes()).toContain('rounded-pill');
+    expect(groceries.classes()).toContain('appearance-none');
+    expect(groceries.attributes('aria-label')).toBe('Category for Groceries');
+    expect(groceries.findAll('option').map((option) => option.text())).toEqual([
+      'Uncategorised',
+      'Groceries',
+      'Internal (hidden)',
+      'Travel',
+    ]);
+
+    const uncategorised = wrapper.get('[data-transaction-id="1"] [data-testid="row-category-select"]');
+    expect(uncategorised.attributes('style')).toBeUndefined();
+    expect(uncategorised.classes()).toContain('bg-surface');
+    expect((uncategorised.element as HTMLSelectElement).value).toBe('');
   });
 });
 
@@ -1983,8 +2027,8 @@ describe('the person filter', () => {
   it('renders the person column and offers each represented person', async () => {
     const wrapper = await mountTransactions({ route: '/?category=all' });
 
-    expect(wrapper.get('[data-transaction-id="a1"] td:nth-child(8)').text()).toBe('Anna');
-    expect(wrapper.get('[data-transaction-id="d1"] td:nth-child(8)').text()).toBe('Default');
+    expect(wrapper.get('[data-transaction-id="a1"] td:nth-child(7)').text()).toBe('Anna');
+    expect(wrapper.get('[data-transaction-id="d1"] td:nth-child(7)').text()).toBe('Default');
     expect(optionText(wrapper, 'person-filter')).toEqual(['All people', 'Anna', 'Default']);
   });
 

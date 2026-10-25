@@ -29,7 +29,7 @@ const detail = computed(() =>
       <p class="mt-2 max-w-2xl text-muted">{{ detail }}</p>
       <button
         type="button"
-        class="mt-6 min-h-11 rounded-sheet bg-ink px-3 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        class="mt-6 min-h-11 rounded-sheet bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         @click="clearError({ redirect: '/' })"
       >
         Back to the start

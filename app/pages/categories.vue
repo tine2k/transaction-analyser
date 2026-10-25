@@ -429,7 +429,7 @@ async function remove(category: Category): Promise<void> {
           v-model="hidden"
           type="checkbox"
           data-testid="hidden-input"
-          class="size-5 rounded-sheet border-rule-strong text-ink focus:ring-ink"
+          class="size-5 rounded-sheet border-rule-strong text-brand focus:ring-brand"
         >
         Hidden from the analysis
       </label>
@@ -448,7 +448,7 @@ async function remove(category: Category): Promise<void> {
               name="expense-type"
               value="unset"
               data-testid="expense-type-unset"
-              class="size-5 min-h-11 border-rule-strong text-ink focus:ring-ink"
+              class="size-5 min-h-11 border-rule-strong text-brand focus:ring-brand"
             >
             Unset
           </label>
@@ -459,7 +459,7 @@ async function remove(category: Category): Promise<void> {
               name="expense-type"
               value="recurring"
               data-testid="expense-type-recurring"
-              class="size-5 min-h-11 border-rule-strong text-ink focus:ring-ink"
+              class="size-5 min-h-11 border-rule-strong text-brand focus:ring-brand"
             >
             Recurring
           </label>
@@ -470,7 +470,7 @@ async function remove(category: Category): Promise<void> {
               name="expense-type"
               value="one-time"
               data-testid="expense-type-one-time"
-              class="size-5 min-h-11 border-rule-strong text-ink focus:ring-ink"
+              class="size-5 min-h-11 border-rule-strong text-brand focus:ring-brand"
             >
             One-time
           </label>
@@ -513,7 +513,7 @@ async function remove(category: Category): Promise<void> {
         <button
           type="submit"
           :disabled="saving"
-          class="inline-flex min-h-11 items-center gap-2 rounded-sheet bg-ink px-3 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
+          class="inline-flex min-h-11 items-center gap-2 rounded-sheet bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
         >
           <AppIcon :icon="editingId === null ? IconPlus : IconCheck" />
           {{ editingId === null ? 'Add category' : 'Save changes' }}

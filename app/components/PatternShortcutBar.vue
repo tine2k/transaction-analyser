@@ -37,7 +37,7 @@ function choose(event: Event): void {
   <div
     v-if="text !== null || status !== null"
     data-testid="pattern-shortcut-bar"
-    class="border-t border-rule-strong bg-surface px-4 py-3 shadow-[0_-2px_8px_rgba(32,36,43,0.08)]"
+    class="border-t border-rule-strong bg-surface px-4 py-3 shadow-[0_-2px_8px_rgba(32,30,62,0.10)]"
   >
     <div class="w-full">
       <p
@@ -62,7 +62,7 @@ function choose(event: Event): void {
           <select
             data-testid="pattern-shortcut-category"
             :disabled="categories.length === 0"
-            class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-auto"
+            class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto"
             @change="choose"
           >
             <option value="">{{ categories.length === 0 ? 'No categories stored' : 'Choose a category' }}</option>
@@ -84,7 +84,7 @@ function choose(event: Event): void {
         <button
           type="button"
           data-testid="pattern-shortcut-dismiss"
-          class="min-h-11 shrink-0 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          class="min-h-11 shrink-0 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           @click="emit('dismiss')"
         >
           Dismiss

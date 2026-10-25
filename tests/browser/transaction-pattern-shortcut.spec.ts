@@ -93,7 +93,7 @@ async function interceptApi(page: Page, options: { failAppend?: boolean } = {}):
 
 async function selectTextInCell(page: Page, transactionId: string, start: number, end: number): Promise<string> {
   return page.evaluate(({ transactionId: id, start: startIndex, end: endIndex }) => {
-    const cell = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(5)`);
+    const cell = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(4)`);
     const node = cell?.firstChild ?? null;
     if (node === null) {
       throw new Error('purpose cell is not rendered');
@@ -110,8 +110,8 @@ async function selectTextInCell(page: Page, transactionId: string, start: number
 
 async function selectAcrossCells(page: Page, transactionId: string): Promise<void> {
   await page.evaluate((id) => {
-    const purpose = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(5)`)?.firstChild ?? null;
-    const counterparty = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(6)`)?.firstChild ?? null;
+    const purpose = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(4)`)?.firstChild ?? null;
+    const counterparty = document.querySelector(`[data-transaction-id="${id}"] td:nth-child(5)`)?.firstChild ?? null;
     if (purpose === null || counterparty === null) {
       throw new Error('row is not rendered');
     }

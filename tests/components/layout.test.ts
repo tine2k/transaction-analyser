@@ -8,11 +8,12 @@ mockNuxtImport('useRoute', () => () => route);
 import DefaultLayout from '../../app/layouts/default.vue';
 
 describe('default layout navigation', () => {
-  it('names the application in the masthead', async () => {
+  it('names the application in the brand bar', async () => {
     route.path = '/';
     const wrapper = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
 
     expect(wrapper.get('header p').text()).toBe('Expenses');
+    expect(wrapper.get('header').classes()).toContain('brand-bar');
     await wrapper.unmount();
   });
 
@@ -30,14 +31,16 @@ describe('default layout navigation', () => {
       ['Monthly average', '/monthly-average'],
       ['Imports', '/imports'],
     ]);
-    expect(links.every((link) => link.findAll('svg[aria-hidden="true"]').length === 1)).toBe(true);
-    expect(links.every((link) => link.get('svg').attributes('stroke-width') === '1.5')).toBe(true);
+    expect(links.every((link) => link.findAll('svg').length === 0)).toBe(true);
     expect(links[0]?.attributes('aria-current')).toBe('page');
+    expect(links[0]?.classes()).toContain('bg-surface');
+    expect(links[1]?.classes()).toContain('bg-white/10');
     await transactions.unmount();
 
     route.path = '/analytics';
     const analytics = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
     expect(analytics.findAll('nav a')[3]?.attributes('aria-current')).toBe('page');
+    expect(analytics.findAll('nav a')[3]?.classes()).toContain('bg-surface');
     await analytics.unmount();
 
     route.path = '/people';

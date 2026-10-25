@@ -130,7 +130,7 @@ async function submit(): Promise<void> {
           type="submit"
           :disabled="saving"
           data-testid="person-submit"
-          class="inline-flex min-h-11 items-center gap-2 rounded-sheet bg-ink px-3 py-2 text-sm font-medium text-surface hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
+          class="inline-flex min-h-11 items-center gap-2 rounded-sheet bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
         >
           <AppIcon :icon="editingId === null ? IconPlus : IconCheck" />
           {{ editingId === null ? 'Add person' : 'Save changes' }}

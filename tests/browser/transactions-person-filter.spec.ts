@@ -82,8 +82,8 @@ test('renders the person column and filters the rows by person', async ({ page }
   await page.goto('/?category=all', { waitUntil: 'networkidle' });
 
   await expect(page.locator('thead th', { hasText: 'Person' })).toHaveCount(1);
-  await expect(page.locator('[data-transaction-id="1"] td').nth(7)).toHaveText('Anna');
-  await expect(page.locator('[data-transaction-id="3"] td').nth(7)).toHaveText('Default');
+  await expect(page.locator('[data-transaction-id="1"] td').nth(6)).toHaveText('Anna');
+  await expect(page.locator('[data-transaction-id="3"] td').nth(6)).toHaveText('Default');
   await expect(page.getByTestId('person-filter').locator('option')).toHaveText([
     'All people',
     'Anna',

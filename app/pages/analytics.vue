@@ -174,7 +174,7 @@ function onPieSliceClick(parameter: unknown, periodKey: 'month' | 'year', period
 
 function chartOption(chart: DisplayedChart): EChartsOption {
   return {
-    textStyle: { fontFamily: 'IBM Plex Sans Variable, sans-serif', color: '#20242B' },
+    textStyle: { fontFamily: 'IBM Plex Sans Variable, sans-serif', color: '#201E3E' },
     tooltip: {
       trigger: 'item',
       formatter: tooltipLabel,
@@ -196,7 +196,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
       label: {
         show: true,
         formatter: sliceLabel,
-        color: '#20242B',
+        color: '#201E3E',
         fontSize: 12,
         lineHeight: 16,
         overflow: 'none',

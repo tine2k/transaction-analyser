@@ -267,4 +267,12 @@ describe('the monthly average person filter', () => {
       .toEqual(['category:1']);
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
+
+  it('rests the average list on the sheet elevation', async () => {
+    mocks.useFetch.mockReturnValue(response(sampleTransactions()));
+
+    const wrapper = await mountSuspended(MonthlyAverage);
+
+    expect(wrapper.get('[data-testid="monthly-average-list"]').classes()).toContain('shadow-sheet');
+  });
 });

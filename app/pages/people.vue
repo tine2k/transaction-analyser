@@ -103,7 +103,7 @@ async function submit(): Promise<void> {
 
     <form
       ref="formElement"
-      class="mt-6 w-full min-w-0 max-w-2xl rounded-sheet border border-rule-strong bg-surface p-4"
+      class="mt-6 w-full min-w-0 max-w-2xl rounded-sheet border border-rule-strong bg-surface p-4 shadow-sheet"
       @submit.prevent="submit"
     >
       <h2 class="font-display text-lg font-semibold text-ink">
@@ -169,7 +169,7 @@ async function submit(): Promise<void> {
         aria-describedby="people-scroll-help"
         tabindex="0"
         data-testid="people-scroll"
-        class="max-w-full overflow-x-auto rounded-sheet border border-rule-strong bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        class="max-w-full overflow-x-auto rounded-sheet border border-rule-strong bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
       >
         <table class="w-max min-w-full border-collapse text-left text-sm" data-testid="people-table">
           <caption class="sr-only">

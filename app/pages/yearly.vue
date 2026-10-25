@@ -227,7 +227,7 @@ function totalLocation(categoryKey: string) {
     </p>
 
     <template v-else-if="transactions">
-      <div class="mt-4 flex flex-col gap-3 rounded-panel bg-surface p-4 sm:p-5">
+      <div class="mt-4 flex flex-col gap-3 rounded-panel bg-surface p-4 shadow-sheet sm:p-5" data-testid="yearly-filter-panel">
         <fieldset class="flex flex-wrap items-center gap-4 text-sm text-muted" data-testid="expense-type-filter">
           <legend class="sr-only">Expense type filter</legend>
           <label class="inline-flex min-h-11 items-center gap-2">
@@ -294,13 +294,13 @@ function totalLocation(categoryKey: string) {
       </div>
 
       <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="yearly-summary">
-        <section class="min-w-0 rounded-panel bg-surface p-5 sm:p-6">
+        <section class="min-w-0 rounded-panel bg-surface p-5 shadow-sheet sm:p-6" data-testid="yearly-summary-card">
           <h2 class="text-sm font-semibold text-muted">Total moved {{ selectedYear }}</h2>
           <p class="mt-1.5 text-3xl font-extrabold tracking-[-0.02em] text-ink tabular-nums" data-testid="total-moved-value">
             {{ totalMoved }}
           </p>
         </section>
-        <section class="min-w-0 rounded-panel bg-surface p-5 sm:p-6">
+        <section class="min-w-0 rounded-panel bg-surface p-5 shadow-sheet sm:p-6" data-testid="yearly-summary-card">
           <h2 class="text-sm font-semibold text-muted">Avg per month</h2>
           <p class="mt-1.5 text-3xl font-extrabold tracking-[-0.02em] text-ink tabular-nums" data-testid="average-value">
             {{ average }}
@@ -320,7 +320,7 @@ function totalLocation(categoryKey: string) {
           aria-label="Yearly category matrix"
           aria-describedby="yearly-matrix-scroll-help"
           tabindex="0"
-          class="max-w-full overflow-x-auto rounded-panel bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          class="max-w-full overflow-x-auto rounded-panel bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           data-testid="yearly-matrix-scroll"
         >
           <table

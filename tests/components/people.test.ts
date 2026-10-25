@@ -206,4 +206,11 @@ describe('people management page', () => {
       .toBe(true);
     expect(wrapper.get('[data-testid="person-name-input"]').classes()).toContain('min-h-11');
   });
+
+  it('rests the form and people table on the sheet elevation', async () => {
+    const wrapper = await mountSuspended(People);
+
+    expect(wrapper.get('form').classes()).toContain('shadow-sheet');
+    expect(wrapper.get('[data-testid="people-scroll"]').classes()).toContain('shadow-sheet');
+  });
 });

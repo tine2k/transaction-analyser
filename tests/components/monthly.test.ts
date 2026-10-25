@@ -299,4 +299,24 @@ describe('the Monthly screen', () => {
     expect(empty.get('[data-testid="no-category-data"]').text()).toContain(`No category data for`);
     expect(empty.findAll('[data-testid="month-pill"]')).toHaveLength(12);
   });
+
+  it('rests every analysis surface on the sheet elevation', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      currentMonthTransaction('-12.50', { id: '1', name: 'Groceries' }),
+    ]));
+
+    const wrapper = await mountSuspended(Monthly);
+
+    expect(wrapper.get('[data-testid="monthly-filter-panel"]').classes()).toContain('shadow-sheet');
+    const summaries = wrapper.findAll('[data-testid="monthly-summary-card"]');
+    expect(summaries).toHaveLength(2);
+    expect(summaries.every((card) => card.classes().includes('shadow-sheet'))).toBe(true);
+    expect(wrapper.get('[data-testid="monthly-bar-panel"]').classes()).toContain('shadow-sheet');
+    expect(wrapper.get('[data-testid="monthly-category-scroll"]').classes()).toContain('shadow-sheet');
+
+    const tableSection = wrapper.get('[data-testid="monthly-table-section"]');
+    expect(tableSection.classes()).toContain('mt-4');
+    expect(tableSection.find('[data-testid="monthly-category-scroll"]').exists()).toBe(true);
+    expect(tableSection.find('#monthly-table-scroll-help').exists()).toBe(true);
+  });
 });

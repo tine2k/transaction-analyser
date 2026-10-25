@@ -1004,19 +1004,14 @@ The Transactions filter and table sheets SHALL use a 20px corner radius at deskt
 
 
 
-### Requirement: Transactions sheets carry the mock's resting elevation
+### Requirement: Transactions sheets rest elevated at every width
 
-At desktop widths the Transactions filter and table sheets SHALL carry the shadow `0 1px 3px rgba(40, 30, 120, 0.08)`. At mobile widths the sheets SHALL be flat. The fixed action bars SHALL keep a stronger upward shadow because they float above the table.
+At every viewport width the Transactions filter and table sheets SHALL carry the shadow `0 1px 3px rgba(40, 30, 120, 0.08)`. The fixed action bars SHALL keep a stronger upward shadow because they float above the table.
 
-#### Scenario: Desktop sheets rest elevated
+#### Scenario: Sheets rest elevated at every width
 
-- **WHEN** either Transactions sheet is rendered at a desktop width
+- **WHEN** either Transactions sheet is rendered at a phone, tablet, or desktop width
 - **THEN** its computed box shadow is `0 1px 3px rgba(40, 30, 120, 0.08)`
-
-#### Scenario: Mobile sheets stay flat
-
-- **WHEN** either Transactions sheet is rendered at a mobile width
-- **THEN** it has no resting box shadow
 
 #### Scenario: Floating bars keep their stronger elevation
 
@@ -1121,7 +1116,7 @@ When the Transactions table has no rows to show, the empty-state message SHALL b
 
 ### Requirement: The phone transaction list uses the mock's card presentation
 
-At phone widths the system SHALL present each transaction as a surface card with the purpose and amount on its top row, the category pill below, and the booking and value dates in a meta row. The card SHALL use an 18px corner radius, flat elevation, 16px padding, and a 10px internal gap. The counterparty name, counterparty account, and person SHALL remain visible in the card.
+At phone widths the system SHALL present each transaction as a surface card with the purpose and amount on its top row, the category pill below, and the booking and value dates in a meta row. The card SHALL use an 18px corner radius, the theme's resting shadow, 16px padding, and a 10px internal gap. The counterparty name, counterparty account, and person SHALL remain visible in the card.
 
 #### Scenario: The card follows the mobile mock's arrangement
 
@@ -1136,7 +1131,7 @@ At phone widths the system SHALL present each transaction as a surface card with
 #### Scenario: The card uses the mock's surface metrics
 
 - **WHEN** a card is rendered at a phone width
-- **THEN** it has an 18px corner radius, no resting shadow, 16px padding, and a 10px gap between its inner rows
+- **THEN** it has an 18px corner radius, the theme's resting shadow, 16px padding, and a 10px gap between its inner rows
 
 #### Scenario: The amount stays ink-coloured
 

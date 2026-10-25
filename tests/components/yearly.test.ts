@@ -348,4 +348,21 @@ describe('yearly page', () => {
     expect(empty.get('[data-testid="total-moved-value"]').text()).toBe(formatEuroAmount('0'));
     expect(empty.text()).toContain(`No category data for ${currentYear}.`);
   });
+
+  it('rests every analysis surface on the sheet elevation', async () => {
+    mocks.useFetch.mockReturnValue(response(currentYearTransactions()));
+
+    const wrapper = await mountSuspended(Yearly, { route: '/yearly' });
+
+    expect(wrapper.get('[data-testid="yearly-filter-panel"]').classes()).toContain('shadow-sheet');
+    const summaries = wrapper.findAll('[data-testid="yearly-summary-card"]');
+    expect(summaries).toHaveLength(2);
+    expect(summaries.every((card) => card.classes().includes('shadow-sheet'))).toBe(true);
+    expect(wrapper.get('[data-testid="yearly-matrix-scroll"]').classes()).toContain('shadow-sheet');
+
+    const tableSection = wrapper.get('[data-testid="yearly-table-section"]');
+    expect(tableSection.classes()).toContain('mt-4');
+    expect(tableSection.find('[data-testid="yearly-matrix-scroll"]').exists()).toBe(true);
+    expect(tableSection.find('#yearly-matrix-scroll-help').exists()).toBe(true);
+  });
 });

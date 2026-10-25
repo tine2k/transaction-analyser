@@ -221,7 +221,7 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
 
       <ul
         v-if="sortedAverages.length > 0"
-        class="mt-6 max-w-xl divide-y divide-rule rounded-sheet border border-rule-strong bg-surface"
+        class="mt-6 max-w-xl divide-y divide-rule rounded-sheet border border-rule-strong bg-surface shadow-sheet"
         aria-label="Category monthly averages"
         data-testid="monthly-average-list"
       >

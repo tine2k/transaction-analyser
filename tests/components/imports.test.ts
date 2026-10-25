@@ -422,4 +422,12 @@ describe('imports page', () => {
 
     expect(wrapper.get('[data-testid="test-notification-status"]').text()).toContain('could not be sent');
   });
+
+  it('rests the import log on the sheet elevation', async () => {
+    mocks.useFetch.mockReturnValue(response(runs));
+
+    const wrapper = await mountSuspended(Imports);
+
+    expect(wrapper.get('[data-testid="imports-scroll"]').classes()).toContain('shadow-sheet');
+  });
 });

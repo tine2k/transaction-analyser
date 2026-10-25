@@ -432,4 +432,11 @@ describe('category management page', () => {
       body: expect.objectContaining({ expenseType: null }),
     }));
   });
+
+  it('rests the form and category table on the sheet elevation', async () => {
+    const wrapper = await mountSuspended(Categories);
+
+    expect(wrapper.get('form').classes()).toContain('shadow-sheet');
+    expect(wrapper.get('[data-testid="categories-scroll"]').classes()).toContain('shadow-sheet');
+  });
 });

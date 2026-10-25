@@ -325,7 +325,7 @@ async function remove(category: Category): Promise<void> {
 
     <form
       ref="formElement"
-      class="mt-6 w-full min-w-0 max-w-2xl rounded-sheet border border-rule-strong bg-surface p-4"
+      class="mt-6 w-full min-w-0 max-w-2xl rounded-sheet border border-rule-strong bg-surface p-4 shadow-sheet"
       @submit.prevent="submit"
     >
       <h2 class="font-display text-lg font-semibold text-ink">
@@ -551,7 +551,7 @@ async function remove(category: Category): Promise<void> {
         aria-describedby="categories-scroll-help"
         tabindex="0"
         data-testid="categories-scroll"
-        class="max-w-full overflow-x-auto rounded-sheet border border-rule-strong bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        class="max-w-full overflow-x-auto rounded-sheet border border-rule-strong bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
       >
       <table class="w-max border-collapse text-left text-sm">
         <thead>

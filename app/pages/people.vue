@@ -95,7 +95,7 @@ async function submit(): Promise<void> {
 
 <template>
   <div>
-    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">People</h1>
+    <h1 class="font-display text-2xl font-extrabold text-ink sm:text-3xl">People</h1>
     <p class="mt-2 max-w-2xl text-muted">
       Every transaction belongs to one person. A person is a name and a stable identity;
       renaming one keeps every transaction it owns, and there is no delete.

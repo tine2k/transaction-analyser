@@ -1217,8 +1217,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="{ 'pb-28': bottomBarsVisible === 1, 'pb-56': bottomBarsVisible === 2 }">
-    <h1 class="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">Transactions</h1>
+  <div
+    class="text-sm"
+    :class="{ 'pb-28': bottomBarsVisible === 1, 'pb-56': bottomBarsVisible === 2 }"
+  >
+    <h1 class="font-display text-[28px] font-extrabold tracking-[-0.02em] text-ink sm:text-[34px]">Transactions</h1>
 
     <p v-if="error" class="mt-4 text-muted">
       The transactions could not be loaded. They are not shown, and this is not an empty result.
@@ -1227,7 +1230,7 @@ onBeforeUnmount(() => {
     <p v-else-if="pending" class="mt-4 text-muted">Loading transactions…</p>
 
     <template v-else-if="transactions">
-      <p class="mt-2 text-sm text-muted" data-testid="visible-total">
+      <p class="mt-1 text-sm text-muted sm:mt-1.5 sm:text-[15px]" data-testid="visible-total">
         <span class="font-medium text-ink" data-testid="visible-count">
           {{ visibleTransactions.length }} transaction{{ visibleTransactions.length === 1 ? '' : 's' }}
         </span>
@@ -1237,9 +1240,12 @@ onBeforeUnmount(() => {
         </span>
       </p>
 
-      <div class="mt-6 rounded-sheet bg-surface p-4 sm:p-6">
+      <div
+        class="mt-3.5 rounded-panel-mobile bg-surface p-3.5 shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:py-5 sm:shadow-sheet"
+        data-testid="filter-sheet"
+      >
         <div class="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))] xl:items-end">
-          <div class="grid min-w-0 gap-1.5 text-xs font-semibold text-muted">
+          <div class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
             <label for="transaction-search">Search transactions</label>
             <form class="flex min-w-0 flex-wrap items-center gap-2" @submit.prevent="applySearch">
               <input
@@ -1250,12 +1256,12 @@ onBeforeUnmount(() => {
                 autocomplete="off"
                 :aria-describedby="searchActive ? 'filters-paused-note' : undefined"
                 placeholder="Purpose, counterparty, account"
-                class="min-h-11 w-full min-w-0 flex-1 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                class="min-h-12 w-full min-w-0 flex-1 rounded-control border border-rule-strong bg-surface px-3.5 py-2 text-[15px] text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-11 sm:px-4 sm:text-sm"
               >
               <button
                 type="submit"
                 data-testid="search-submit"
-                class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-sheet bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                class="inline-flex min-h-12 shrink-0 items-center justify-center rounded-control bg-brand px-[18px] py-2 text-sm font-bold text-white hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-11 sm:px-[22px]"
               >
                 Search
               </button>
@@ -1264,19 +1270,19 @@ onBeforeUnmount(() => {
                 type="button"
                 data-testid="clear-search"
                 aria-label="Clear search"
-                class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                class="inline-flex min-h-12 shrink-0 items-center justify-center rounded-control border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:min-h-11"
                 @click="clearSearch"
               >
                 Clear
               </button>
             </form>
           </div>
-          <label class="grid min-w-0 gap-1.5 text-xs font-semibold text-muted">
+          <label class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
             Person
             <select
               v-model="personFilter"
               data-testid="person-filter"
-              class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              class="min-h-12 w-full min-w-0 rounded-control border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-11 sm:px-3.5"
             >
               <option value="all">All people</option>
               <option v-for="person in personOptions" :key="person.id" :value="person.id">
@@ -1284,14 +1290,14 @@ onBeforeUnmount(() => {
               </option>
             </select>
           </label>
-          <label class="grid min-w-0 gap-1.5 text-xs font-semibold text-muted">
+          <label class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
             Period
             <select
               v-model="periodFilter"
               data-testid="period-filter"
               :disabled="searchActive"
               :aria-describedby="searchActive ? 'filters-paused-note' : undefined"
-              class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
+              class="min-h-12 w-full min-w-0 rounded-control border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-11 sm:px-3.5 disabled:opacity-60"
             >
               <option value="all">All periods</option>
               <optgroup v-if="periods.years.length > 0" label="Years">
@@ -1306,14 +1312,14 @@ onBeforeUnmount(() => {
               </optgroup>
             </select>
           </label>
-          <label class="grid min-w-0 gap-1.5 text-xs font-semibold text-muted">
+          <label class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
             Category
             <select
               v-model="categoryFilter"
               data-testid="category-filter"
               :disabled="searchActive"
               :aria-describedby="searchActive ? 'filters-paused-note' : undefined"
-              class="min-h-11 w-full min-w-0 rounded-sheet border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
+              class="min-h-12 w-full min-w-0 rounded-control border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-11 sm:px-3.5 disabled:opacity-60"
             >
               <option value="all">All categories ({{ scopedTransactions.length }})</option>
               <option value="uncategorised">Uncategorised ({{ uncategorisedTransactions.length }})</option>
@@ -1329,24 +1335,46 @@ onBeforeUnmount(() => {
         v-if="searchActive"
         id="filters-paused-note"
         data-testid="filters-paused-note"
-        class="mt-2 text-sm text-muted"
+        class="mt-3.5 text-sm text-muted sm:mt-6"
       >
         Filters are paused while searching. Category and period filtering is off, the person filter still applies. Clear the search to use them again.
       </p>
 
-      <p v-if="transactions.length === 0" class="mt-6 text-muted">
-        There are no transactions to show.
-      </p>
+      <div
+        v-if="transactions.length === 0"
+        data-testid="table-sheet"
+        class="mt-3.5 rounded-panel-mobile bg-surface px-4 py-10 shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:shadow-sheet"
+      >
+        <p class="text-center text-sm text-muted">
+          There are no transactions to show.
+        </p>
+      </div>
 
-      <p v-else-if="visibleTransactions.length === 0 && searchActive" class="mt-6 text-muted">
-        There are no transactions matching “{{ appliedSearch }}”.
-      </p>
+      <div
+        v-else-if="visibleTransactions.length === 0 && searchActive"
+        data-testid="table-sheet"
+        class="mt-3.5 rounded-panel-mobile bg-surface px-4 py-10 shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:shadow-sheet"
+      >
+        <p class="text-center text-sm text-muted">
+          There are no transactions matching “{{ appliedSearch }}”.
+        </p>
+      </div>
 
-      <p v-else-if="visibleTransactions.length === 0" class="mt-6 text-muted">
-        There are no transactions matching the selected filters.
-      </p>
+      <div
+        v-else-if="visibleTransactions.length === 0"
+        data-testid="table-sheet"
+        class="mt-3.5 rounded-panel-mobile bg-surface px-4 py-10 shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:shadow-sheet"
+      >
+        <p class="text-center text-sm text-muted">
+          There are no transactions matching the selected filters.
+        </p>
+      </div>
 
-      <div v-else class="mt-6 overflow-hidden rounded-sheet bg-surface">
+      <div
+        v-else
+        data-testid="table-sheet"
+        class="mt-3.5 overflow-hidden rounded-panel-mobile bg-surface shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:pb-4 sm:pt-2 sm:shadow-sheet"
+      >
         <p id="transactions-scroll-help" class="px-4 pt-3 text-xs text-muted sm:hidden">
           Scroll horizontally to view all transaction columns.
         </p>
@@ -1361,8 +1389,8 @@ onBeforeUnmount(() => {
         >
         <table class="w-max min-w-full border-collapse text-left text-sm">
           <thead>
-            <tr class="border-b border-rule text-[11px] uppercase tracking-[0.08em] text-muted">
-              <th scope="col" class="px-4 py-3 font-semibold">
+            <tr class="border-b border-rule text-xs uppercase tracking-[0.06em] text-muted">
+              <th scope="col" class="px-2 py-0.5 font-bold">
                 <label class="flex min-h-11 items-center justify-center">
                   <input
                     type="checkbox"
@@ -1380,13 +1408,13 @@ onBeforeUnmount(() => {
                 :key="column.column"
                 scope="col"
                 :aria-sort="ariaSortFor(column.column)"
-                class="px-4 py-3 font-semibold"
+                class="px-2 py-0.5 font-bold"
               >
                 <button
                   type="button"
                   :data-testid="`sort-${column.column}`"
                   :class="[
-                    'flex min-h-11 w-full items-center gap-1 rounded-sheet font-semibold text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
+                    'flex min-h-11 w-full items-center gap-1 rounded-control font-bold text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
                     column.align === 'right' ? 'justify-end' : 'justify-start',
                   ]"
                   @click="activateSort(column.column)"
@@ -1410,7 +1438,7 @@ onBeforeUnmount(() => {
               :aria-busy="markers.has(transaction.id) ? 'true' : undefined"
               class="border-b border-rule transition-colors last:border-b-0 hover:bg-paper/60"
             >
-              <td class="px-4 py-3">
+              <td class="px-2 py-0">
                 <label class="flex min-h-11 items-center justify-center">
                   <input
                     type="checkbox"
@@ -1422,15 +1450,15 @@ onBeforeUnmount(() => {
                   <span class="sr-only">Select {{ transaction.purpose }}</span>
                 </label>
               </td>
-              <td class="whitespace-nowrap px-4 py-3 tabular-nums text-ink">
+              <td class="whitespace-nowrap px-2 py-[13px] font-semibold tabular-nums text-ink">
                 <time :datetime="transaction.bookingDate">{{ formatCalendarDate(transaction.bookingDate) }}</time>
               </td>
-              <td class="whitespace-nowrap px-4 py-3 tabular-nums text-ink">
+              <td class="whitespace-nowrap px-2 py-[13px] tabular-nums text-ink">
                 <time :datetime="transaction.valueDate">{{ formatCalendarDate(transaction.valueDate) }}</time>
               </td>
-              <td class="px-4 py-3 text-ink">{{ transaction.purpose }}</td>
-              <td class="px-4 py-3 text-ink">{{ transaction.counterpartyName }}</td>
-              <td class="px-4 py-3 text-ink">
+              <td class="px-2 py-[13px] text-ink">{{ transaction.purpose }}</td>
+              <td class="px-2 py-[13px] text-ink">{{ transaction.counterpartyName }}</td>
+              <td class="px-2 py-[13px] text-ink">
                 <template v-if="transaction.counterpartyAccount !== null">
                   {{ transaction.counterpartyAccount }}
                 </template>
@@ -1439,8 +1467,8 @@ onBeforeUnmount(() => {
                   <span class="sr-only">No counterparty account</span>
                 </template>
               </td>
-              <td class="px-4 py-3 text-ink">{{ transaction.person.name }}</td>
-              <td class="px-4 py-3 text-ink">
+              <td class="px-2 py-[13px] text-ink">{{ transaction.person.name }}</td>
+              <td class="px-2 py-0 text-ink">
                 <span class="inline-flex min-w-0 items-center gap-1.5">
                   <span
                     v-if="markers.has(transaction.id)"
@@ -1456,13 +1484,13 @@ onBeforeUnmount(() => {
                     <AppIcon :icon="IconMapPin" :size="14" />
                     <span class="sr-only">Manually assigned</span>
                   </span>
-                  <span class="relative inline-flex min-w-0 items-center">
+                  <label class="relative inline-flex min-h-11 min-w-0 items-center">
                     <select
                       data-testid="row-category-select"
                       :value="transaction.category?.id ?? ''"
                       :disabled="rowInFlight(transaction.id)"
                       :aria-label="`Category for ${transaction.purpose}`"
-                      class="min-h-11 max-w-56 min-w-0 appearance-none truncate rounded-pill border py-1.5 pl-3 pr-8 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
+                      class="max-w-56 min-w-0 appearance-none truncate rounded-pill border py-[5px] pl-3 pr-8 text-xs font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
                       :class="transaction.category === null ? 'border-rule-strong bg-surface text-ink' : ''"
                       :style="categoryPillStyle(transaction.category)"
                       @change="chooseRowCategory(transaction, $event)"
@@ -1477,11 +1505,11 @@ onBeforeUnmount(() => {
                       :size="14"
                       class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted"
                     />
-                  </span>
+                  </label>
                 </span>
                 <span v-if="markers.has(transaction.id)" class="sr-only">Updating category</span>
               </td>
-              <td class="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-ink">{{ transaction.amount }}</td>
+              <td class="whitespace-nowrap px-2 py-[13px] text-right font-bold tabular-nums text-ink">{{ transaction.amount }}</td>
             </tr>
           </tbody>
         </table>

@@ -436,7 +436,8 @@ describe('transaction list filters', () => {
 
     for (const selector of ['[data-testid="category-filter"]', '[data-testid="period-filter"]']) {
       const filter = wrapper.get(selector);
-      expect(filter.classes()).toContain('min-h-11');
+      expect(filter.classes()).toContain('min-h-12');
+      expect(filter.classes()).toContain('sm:min-h-11');
       expect(filter.classes()).toContain('w-full');
       expect(filter.classes()).toContain('min-w-0');
     }
@@ -1230,7 +1231,9 @@ describe('manual category assignment', () => {
 
     const control = wrapper.get('[data-transaction-id="2"] [data-testid="row-category-select"]');
     expect((control.element as HTMLSelectElement).value).toBe('1');
-    expect(control.classes()).toContain('min-h-11');
+    expect(control.classes()).toContain('py-[5px]');
+    expect(control.classes()).toContain('font-bold');
+    expect(control.element.closest('label')?.classList.contains('min-h-11')).toBe(true);
     expect(control.findAll('option').map((option) => option.text())).toEqual([
       'Uncategorised',
       'Groceries',

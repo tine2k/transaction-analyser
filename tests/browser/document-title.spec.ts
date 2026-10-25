@@ -70,3 +70,40 @@ test('the masthead names the application', async ({ page }) => {
   await expect(page.getByRole('banner').getByText('Expenses', { exact: true })).toBeVisible();
   await expect(page.getByRole('banner')).not.toContainText('Transaction Analyser');
 });
+
+test('every route uses the display family inside the bounded frame without external font requests', async ({ page }) => {
+  await page.setViewportSize({ width: 1720, height: 1200 });
+  const externalFonts: string[] = [];
+  page.on('request', (request) => {
+    if (request.resourceType() === 'font' && new URL(request.url()).origin !== 'http://127.0.0.1:3000') {
+      externalFonts.push(request.url());
+    }
+  });
+  await interceptApi(page);
+
+  for (const screen of screens) {
+    await page.goto(screen.path, { waitUntil: 'networkidle' });
+    const metrics = await page.evaluate(() => {
+      const heading = document.querySelector('h1') as HTMLElement;
+      const main = document.querySelector('main') as HTMLElement;
+      const rect = main.getBoundingClientRect();
+      return {
+        bodyFamily: window.getComputedStyle(document.body).fontFamily,
+        headingFamily: window.getComputedStyle(heading).fontFamily,
+        headingWeight: window.getComputedStyle(heading).fontWeight,
+        mainWidth: rect.width,
+        mainX: rect.x,
+        noOverflow: document.documentElement.scrollWidth <= window.innerWidth,
+      };
+    });
+
+    expect(metrics.bodyFamily, screen.path).toContain('Plus Jakarta Sans');
+    expect(metrics.headingFamily, screen.path).toContain('Plus Jakarta Sans');
+    expect(metrics.headingWeight, screen.path).toBe('800');
+    expect(metrics.mainWidth, screen.path).toBeLessThanOrEqual(1280);
+    expect(metrics.mainX, screen.path).toBeGreaterThan(0);
+    expect(metrics.noOverflow, screen.path).toBe(true);
+  }
+
+  expect(externalFonts).toEqual([]);
+});

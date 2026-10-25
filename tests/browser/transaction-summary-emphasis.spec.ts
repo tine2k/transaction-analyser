@@ -118,14 +118,14 @@ test('the summary sits beneath the title with the count before the sum', async (
   expect(order.summaryBeforeFilters).toBe(true);
 
   const hierarchy = await readSummary(page);
-  expect(hierarchy.countFontSize).toBe(14);
-  expect(hierarchy.sumFontSize).toBe(14);
+  expect(hierarchy.countFontSize).toBe(15);
+  expect(hierarchy.sumFontSize).toBe(15);
   expect(hierarchy.countColor).toBe('rgb(32, 30, 62)');
   expect(hierarchy.sumColor).toBe('rgb(95, 92, 120)');
   expect(hierarchy.countBeforeSum).toBe(true);
 });
 
-test('the summary keeps the interface size at every viewport', async ({ page }) => {
+test('the summary uses the interface size at every viewport', async ({ page }) => {
   await interceptApi(page);
 
   for (const viewport of [
@@ -136,8 +136,9 @@ test('the summary keeps the interface size at every viewport', async ({ page }) 
     await page.goto('/', { waitUntil: 'networkidle' });
 
     const { countFontSize, sumFontSize } = await readSummary(page);
-    expect(countFontSize).toBe(14);
-    expect(sumFontSize).toBe(14);
+    const expected = viewport.width < 640 ? 14 : 15;
+    expect(countFontSize).toBe(expected);
+    expect(sumFontSize).toBe(expected);
   }
 });
 

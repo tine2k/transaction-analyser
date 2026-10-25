@@ -25,7 +25,7 @@ const detail = computed(() =>
   <NuxtLayout name="default">
     <div>
       <p class="font-mono text-sm font-semibold text-muted">{{ error.status }}</p>
-      <h1 class="mt-1 font-display text-2xl font-semibold text-ink sm:text-3xl">{{ heading }}</h1>
+      <h1 class="mt-1 font-display text-2xl font-extrabold text-ink sm:text-3xl">{{ heading }}</h1>
       <p class="mt-2 max-w-2xl text-muted">{{ detail }}</p>
       <button
         type="button"

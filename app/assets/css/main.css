@@ -7,21 +7,21 @@
 /* Gives Vue ECharts' custom element and its internal host explicit dimensions. */
 @import 'vue-echarts/style.css';
 
-/* IBM Plex Sans Variable — interface, tables, controls. */
+/* Plus Jakarta Sans Variable — masthead, titles, interface, tables, controls. */
 @font-face {
-  font-family: 'IBM Plex Sans Variable';
+  font-family: 'Plus Jakarta Sans';
   font-style: normal;
   font-display: swap;
-  font-weight: 100 700;
-  src: url('../../../node_modules/@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2') format('woff2-variations');
+  font-weight: 200 800;
+  src: url('../../../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2') format('woff2-variations');
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 @font-face {
-  font-family: 'IBM Plex Sans Variable';
+  font-family: 'Plus Jakarta Sans';
   font-style: normal;
   font-display: swap;
-  font-weight: 100 700;
-  src: url('../../../node_modules/@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-ext-wght-normal.woff2') format('woff2-variations');
+  font-weight: 200 800;
+  src: url('../../../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-ext-wght-normal.woff2') format('woff2-variations');
   unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
 
@@ -45,9 +45,9 @@
 
 /* The theme's design tokens. Every template value resolves to one of these
    roles: the paper ground, the surface sheets, ink and muted text, rules, the
-   brand and failure colours, the three type faces, and the sheet and pill
-   radii. The brand role covers the shared menu bar, primary actions, and
-   selection controls. */
+   brand and failure colours, the interface and machine faces, the sheet,
+   panel, control, and pill radii, and the resting sheet elevation. The brand
+   role covers the shared menu bar, primary actions, and selection controls. */
 @theme {
   --color-paper: #f5f4fa;
   --color-surface: #ffffff;
@@ -63,12 +63,17 @@
   --color-brand-bar-via: #2531ab;
   --color-brand-bar-to: #1f76b1;
 
-  --font-sans: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --radius-sheet: 14px;
+  --radius-panel: 20px;
+  --radius-panel-mobile: 18px;
+  --radius-control: 12px;
   --radius-pill: 9999px;
+
+  --shadow-sheet: 0 1px 3px rgba(40, 30, 120, 0.08);
 }
 
 /* The shared menu bar's brand ground, kept here so the gradient resolves from

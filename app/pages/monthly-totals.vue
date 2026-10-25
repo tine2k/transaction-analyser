@@ -84,7 +84,7 @@ function transactionLocation(month: string, categoryKey: string) {
 
 <template>
   <div>
-    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">Monthly totals</h1>
+    <h1 class="font-display text-2xl font-extrabold text-ink sm:text-3xl">Monthly totals</h1>
     <p class="mt-2 max-w-2xl text-sm text-muted">
       Absolute transaction totals by category for every month with transaction data.
     </p>

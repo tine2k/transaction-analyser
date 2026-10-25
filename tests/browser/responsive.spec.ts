@@ -119,12 +119,22 @@ async function expectPhoneControlsToBeTouchSized(page: Page): Promise<void> {
   const shortControls = await page.locator(
     'button:visible, select:visible, input:not([type="checkbox"]):visible, #screen-navigation a:visible',
   ).evaluateAll((elements) => elements
-    .filter((element) => element.getBoundingClientRect().height < 44)
-    .map((element) => ({
-      element: element.tagName,
-      label: (element.textContent ?? '').trim(),
-      height: element.getBoundingClientRect().height,
-    })));
+    .filter((element) => {
+      const target = element.matches('[data-testid="row-category-select"]')
+        ? element.closest('label') ?? element
+        : element;
+      return target.getBoundingClientRect().height < 44;
+    })
+    .map((element) => {
+      const target = element.matches('[data-testid="row-category-select"]')
+        ? element.closest('label') ?? element
+        : element;
+      return {
+        element: element.tagName,
+        label: (element.textContent ?? '').trim(),
+        height: target.getBoundingClientRect().height,
+      };
+    }));
   expect(shortControls).toEqual([]);
 
   const shortCheckboxLabels = await page.locator('input[type="checkbox"]:visible').evaluateAll((elements) =>

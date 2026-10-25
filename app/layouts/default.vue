@@ -48,10 +48,10 @@ watch(() => route.path, () => {
 <template>
   <div class="min-h-screen text-ink">
     <header class="brand-bar">
-      <div class="w-full px-4 py-3 sm:px-8 sm:py-4">
-        <div class="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-start md:gap-8">
+      <div class="px-4 pb-3 pt-3.5 sm:px-10 sm:py-3.5">
+        <div class="mx-auto flex w-full max-w-[1280px] flex-col gap-3 md:flex-row md:items-center md:justify-start md:gap-8">
           <div class="flex items-center justify-between gap-4">
-            <p class="font-display text-xl font-semibold tracking-tight text-white">
+            <p class="font-display text-xl font-extrabold tracking-normal text-white md:tracking-[-0.02em]">
               Expenses
             </p>
             <button
@@ -69,7 +69,7 @@ watch(() => route.path, () => {
           <nav
             id="screen-navigation"
             aria-label="Screens"
-            class="flex-col gap-1 text-sm md:flex md:flex-row md:flex-wrap md:items-center md:justify-start"
+            class="flex-col gap-1 md:flex md:flex-row md:flex-wrap md:items-center md:justify-start md:gap-1.5"
             :class="mobileNavOpen ? 'flex' : 'hidden md:flex'"
           >
             <NuxtLink
@@ -77,7 +77,7 @@ watch(() => route.path, () => {
               :key="screen.to"
               :to="screen.to"
               :aria-current="isCurrent(screen.to) ? 'page' : undefined"
-              class="inline-flex min-h-11 items-center rounded-pill px-4 py-2 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+              class="inline-flex min-h-12 items-center rounded-control px-4 py-2 text-[15px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 md:min-h-10 md:rounded-pill md:py-2.5 md:text-sm"
               :class="
                 isCurrent(screen.to)
                   ? 'bg-surface text-brand-bar-from focus-visible:outline-white'
@@ -92,7 +92,7 @@ watch(() => route.path, () => {
       </div>
     </header>
 
-    <main class="w-full min-w-0 px-4 py-6 sm:px-8 sm:py-10">
+    <main class="mx-auto w-full min-w-0 max-w-[1280px] px-4 py-5 pb-8 sm:px-10 sm:py-8 sm:pb-16">
       <slot />
     </main>
   </div>

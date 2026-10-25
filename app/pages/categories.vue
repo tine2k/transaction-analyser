@@ -314,7 +314,7 @@ async function remove(category: Category): Promise<void> {
 
 <template>
   <div>
-    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">Categories</h1>
+    <h1 class="font-display text-2xl font-extrabold text-ink sm:text-3xl">Categories</h1>
     <p class="mt-2 max-w-2xl text-muted">
       A category is a name with regular expressions matched against a transaction's purpose line
       and optional from/to date windows matched against its booking date. An expression is applied

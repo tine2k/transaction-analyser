@@ -115,7 +115,7 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
 
 <template>
   <div>
-    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">Monthly average</h1>
+    <h1 class="font-display text-2xl font-extrabold text-ink sm:text-3xl">Monthly average</h1>
     <p class="mt-2 max-w-2xl text-sm text-muted">
       Average absolute transaction spend per category over a recent window of calendar months.
     </p>

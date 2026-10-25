@@ -196,7 +196,16 @@ test('the assignment controls measure at least 44 CSS pixels high', async ({ pag
       '[data-testid="bulk-assignment-apply"]',
       '[data-testid="bulk-assignment-clear"]',
     ];
-    return selectors.map((selector) => document.querySelector(selector)?.getBoundingClientRect().height ?? 0);
+    return selectors.map((selector) => {
+      const element = document.querySelector(selector);
+      if (element === null) {
+        return 0;
+      }
+      const target = selector === '[data-testid="row-category-select"]'
+        ? element.closest('label') ?? element
+        : element;
+      return target.getBoundingClientRect().height;
+    });
   });
 
   expect(heights).toHaveLength(4);

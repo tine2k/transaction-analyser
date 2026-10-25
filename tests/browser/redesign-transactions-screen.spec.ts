@@ -54,13 +54,13 @@ const transactions = [
   },
 ];
 
-async function interceptApi(page: Page): Promise<void> {
+async function interceptApi(page: Page, transactionRows = transactions): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const { pathname } = new URL(route.request().url());
     const method = route.request().method();
 
     if (pathname === '/api/transactions' && method === 'GET') {
-      await route.fulfill({ json: transactions });
+      await route.fulfill({ json: transactionRows });
       return;
     }
 
@@ -86,6 +86,294 @@ async function openWithAllCategories(page: Page): Promise<void> {
 
 test.describe('redesigned transactions screen', () => {
   test.use({ viewport: { width: 1720, height: 1200 } });
+
+  test('matches the mock masthead and frame metrics', async ({ page }) => {
+    await openWithAllCategories(page);
+
+    const desktop = await page.evaluate(() => {
+      const wordmark = document.querySelector('header p') as HTMLElement;
+      const headerBox = document.querySelector('header > div') as HTMLElement;
+      const headerInner = headerBox.firstElementChild as HTMLElement;
+      const link = document.querySelector('#screen-navigation a') as HTMLElement;
+      const main = document.querySelector('main') as HTMLElement;
+      return {
+        wordmarkSize: window.getComputedStyle(wordmark).fontSize,
+        wordmarkWeight: window.getComputedStyle(wordmark).fontWeight,
+        wordmarkSpacing: Number.parseFloat(window.getComputedStyle(wordmark).letterSpacing),
+        headerTop: Number.parseFloat(window.getComputedStyle(headerBox).paddingTop),
+        headerLeft: Number.parseFloat(window.getComputedStyle(headerBox).paddingLeft),
+        headerMax: window.getComputedStyle(headerInner).maxWidth,
+        linkSize: window.getComputedStyle(link).fontSize,
+        linkWeight: window.getComputedStyle(link).fontWeight,
+        linkTop: Number.parseFloat(window.getComputedStyle(link).paddingTop),
+        linkLeft: Number.parseFloat(window.getComputedStyle(link).paddingLeft),
+        linkHeight: link.getBoundingClientRect().height,
+        linkRadius: Number.parseFloat(window.getComputedStyle(link).borderRadius),
+        mainMax: window.getComputedStyle(main).maxWidth,
+        mainTop: Number.parseFloat(window.getComputedStyle(main).paddingTop),
+        mainLeft: Number.parseFloat(window.getComputedStyle(main).paddingLeft),
+        mainBottom: Number.parseFloat(window.getComputedStyle(main).paddingBottom),
+        mainWidth: main.getBoundingClientRect().width,
+        mainX: main.getBoundingClientRect().x,
+      };
+    });
+
+    expect(desktop.wordmarkSize).toBe('20px');
+    expect(desktop.wordmarkWeight).toBe('800');
+    expect(desktop.wordmarkSpacing).toBeLessThan(0);
+    expect(desktop.headerTop).toBe(14);
+    expect(desktop.headerLeft).toBe(40);
+    expect(desktop.headerMax).toBe('1280px');
+    expect(desktop.linkSize).toBe('14px');
+    expect(desktop.linkWeight).toBe('600');
+    expect(desktop.linkTop).toBe(10);
+    expect(desktop.linkLeft).toBe(16);
+    expect(desktop.linkHeight).toBeGreaterThanOrEqual(40);
+    expect(desktop.linkRadius).toBeGreaterThanOrEqual(9999);
+    expect(desktop.mainMax).toBe('1280px');
+    expect(desktop.mainTop).toBe(32);
+    expect(desktop.mainLeft).toBe(40);
+    expect(desktop.mainBottom).toBe(64);
+    expect(desktop.mainWidth).toBeLessThanOrEqual(1280);
+    expect(desktop.mainX).toBeGreaterThan(0);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openWithAllCategories(page);
+    await page.getByTestId('mobile-navigation-toggle').click();
+
+    const mobile = await page.evaluate(() => {
+      const wordmark = document.querySelector('header p') as HTMLElement;
+      const headerBox = document.querySelector('header > div') as HTMLElement;
+      const link = document.querySelector('#screen-navigation a') as HTMLElement;
+      const main = document.querySelector('main') as HTMLElement;
+      return {
+        wordmarkSize: window.getComputedStyle(wordmark).fontSize,
+        wordmarkWeight: window.getComputedStyle(wordmark).fontWeight,
+        headerTop: Number.parseFloat(window.getComputedStyle(headerBox).paddingTop),
+        headerBottom: Number.parseFloat(window.getComputedStyle(headerBox).paddingBottom),
+        headerLeft: Number.parseFloat(window.getComputedStyle(headerBox).paddingLeft),
+        linkSize: window.getComputedStyle(link).fontSize,
+        linkWeight: window.getComputedStyle(link).fontWeight,
+        linkHeight: link.getBoundingClientRect().height,
+        linkRadius: Number.parseFloat(window.getComputedStyle(link).borderRadius),
+        mainTop: Number.parseFloat(window.getComputedStyle(main).paddingTop),
+        mainLeft: Number.parseFloat(window.getComputedStyle(main).paddingLeft),
+        mainBottom: Number.parseFloat(window.getComputedStyle(main).paddingBottom),
+        mainWidth: main.getBoundingClientRect().width,
+      };
+    });
+
+    expect(mobile.wordmarkSize).toBe('20px');
+    expect(mobile.wordmarkWeight).toBe('800');
+    expect(mobile.headerTop).toBe(14);
+    expect(mobile.headerBottom).toBe(12);
+    expect(mobile.headerLeft).toBe(16);
+    expect(mobile.linkSize).toBe('15px');
+    expect(mobile.linkWeight).toBe('600');
+    expect(mobile.linkHeight).toBeGreaterThanOrEqual(48);
+    expect(mobile.linkRadius).toBe(12);
+    expect(mobile.mainTop).toBe(20);
+    expect(mobile.mainLeft).toBe(16);
+    expect(mobile.mainBottom).toBe(32);
+    expect(mobile.mainWidth).toBeLessThanOrEqual(390);
+  });
+
+  test('matches the mock transaction typography, sheets, controls, and table', async ({ page }) => {
+    await openWithAllCategories(page);
+
+    const desktop = await page.evaluate(() => {
+      const style = (element: Element) => window.getComputedStyle(element);
+      const title = document.querySelector('h1') as HTMLElement;
+      const summary = document.querySelector('[data-testid="visible-total"]') as HTMLElement;
+      const label = document.querySelector('label[for="transaction-search"]') as HTMLElement;
+      const input = document.querySelector('[data-testid="transaction-search"]') as HTMLElement;
+      const select = document.querySelector('[data-testid="person-filter"]') as HTMLElement;
+      const searchButton = document.querySelector('[data-testid="search-submit"]') as HTMLElement;
+      const filterSheet = document.querySelector('[data-testid="filter-sheet"]') as HTMLElement;
+      const tableSheet = document.querySelector('[data-testid="table-sheet"]') as HTMLElement;
+      const headerRow = document.querySelector('thead tr') as HTMLElement;
+      const sortButton = document.querySelector('[data-testid="sort-bookingDate"]') as HTMLElement;
+      const bodyRow = document.querySelector('tbody tr') as HTMLElement;
+      const cell = document.querySelector('tbody tr td:nth-child(4)') as HTMLElement;
+      const booking = document.querySelector('tbody tr td:nth-child(2)') as HTMLElement;
+      const amount = document.querySelector('tbody tr td:last-child') as HTMLElement;
+      const pill = document.querySelector('[data-testid="row-category-select"]') as HTMLElement;
+      const pillLabel = pill.closest('label') as HTMLElement;
+
+      return {
+        titleSize: style(title).fontSize,
+        titleWeight: style(title).fontWeight,
+        titleSpacing: Number.parseFloat(style(title).letterSpacing),
+        summarySize: style(summary).fontSize,
+        labelSize: style(label).fontSize,
+        labelWeight: style(label).fontWeight,
+        fontFamily: style(cell).fontFamily,
+        inputHeight: input.getBoundingClientRect().height,
+        inputRadius: style(input).borderRadius,
+        inputSize: style(input).fontSize,
+        inputLeft: Number.parseFloat(style(input).paddingLeft),
+        selectHeight: select.getBoundingClientRect().height,
+        selectRadius: style(select).borderRadius,
+        selectLeft: Number.parseFloat(style(select).paddingLeft),
+        buttonHeight: searchButton.getBoundingClientRect().height,
+        buttonRadius: style(searchButton).borderRadius,
+        buttonWeight: style(searchButton).fontWeight,
+        buttonLeft: Number.parseFloat(style(searchButton).paddingLeft),
+        filterRadius: style(filterSheet).borderRadius,
+        filterTop: Number.parseFloat(style(filterSheet).paddingTop),
+        filterLeft: Number.parseFloat(style(filterSheet).paddingLeft),
+        filterShadow: style(filterSheet).boxShadow,
+        tableRadius: style(tableSheet).borderRadius,
+        tableTop: Number.parseFloat(style(tableSheet).paddingTop),
+        tableLeft: Number.parseFloat(style(tableSheet).paddingLeft),
+        tableBottom: Number.parseFloat(style(tableSheet).paddingBottom),
+        tableShadow: style(tableSheet).boxShadow,
+        headerSize: style(headerRow).fontSize,
+        headerWeight: style(sortButton).fontWeight,
+        headerSpacing: Number.parseFloat(style(headerRow).letterSpacing),
+        headerHeight: headerRow.getBoundingClientRect().height,
+        cellTop: Number.parseFloat(style(cell).paddingTop),
+        cellLeft: Number.parseFloat(style(cell).paddingLeft),
+        rowHeight: bodyRow.getBoundingClientRect().height,
+        bookingWeight: style(booking).fontWeight,
+        amountWeight: style(amount).fontWeight,
+        pillSize: style(pill).fontSize,
+        pillWeight: style(pill).fontWeight,
+        pillTop: Number.parseFloat(style(pill).paddingTop),
+        pillLeft: Number.parseFloat(style(pill).paddingLeft),
+        pillHeight: pill.getBoundingClientRect().height,
+        pillLabelHeight: pillLabel.getBoundingClientRect().height,
+      };
+    });
+
+    expect(desktop.titleSize).toBe('34px');
+    expect(desktop.titleWeight).toBe('800');
+    expect(desktop.titleSpacing).toBeLessThan(0);
+    expect(desktop.summarySize).toBe('15px');
+    expect(desktop.labelSize).toBe('12px');
+    expect(desktop.labelWeight).toBe('700');
+    expect(desktop.fontFamily).toContain('Plus Jakarta Sans');
+    expect(desktop.inputHeight).toBe(44);
+    expect(desktop.inputRadius).toBe('12px');
+    expect(desktop.inputSize).toBe('14px');
+    expect(desktop.inputLeft).toBe(16);
+    expect(desktop.selectHeight).toBe(44);
+    expect(desktop.selectRadius).toBe('12px');
+    expect(desktop.selectLeft).toBe(14);
+    expect(desktop.buttonHeight).toBe(44);
+    expect(desktop.buttonRadius).toBe('12px');
+    expect(desktop.buttonWeight).toBe('700');
+    expect(desktop.buttonLeft).toBe(22);
+    expect(desktop.filterRadius).toBe('20px');
+    expect(desktop.filterTop).toBe(20);
+    expect(desktop.filterLeft).toBe(24);
+    expect(desktop.filterShadow).toContain('rgba(40, 30, 120, 0.08)');
+    expect(desktop.tableRadius).toBe('20px');
+    expect(desktop.tableTop).toBe(8);
+    expect(desktop.tableLeft).toBe(24);
+    expect(desktop.tableBottom).toBe(16);
+    expect(desktop.tableShadow).toContain('rgba(40, 30, 120, 0.08)');
+    expect(desktop.headerSize).toBe('12px');
+    expect(desktop.headerWeight).toBe('700');
+    expect(desktop.headerSpacing).toBeCloseTo(0.72, 1);
+    expect(desktop.headerHeight).toBeGreaterThanOrEqual(47);
+    expect(desktop.headerHeight).toBeLessThanOrEqual(49);
+    expect(desktop.cellTop).toBe(13);
+    expect(desktop.cellLeft).toBe(8);
+    expect(desktop.rowHeight).toBeGreaterThanOrEqual(44);
+    expect(desktop.rowHeight).toBeLessThanOrEqual(48);
+    expect(desktop.bookingWeight).toBe('600');
+    expect(desktop.amountWeight).toBe('700');
+    expect(desktop.pillSize).toBe('12px');
+    expect(desktop.pillWeight).toBe('700');
+    expect(desktop.pillTop).toBe(5);
+    expect(desktop.pillLeft).toBe(12);
+    expect(desktop.pillHeight).toBeLessThan(44);
+    expect(desktop.pillLabelHeight).toBeGreaterThanOrEqual(44);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openWithAllCategories(page);
+
+    const mobile = await page.evaluate(() => {
+      const style = (element: Element) => window.getComputedStyle(element);
+      const title = document.querySelector('h1') as HTMLElement;
+      const summary = document.querySelector('[data-testid="visible-total"]') as HTMLElement;
+      const input = document.querySelector('[data-testid="transaction-search"]') as HTMLElement;
+      const select = document.querySelector('[data-testid="person-filter"]') as HTMLElement;
+      const searchButton = document.querySelector('[data-testid="search-submit"]') as HTMLElement;
+      const filterSheet = document.querySelector('[data-testid="filter-sheet"]') as HTMLElement;
+      const tableSheet = document.querySelector('[data-testid="table-sheet"]') as HTMLElement;
+      const pill = document.querySelector('[data-testid="row-category-select"]') as HTMLElement;
+      const pillLabel = pill.closest('label') as HTMLElement;
+
+      return {
+        titleSize: style(title).fontSize,
+        titleWeight: style(title).fontWeight,
+        summarySize: style(summary).fontSize,
+        inputHeight: input.getBoundingClientRect().height,
+        inputSize: style(input).fontSize,
+        inputLeft: Number.parseFloat(style(input).paddingLeft),
+        selectHeight: select.getBoundingClientRect().height,
+        selectLeft: Number.parseFloat(style(select).paddingLeft),
+        buttonHeight: searchButton.getBoundingClientRect().height,
+        buttonLeft: Number.parseFloat(style(searchButton).paddingLeft),
+        filterRadius: style(filterSheet).borderRadius,
+        filterPadding: Number.parseFloat(style(filterSheet).paddingTop),
+        tableRadius: style(tableSheet).borderRadius,
+        tableShadow: style(tableSheet).boxShadow,
+        pillHeight: pill.getBoundingClientRect().height,
+        pillLabelHeight: pillLabel.getBoundingClientRect().height,
+      };
+    });
+
+    expect(mobile.titleSize).toBe('28px');
+    expect(mobile.titleWeight).toBe('800');
+    expect(mobile.summarySize).toBe('14px');
+    expect(mobile.inputHeight).toBe(48);
+    expect(mobile.inputSize).toBe('15px');
+    expect(mobile.inputLeft).toBe(14);
+    expect(mobile.selectHeight).toBe(48);
+    expect(mobile.selectLeft).toBe(12);
+    expect(mobile.buttonHeight).toBe(48);
+    expect(mobile.buttonLeft).toBe(18);
+    expect(mobile.filterRadius).toBe('18px');
+    expect(mobile.filterPadding).toBe(14);
+    expect(mobile.tableRadius).toBe('18px');
+    expect(mobile.tableShadow).not.toContain('rgba(40, 30, 120, 0.08)');
+    expect(mobile.pillHeight).toBeLessThan(44);
+    expect(mobile.pillLabelHeight).toBeGreaterThanOrEqual(44);
+  });
+
+  test('centres the empty state in a flat sheet', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await interceptApi(page, []);
+    await page.goto('/?category=all', { waitUntil: 'networkidle' });
+
+    const sheet = page.getByTestId('table-sheet');
+    await expect(sheet).toBeVisible();
+    const message = sheet.getByText('There are no transactions to show.');
+    await expect(message).toBeVisible();
+
+    const empty = await page.evaluate(() => {
+      const sheetElement = document.querySelector('[data-testid="table-sheet"]') as HTMLElement;
+      const messageElement = sheetElement.querySelector('p') as HTMLElement;
+      const sheetStyle = window.getComputedStyle(sheetElement);
+      const messageStyle = window.getComputedStyle(messageElement);
+      return {
+        sheetRadius: sheetStyle.borderRadius,
+        sheetShadow: sheetStyle.boxShadow,
+        sheetTop: Number.parseFloat(sheetStyle.paddingTop),
+        messageSize: messageStyle.fontSize,
+        messageAlign: messageStyle.textAlign,
+      };
+    });
+
+    expect(empty.sheetRadius).toBe('18px');
+    expect(empty.sheetShadow).not.toContain('rgba(40, 30, 120, 0.08)');
+    expect(empty.sheetTop).toBe(40);
+    expect(empty.messageSize).toBe('14px');
+    expect(empty.messageAlign).toBe('center');
+  });
 
   test('presents the brand bar, summary, sheets, pills, and amount-last table', async ({ page }) => {
     await openWithAllCategories(page);
@@ -163,10 +451,8 @@ test.describe('redesigned transactions screen', () => {
     });
 
     const sheetStyles = await page.evaluate(() => {
-      const filterInput = document.querySelector('[data-testid="transaction-search"]') as HTMLElement;
-      const tableRegion = document.querySelector('[data-testid="transactions-scroll"]') as HTMLElement;
-      const filterSheet = filterInput.parentElement?.closest('.rounded-sheet') as HTMLElement;
-      const tableSheet = tableRegion.closest('.rounded-sheet') as HTMLElement;
+      const filterSheet = document.querySelector('[data-testid="filter-sheet"]') as HTMLElement;
+      const tableSheet = document.querySelector('[data-testid="table-sheet"]') as HTMLElement;
       return {
         filterBackground: window.getComputedStyle(filterSheet).backgroundColor,
         filterRadius: window.getComputedStyle(filterSheet).borderRadius,
@@ -176,8 +462,8 @@ test.describe('redesigned transactions screen', () => {
     });
     expect(sheetStyles.filterBackground).toBe('rgb(255, 255, 255)');
     expect(sheetStyles.tableBackground).toBe('rgb(255, 255, 255)');
-    expect(sheetStyles.filterRadius).toBe('14px');
-    expect(sheetStyles.tableRadius).toBe('14px');
+    expect(sheetStyles.filterRadius).toBe('20px');
+    expect(sheetStyles.tableRadius).toBe('20px');
 
     const headers = page.locator('thead th');
     await expect(headers).toHaveCount(9);
@@ -279,7 +565,7 @@ test.describe('redesigned transactions screen', () => {
 
       if (viewport.width <= 390) {
         const shortControls = await page.locator(
-          'button:visible, select:visible, input:not([type="checkbox"]):visible, #screen-navigation a:visible',
+          'button:visible, select:visible:not([data-testid="row-category-select"]), input:not([type="checkbox"]):visible, #screen-navigation a:visible',
         ).evaluateAll((elements) => elements
           .filter((element) => element.getBoundingClientRect().height < 44)
           .map((element) => ({
@@ -289,7 +575,7 @@ test.describe('redesigned transactions screen', () => {
           })));
         expect(shortControls).toEqual([]);
         const pillHeight = await page.locator('[data-testid="row-category-select"]').first()
-          .evaluate((element) => element.getBoundingClientRect().height);
+          .evaluate((element) => (element.closest('label') as HTMLElement).getBoundingClientRect().height);
         expect(pillHeight).toBeGreaterThanOrEqual(44);
       }
     });

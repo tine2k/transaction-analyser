@@ -174,7 +174,7 @@ function onPieSliceClick(parameter: unknown, periodKey: 'month' | 'year', period
 
 function chartOption(chart: DisplayedChart): EChartsOption {
   return {
-    textStyle: { fontFamily: 'IBM Plex Sans Variable, sans-serif', color: '#201E3E' },
+    textStyle: { fontFamily: 'Plus Jakarta Sans, sans-serif', color: '#201E3E' },
     tooltip: {
       trigger: 'item',
       formatter: tooltipLabel,
@@ -210,7 +210,7 @@ function chartOption(chart: DisplayedChart): EChartsOption {
 
 <template>
   <div>
-    <h1 class="font-display text-2xl font-semibold text-ink sm:text-3xl">Category spending</h1>
+    <h1 class="font-display text-2xl font-extrabold text-ink sm:text-3xl">Category spending</h1>
     <p class="mt-2 max-w-2xl text-sm text-muted">
       {{ view === 'months'
         ? 'Absolute transaction totals by category for each of the last 12 months.'

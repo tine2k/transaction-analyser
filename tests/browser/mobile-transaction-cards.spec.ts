@@ -164,7 +164,7 @@ test.describe('phone transactions cards', () => {
     });
 
     expect(metrics.radius).toBe('18px');
-    expect(metrics.shadow).toBe('none');
+    expect(metrics.shadow).toContain('rgba(40, 30, 120, 0.08)');
     expect(metrics.padding).toBe(16);
     expect(metrics.gap).toBe(10);
     expect(metrics.background).toBe('rgb(255, 255, 255)');

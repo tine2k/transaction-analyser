@@ -4,6 +4,7 @@ import {
   averageDecimalString,
   createCategoryColorMap,
   createMonthlyCategoryMatrixData,
+  createYearlyCategoryMatrixData,
   filterTransactionsByExpenseType,
   filterTransactionsByMonth,
   filterTransactionsByPerson,
@@ -13,12 +14,16 @@ import {
   getCategoryBreakdown,
   getCategoryMonthlyAverages,
   getCategorySharePercent,
+  getElapsedMonthsInYear,
   getLastCalendarMonths,
   getPersonChoices,
+  getYearlyCellTintPercent,
+  getYearlyYearOptions,
   groupTransactionsByAvailableMonth,
   isZeroAmountString,
   resolvePersonChoice,
   resolveSelectedMonth,
+  resolveSelectedYear,
   sumAbsoluteAmountStrings,
   sumSignedAmountStrings,
   type CategorySpendingTransaction,
@@ -72,12 +77,15 @@ describe('decimal-safe category totals', () => {
     const [total] = getCategoryBreakdown(transactions).entries;
 
     expect(total?.amount).toBe('16.50');
-    expect(formatEuroAmount(total?.amount ?? '')).toBe(new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(16.5));
+    expect(formatEuroAmount(total?.amount ?? '', 'en-US')).toBe('€\u00A016.50');
+  });
+
+  it('separates a leading euro symbol from the digits with a non-breaking space', () => {
+    expect(formatEuroAmount('1234.50', 'en-US')).toBe('€\u00A01,234.50');
+    expect(formatEuroAmount('-0.01', 'en-US')).toBe('-€\u00A00.01');
+    expect(formatEuroAmount('0', 'en-US')).toBe('€\u00A00');
+    expect(formatEuroAmount('1234.50', 'nl-NL')).toBe('€\u00A01.234,50');
+    expect(formatEuroAmount('1234.50', 'de-DE')).toBe('1.234,50\u00A0€');
   });
 
   it('uses locale grouping and currency placement without rounding large exact amounts', () => {
@@ -418,6 +426,127 @@ describe('calendar-year month selection', () => {
 
     expect(filterTransactionsByMonth(transactions, '2026-09').map(({ amount }) => amount))
       .toEqual(['-2.00', '-3.00']);
+  });
+});
+
+describe('yearly year selection', () => {
+  it('offers represented years, the current year, and a selected year oldest first', () => {
+    const transactions = [
+      transaction('2024-01-02', '-1.00', { id: '1', name: 'Old' }),
+      transaction('2026-05-02', '-1.00', { id: '1', name: 'Recent' }),
+      transaction('2023-05-02', '-1.00', { id: '2', name: 'Hidden', hidden: true }),
+    ];
+
+    expect(getYearlyYearOptions(transactions, '2026-09-28')).toEqual([2024, 2026]);
+    expect(getYearlyYearOptions(transactions, '2026-09-28', 2020)).toEqual([2020, 2024, 2026]);
+  });
+
+  it('selects a well-formed query year even when no transaction represents it', () => {
+    expect(resolveSelectedYear('2025', [], '2026-09-28')).toBe(2025);
+    expect(resolveSelectedYear('2025-3', [], '2026-09-28')).toBe(2026);
+  });
+
+  it('defaults to the current year when represented, then the newest represented year', () => {
+    const transactions = [
+      transaction('2024-01-02', '-1.00', { id: '1', name: 'Old' }),
+      transaction('2026-05-02', '-1.00', { id: '1', name: 'Recent' }),
+    ];
+
+    expect(resolveSelectedYear(undefined, transactions, '2026-09-28')).toBe(2026);
+    expect(resolveSelectedYear(undefined, transactions.slice(0, 1), '2026-09-28')).toBe(2024);
+    expect(resolveSelectedYear(undefined, [], '2026-09-28')).toBe(2026);
+  });
+
+  it('does not let a hidden-only current year win the default', () => {
+    const transactions = [
+      transaction('2026-09-02', '-1.00', { id: '2', name: 'Internal', hidden: true }),
+      transaction('2024-07-02', '-1.00', { id: '1', name: 'Groceries' }),
+    ];
+
+    expect(resolveSelectedYear(undefined, transactions, '2026-09-28')).toBe(2024);
+  });
+
+  it('counts elapsed calendar months for current, past, and future years', () => {
+    expect(getElapsedMonthsInYear(2026, '2026-10-15')).toBe(10);
+    expect(getElapsedMonthsInYear(2025, '2026-10-15')).toBe(12);
+    expect(getElapsedMonthsInYear(2027, '2026-10-15')).toBe(0);
+    expect(getElapsedMonthsInYear(2026, '2026-01-01')).toBe(1);
+  });
+});
+
+describe('yearly category matrix', () => {
+  it('builds twelve month cells and a total from exact absolute sums', () => {
+    const matrix = createYearlyCategoryMatrixData([
+      transaction('2026-01-02', '-12.50', { id: '1', name: 'Groceries' }),
+      transaction('2026-01-03', '4.00', { id: '1', name: 'Groceries' }),
+      transaction('2026-03-04', '-7.00', { id: '1', name: 'Groceries' }),
+      transaction('2026-02-05', '-100.00', { id: '2', name: 'Rent' }),
+      transaction('2025-12-06', '-50.00', { id: '1', name: 'Groceries' }),
+    ], 2026);
+
+    expect(matrix.months.map(({ key }) => key)).toEqual([
+      '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
+      '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12',
+    ]);
+    expect(matrix.rows.map(({ name, total }) => [name, total])).toEqual([
+      ['Rent', '100.00'],
+      ['Groceries', '23.50'],
+    ]);
+    expect(matrix.rows[0]?.cells).toEqual([
+      '0', '100.00', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0',
+    ]);
+    expect(matrix.rows[1]?.cells).toEqual([
+      '16.50', '0', '7.00', '0', '0', '0', '0', '0', '0', '0', '0', '0',
+    ]);
+    expect(matrix.rows[0]?.maximum).toBe('100.00');
+    expect(matrix.rows[1]?.maximum).toBe('16.50');
+    expect(matrix.total).toBe('123.50');
+  });
+
+  it('excludes hidden categories and includes uncategorised', () => {
+    const matrix = createYearlyCategoryMatrixData([
+      transaction('2026-01-02', '-12.50', { id: '1', name: 'Groceries' }),
+      transaction('2026-01-03', '-999.00', { id: '2', name: 'Internal', hidden: true }),
+      transaction('2026-02-04', '-2.00', null),
+    ], 2026);
+
+    expect(matrix.rows.map(({ name, total }) => [name, total])).toEqual([
+      ['Groceries', '12.50'],
+      ['Uncategorised', '2.00'],
+    ]);
+    expect(matrix.total).toBe('14.50');
+  });
+
+  it('orders rows by total descending, then name and identity, with uncategorised participating', () => {
+    const matrix = createYearlyCategoryMatrixData([
+      transaction('2026-01-02', '-5.00', { id: '3', name: 'Zulu' }),
+      transaction('2026-01-03', '-5.00', { id: '2', name: 'alpha' }),
+      transaction('2026-01-04', '-10.00', null),
+      transaction('2026-01-05', '-5.00', { id: '4', name: 'Alpha' }),
+    ], 2026);
+
+    expect(matrix.rows.map(({ name }) => name)).toEqual([
+      'Uncategorised', 'alpha', 'Alpha', 'Zulu',
+    ]);
+  });
+
+  it('keeps a zero-total category row', () => {
+    const matrix = createYearlyCategoryMatrixData([
+      transaction('2026-01-02', '0.00', { id: '1', name: 'Zero-only' }),
+    ], 2026);
+
+    expect(matrix.rows).toHaveLength(1);
+    expect(matrix.rows[0]?.name).toBe('Zero-only');
+    expect(isZeroAmountString(matrix.rows[0]?.total ?? '')).toBe(true);
+    expect(matrix.rows[0]?.maximum).toBe('0');
+  });
+
+  it('computes a row-relative tint within the brand range', () => {
+    expect(getYearlyCellTintPercent('100.00', '100.00')).toBe(56);
+    expect(getYearlyCellTintPercent('50.00', '100.00')).toBe(31);
+    expect(getYearlyCellTintPercent('0', '100.00')).toBe(0);
+    expect(getYearlyCellTintPercent('100.00', '0')).toBe(0);
+    expect(getYearlyCellTintPercent('200.00', '100.00')).toBe(56);
   });
 });
 

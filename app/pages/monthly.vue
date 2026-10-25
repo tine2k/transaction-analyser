@@ -357,77 +357,79 @@ function transactionLocation(categoryKey: string) {
       </p>
 
       <template v-else>
-        <p id="monthly-table-scroll-help" class="mb-2 mt-5 text-xs text-muted lg:hidden">
-          Scroll horizontally to view every column.
-        </p>
-        <div
-          role="region"
-          aria-label="Monthly category table"
-          aria-describedby="monthly-table-scroll-help"
-          tabindex="0"
-          class="max-w-full overflow-x-auto rounded-panel bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          data-testid="monthly-category-scroll"
-        >
-          <table
-            class="w-full min-w-[720px] border-collapse text-left text-sm"
-            data-testid="monthly-category-table"
+        <div class="mt-4" data-testid="monthly-table-section">
+          <p id="monthly-table-scroll-help" class="mb-2 text-xs text-muted lg:hidden">
+            Scroll horizontally to view every column.
+          </p>
+          <div
+            role="region"
+            aria-label="Monthly category table"
+            aria-describedby="monthly-table-scroll-help"
+            tabindex="0"
+            class="max-w-full overflow-x-auto rounded-panel bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            data-testid="monthly-category-scroll"
           >
-            <caption class="sr-only">
-              Absolute transaction totals by category for {{ selectedMonthLabel }}
-            </caption>
-            <thead>
-              <tr class="text-xs uppercase tracking-[0.06em] text-muted">
-                <th scope="col" class="px-3 py-3 font-bold sm:px-5">Category</th>
-                <th scope="col" class="w-[38%] px-3 py-3 font-bold sm:px-5">Share of top category</th>
-                <th scope="col" class="px-3 py-3 text-right font-bold sm:px-5">Transactions</th>
-                <th scope="col" class="px-3 py-3 text-right font-bold sm:px-5">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="entry in breakdown.entries"
-                :key="entry.key"
-                class="border-t border-rule"
-                data-testid="category-row"
-                :data-category-key="entry.key"
-              >
-                <th scope="row" class="whitespace-nowrap px-3 py-3 font-semibold sm:px-5">
-                  <NuxtLink
-                    :to="transactionLocation(entry.key)"
-                    :aria-label="`View ${entry.name} transactions for ${selectedMonthLabel}`"
-                    class="inline-flex min-h-11 items-center gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                    data-testid="category-transaction-link"
-                  >
-                    <span
-                      aria-hidden="true"
-                      class="h-2.5 w-2.5 shrink-0 rounded-full"
-                      data-testid="category-color"
-                      :style="{ backgroundColor: categoryColor(entry.key) }"
-                    />
-                    <span class="break-words">{{ entry.name }}</span>
-                  </NuxtLink>
-                </th>
-                <td class="px-3 py-3 sm:px-5">
-                  <div class="h-2.5 rounded-full bg-rule">
-                    <div
-                      class="h-2.5 rounded-full"
-                      data-testid="share-bar"
-                      :style="{
-                        width: `${sharePercent(entry.amount)}%`,
-                        backgroundColor: categoryColor(entry.key),
-                      }"
-                    />
-                  </div>
-                </td>
-                <td class="whitespace-nowrap px-3 py-3 text-right text-muted tabular-nums sm:px-5" data-testid="row-transactions">
-                  {{ entry.transactions }}
-                </td>
-                <td class="whitespace-nowrap px-3 py-3 text-right font-bold text-ink tabular-nums sm:px-5" data-testid="row-amount">
-                  {{ formatEuroAmount(entry.amount) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+            <table
+              class="w-full min-w-[720px] border-collapse text-left text-sm"
+              data-testid="monthly-category-table"
+            >
+              <caption class="sr-only">
+                Absolute transaction totals by category for {{ selectedMonthLabel }}
+              </caption>
+              <thead>
+                <tr class="text-xs uppercase tracking-[0.06em] text-muted">
+                  <th scope="col" class="px-3 py-3 font-bold sm:px-5">Category</th>
+                  <th scope="col" class="w-[38%] px-3 py-3 font-bold sm:px-5">Share of top category</th>
+                  <th scope="col" class="px-3 py-3 text-right font-bold sm:px-5">Transactions</th>
+                  <th scope="col" class="px-3 py-3 text-right font-bold sm:px-5">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="entry in breakdown.entries"
+                  :key="entry.key"
+                  class="border-t border-rule"
+                  data-testid="category-row"
+                  :data-category-key="entry.key"
+                >
+                  <th scope="row" class="whitespace-nowrap px-3 py-3 font-semibold sm:px-5">
+                    <NuxtLink
+                      :to="transactionLocation(entry.key)"
+                      :aria-label="`View ${entry.name} transactions for ${selectedMonthLabel}`"
+                      class="inline-flex min-h-11 items-center gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                      data-testid="category-transaction-link"
+                    >
+                      <span
+                        aria-hidden="true"
+                        class="h-2.5 w-2.5 shrink-0 rounded-full"
+                        data-testid="category-color"
+                        :style="{ backgroundColor: categoryColor(entry.key) }"
+                      />
+                      <span class="break-words">{{ entry.name }}</span>
+                    </NuxtLink>
+                  </th>
+                  <td class="px-3 py-3 sm:px-5">
+                    <div class="h-2.5 rounded-full bg-rule">
+                      <div
+                        class="h-2.5 rounded-full"
+                        data-testid="share-bar"
+                        :style="{
+                          width: `${sharePercent(entry.amount)}%`,
+                          backgroundColor: categoryColor(entry.key),
+                        }"
+                      />
+                    </div>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-3 text-right text-muted tabular-nums sm:px-5" data-testid="row-transactions">
+                    {{ entry.transactions }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-3 text-right font-bold text-ink tabular-nums sm:px-5" data-testid="row-amount">
+                    {{ formatEuroAmount(entry.amount) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </template>
     </template>

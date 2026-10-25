@@ -111,7 +111,7 @@ The window defaults to the first day of the preceding calendar quarter through t
 - **Categories** - regular expressions matched against the purpose line or the counterparty name, and inclusive date windows, assign transactions, with match previews, a hidden flag, and an optional expense type (recurring or one-time) that classifies the category for the analysis screens.
 - **People** - the named owners every transaction belongs to; the list shows each person's transaction count, and a person can be created or renamed but never deleted. Renaming keeps every transaction it owns and changes what future imports must name.
 - **Monthly** - one selected calendar month with a year control and twelve month pills, a `Total moved` figure, a transaction count, a top-eight category bar plus `Other`, and a category table with share, transaction count, and amount; filterable by person and expense type, with uncategorised hidden on demand and each category row linking to the matching transactions for that person.
-- **Monthly totals** - a month-by-category matrix over every month with data; filterable by person and expense type, with each amount linking to the matching transactions for that person.
+- **Yearly** - one selected year as a category-by-month matrix with year pills, `Total moved` and average-per-month cards, a total column, and a row-relative heatmap; filterable by person, expense type, and hidden uncategorised rows, with every populated month and total cell linking to the matching transactions for that person.
 - **Monthly average** - average spend per category over a chosen number of months; filterable by person and expense type.
 
 ## Development

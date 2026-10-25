@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
 // transaction data.
 //
 // See openspec/changes/replace-analytics-with-monthly-screen/specs/category-spending-chart/spec.md
-// and openspec/specs/monthly-category-totals-table/spec.md
+// and openspec/changes/replace-monthly-totals-with-yearly-screen/specs/monthly-category-totals-table/spec.md
 // and openspec/specs/monthly-category-average/spec.md
 
 const today = new Date();
@@ -21,6 +21,7 @@ const transactions = [
     purpose: 'Supermarket',
     counterpartyName: 'REWE',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
     category: { id: '1', name: 'Groceries', hidden: false, expenseType: 'recurring' },
   },
   {
@@ -31,6 +32,7 @@ const transactions = [
     purpose: 'Car dealer',
     counterpartyName: 'Dealer',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
     category: { id: '2', name: 'New car', hidden: false, expenseType: 'one-time' },
   },
   {
@@ -41,6 +43,7 @@ const transactions = [
     purpose: 'Transfer',
     counterpartyName: 'Own account',
     counterpartyAccount: null,
+    person: { id: '1', name: 'Default' },
     category: { id: '3', name: 'Internal', hidden: false, expenseType: null },
   },
 ];
@@ -63,13 +66,13 @@ test('the monthly filter defaults to all and narrows the summary, bar, and table
   await page.goto('/monthly', { waitUntil: 'networkidle' });
 
   await expect(page.getByTestId('expense-type-all')).toBeChecked();
-  await expect(page.getByTestId('total-moved-value')).toHaveText('€60.00');
+  await expect(page.getByTestId('total-moved-value')).toHaveText('€ 60.00');
   await expect(page.getByTestId('transaction-count-value')).toHaveText('3');
   await expect(page.getByTestId('category-row')).toHaveCount(3);
   await expect(page.getByTestId('bar-legend')).toContainText('Groceries');
 
   await page.getByTestId('expense-type-recurring').check();
-  await expect(page.getByTestId('total-moved-value')).toHaveText('€10.00');
+  await expect(page.getByTestId('total-moved-value')).toHaveText('€ 10.00');
   await expect(page.getByTestId('transaction-count-value')).toHaveText('1');
   await expect(page.getByTestId('category-row')).toHaveCount(1);
   await expect(page.getByTestId('bar-legend')).toContainText('Groceries');
@@ -77,7 +80,7 @@ test('the monthly filter defaults to all and narrows the summary, bar, and table
   await expect(page.getByTestId('bar-legend')).not.toContainText('Internal');
 
   await page.getByTestId('expense-type-one-time').check();
-  await expect(page.getByTestId('total-moved-value')).toHaveText('€20.00');
+  await expect(page.getByTestId('total-moved-value')).toHaveText('€ 20.00');
   await expect(page.getByTestId('transaction-count-value')).toHaveText('1');
   await expect(page.getByTestId('category-row')).toHaveCount(1);
   await expect(page.getByTestId('bar-legend')).toContainText('New car');
@@ -86,20 +89,20 @@ test('the monthly filter defaults to all and narrows the summary, bar, and table
   expect(transactionRequests).toBe(1);
 });
 
-test('the monthly totals filter narrows the table', async ({ page }) => {
+test('the yearly filter narrows the table', async ({ page }) => {
   await interceptTransactions(page);
-  await page.goto('/monthly-totals', { waitUntil: 'networkidle' });
+  await page.goto('/yearly', { waitUntil: 'networkidle' });
 
   await expect(page.getByTestId('expense-type-all')).toBeChecked();
-  await expect(page.getByTestId('category-heading')).toHaveCount(3);
+  await expect(page.getByTestId('yearly-row')).toHaveCount(3);
 
   await page.getByTestId('expense-type-recurring').check();
-  await expect(page.getByTestId('category-heading')).toHaveCount(1);
-  await expect(page.getByTestId('category-heading').first()).toHaveText('Groceries');
+  await expect(page.getByTestId('yearly-row')).toHaveCount(1);
+  await expect(page.getByTestId('yearly-row').first()).toContainText('Groceries');
 
   await page.getByTestId('expense-type-one-time').check();
-  await expect(page.getByTestId('category-heading')).toHaveCount(1);
-  await expect(page.getByTestId('category-heading').first()).toHaveText('New car');
+  await expect(page.getByTestId('yearly-row')).toHaveCount(1);
+  await expect(page.getByTestId('yearly-row').first()).toContainText('New car');
 });
 
 test('the monthly average filter narrows the list', async ({ page }) => {

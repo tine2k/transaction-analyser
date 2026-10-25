@@ -1310,7 +1310,7 @@ onBeforeUnmount(() => {
       </p>
 
       <div
-        class="mt-3.5 rounded-panel-mobile bg-surface p-3.5 shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:py-5 sm:shadow-sheet"
+        class="mt-3.5 rounded-panel-mobile bg-surface p-3.5 shadow-sheet sm:mt-6 sm:rounded-panel sm:px-6 sm:py-5"
         data-testid="filter-sheet"
       >
         <div class="grid w-full grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))] xl:items-end">
@@ -1414,7 +1414,7 @@ onBeforeUnmount(() => {
       <div
         v-if="transactions.length === 0"
         data-testid="table-sheet"
-        class="mt-3.5 rounded-panel-mobile bg-surface px-4 py-10 shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:shadow-sheet"
+        class="mt-3.5 rounded-panel-mobile bg-surface px-4 py-10 shadow-sheet sm:mt-6 sm:rounded-panel sm:px-6"
       >
         <p class="text-center text-sm text-muted">
           There are no transactions to show.
@@ -1424,7 +1424,7 @@ onBeforeUnmount(() => {
       <div
         v-else-if="visibleTransactions.length === 0 && searchActive"
         data-testid="table-sheet"
-        class="mt-3.5 rounded-panel-mobile bg-surface px-4 py-10 shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:shadow-sheet"
+        class="mt-3.5 rounded-panel-mobile bg-surface px-4 py-10 shadow-sheet sm:mt-6 sm:rounded-panel sm:px-6"
       >
         <p class="text-center text-sm text-muted">
           There are no transactions matching “{{ appliedSearch }}”.
@@ -1434,7 +1434,7 @@ onBeforeUnmount(() => {
       <div
         v-else-if="visibleTransactions.length === 0"
         data-testid="table-sheet"
-        class="mt-3.5 rounded-panel-mobile bg-surface px-4 py-10 shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:shadow-sheet"
+        class="mt-3.5 rounded-panel-mobile bg-surface px-4 py-10 shadow-sheet sm:mt-6 sm:rounded-panel sm:px-6"
       >
         <p class="text-center text-sm text-muted">
           There are no transactions matching the selected filters.
@@ -1446,7 +1446,7 @@ onBeforeUnmount(() => {
         data-testid="table-sheet"
         :class="phoneViewport
           ? 'mt-3.5'
-          : 'mt-3.5 overflow-hidden rounded-panel-mobile bg-surface shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:pb-4 sm:pt-2 sm:shadow-sheet'"
+          : 'mt-3.5 overflow-hidden rounded-panel-mobile bg-surface shadow-sheet sm:mt-6 sm:rounded-panel sm:px-6 sm:pb-4 sm:pt-2'"
       >
         <div
           v-if="phoneViewport"
@@ -1500,7 +1500,7 @@ onBeforeUnmount(() => {
             data-testid="transaction-card"
             :data-transaction-id="transaction.id"
             :aria-busy="markers.has(transaction.id) ? 'true' : undefined"
-            class="flex flex-col gap-2.5 rounded-panel-mobile bg-surface p-4"
+            class="flex flex-col gap-2.5 rounded-panel-mobile bg-surface p-4 shadow-sheet"
           >
             <div class="flex items-start gap-2">
               <label class="flex min-h-11 min-w-11 items-center justify-center">

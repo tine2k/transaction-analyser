@@ -55,6 +55,20 @@ export type MonthlyCategoryMatrixData = {
   months: Array<CalendarMonth & { totals: Map<string, string> }>;
 };
 
+export type YearlyCategoryRow = {
+  key: string;
+  name: string;
+  cells: string[];
+  total: string;
+  maximum: string;
+};
+
+export type YearlyCategoryMatrixData = {
+  months: CalendarMonth[];
+  rows: YearlyCategoryRow[];
+  total: string;
+};
+
 export type CategoryMonthlyAverage = {
   key: string;
   name: string;
@@ -278,6 +292,8 @@ export function createMonthlyCategoryMatrixData(
   };
 }
 
+const NON_BREAKING_SPACE = '\u00A0';
+
 export function formatEuroAmount(amount: string, locale?: string): string {
   const decimal = parseDecimal(amount);
   const magnitude = decimal.coefficient < 0n ? -decimal.coefficient : decimal.coefficient;
@@ -314,7 +330,7 @@ export function formatEuroAmount(amount: string, locale?: string): string {
   const result: string[] = [];
   let insertedNumber = false;
 
-  for (const part of template) {
+  for (const [index, part] of template.entries()) {
     if (part.type === 'integer' && !insertedNumber) {
       result.push(...localizedInteger.map(({ value }) => value));
       if (decimal.scale > 0) {
@@ -323,6 +339,17 @@ export function formatEuroAmount(amount: string, locale?: string): string {
       insertedNumber = true;
     } else if (part.type !== 'integer' && part.type !== 'group') {
       result.push(part.value);
+      // A locale that puts the symbol first may leave it against the digits
+      // (en-US). Separate them with a non-breaking space so the value cannot
+      // wrap. Locales that already provide a literal (nl-NL) or put the symbol
+      // after the amount (de-DE) keep exactly what Intl produced.
+      const nextType = template[index + 1]?.type;
+      if (
+        part.type === 'currency'
+        && (nextType === 'minusSign' || nextType === 'integer' || nextType === 'group')
+      ) {
+        result.push(NON_BREAKING_SPACE);
+      }
     }
   }
 
@@ -501,6 +528,171 @@ export function getCalendarYearMonths(year: number): CalendarMonth[] {
       endDate: `${key}-${String(lastDay).padStart(2, '0')}`,
     };
   });
+}
+
+function getRepresentedYears(transactions: CategorySpendingTransaction[]): number[] {
+  const years = new Set<number>();
+  for (const { bookingDate } of excludeHiddenCategoryTransactions(transactions)) {
+    const year = Number(bookingDate.slice(0, 4));
+    if (Number.isInteger(year)) {
+      years.add(year);
+    }
+  }
+  return [...years].sort((left, right) => left - right);
+}
+
+// The years the Yearly pills offer: every year represented by an included
+// returned transaction, the current year, and a well-formed selected year.
+// They are ordered oldest first so the pills read as a timeline.
+export function getYearlyYearOptions(
+  transactions: CategorySpendingTransaction[],
+  today: string,
+  selectedYear?: number,
+): number[] {
+  const years = new Set<number>(getRepresentedYears(transactions));
+  const currentYear = Number(today.slice(0, 4));
+  if (Number.isInteger(currentYear)) {
+    years.add(currentYear);
+  }
+  if (selectedYear !== undefined && Number.isInteger(selectedYear)) {
+    years.add(selectedYear);
+  }
+  return [...years].sort((left, right) => left - right);
+}
+
+const YEAR_KEY_PATTERN = /^\d{4}$/;
+
+// A well-formed year query wins, even when no transaction represents it, so a
+// shared link can show an empty year. Otherwise the current year wins when it
+// is represented, then the newest represented year, then the current year.
+export function resolveSelectedYear(
+  value: unknown,
+  transactions: CategorySpendingTransaction[],
+  today: string,
+): number {
+  if (typeof value === 'string' && YEAR_KEY_PATTERN.test(value)) {
+    const year = Number(value);
+    if (Number.isInteger(year)) {
+      return year;
+    }
+  }
+
+  const currentYear = Number(today.slice(0, 4));
+  const represented = getRepresentedYears(transactions);
+  if (represented.includes(currentYear)) {
+    return currentYear;
+  }
+  return represented[represented.length - 1] ?? currentYear;
+}
+
+// The number of calendar months that have elapsed in a year. A current year
+// counts through the current month, a past year counts all twelve, and a
+// future year counts none.
+export function getElapsedMonthsInYear(year: number, today: string): number {
+  if (!Number.isInteger(year)) {
+    throw new Error('calendar year must be an integer');
+  }
+
+  const currentYear = Number(today.slice(0, 4));
+  const currentMonth = Number(today.slice(5, 7));
+  if (!Number.isInteger(currentYear) || !Number.isInteger(currentMonth)) {
+    throw new Error('today must be a YYYY-MM-DD date');
+  }
+
+  if (year < currentYear) {
+    return 12;
+  }
+  if (year > currentYear) {
+    return 0;
+  }
+  return Math.min(12, Math.max(0, currentMonth));
+}
+
+function compareYearlyRows(left: YearlyCategoryRow, right: YearlyCategoryRow): number {
+  const byTotal = compareDecimalStrings(right.total, left.total);
+  if (byTotal !== 0) {
+    return byTotal;
+  }
+
+  const byName = left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+  if (byName !== 0) {
+    return byName;
+  }
+
+  return left.key < right.key ? -1 : left.key > right.key ? 1 : 0;
+}
+
+// One selected year as category rows and twelve month cells. Hidden categories
+// are excluded before any row or cell is formed, and every displayed value is
+// an exact decimal string. The row maximum is the largest month amount, used
+// only for the row-relative heatmap.
+export function createYearlyCategoryMatrixData(
+  transactions: CategorySpendingTransaction[],
+  year: number,
+): YearlyCategoryMatrixData {
+  const months = getCalendarYearMonths(year);
+  const monthKeys = new Set(months.map(({ key }) => key));
+  const groups = new Map<string, { name: string; amountsByMonth: Map<string, string[]> }>();
+
+  for (const transaction of excludeHiddenCategoryTransactions(transactions)) {
+    const monthKey = transaction.bookingDate.slice(0, 7);
+    if (!monthKeys.has(monthKey)) {
+      continue;
+    }
+
+    const key = transaction.category === null ? 'uncategorised' : `category:${transaction.category.id}`;
+    let group = groups.get(key);
+    if (group === undefined) {
+      group = { name: transaction.category?.name ?? 'Uncategorised', amountsByMonth: new Map() };
+      groups.set(key, group);
+    }
+
+    const amounts = group.amountsByMonth.get(monthKey);
+    if (amounts === undefined) {
+      group.amountsByMonth.set(monthKey, [transaction.amount]);
+    } else {
+      amounts.push(transaction.amount);
+    }
+  }
+
+  const rows = [...groups.entries()]
+    .map(([key, group]) => {
+      const cells = months.map(({ key: monthKey }) =>
+        sumAbsoluteAmountStrings(group.amountsByMonth.get(monthKey) ?? []));
+      const total = sumAbsoluteAmountStrings(cells);
+      const maximum = cells.reduce(
+        (largest, amount) => (compareDecimalStrings(amount, largest) > 0 ? amount : largest),
+        '0',
+      );
+      return { key, name: group.name, cells, total, maximum };
+    })
+    .sort(compareYearlyRows);
+
+  return {
+    months,
+    rows,
+    total: sumAbsoluteAmountStrings(rows.map(({ total }) => total)),
+  };
+}
+
+// The brand-tinted background percentage for a populated Yearly cell, relative
+// to the largest month in its row. Zero amounts and zero rows are untinted;
+// the result stays within the 6%–56% brand range.
+export function getYearlyCellTintPercent(amount: string, rowMaximum: string): number {
+  const amountDecimal = parseDecimal(amount);
+  const maximumDecimal = parseDecimal(rowMaximum);
+  if (amountDecimal.coefficient <= 0n || maximumDecimal.coefficient <= 0n) {
+    return 0;
+  }
+
+  const commonScale = Math.max(amountDecimal.scale, maximumDecimal.scale);
+  const amountCoefficient = amountDecimal.coefficient * powerOfTen(commonScale - amountDecimal.scale);
+  const maximumCoefficient = maximumDecimal.coefficient * powerOfTen(commonScale - maximumDecimal.scale);
+  const precision = 1_000_000n;
+  const ratio = Number((amountCoefficient * precision + maximumCoefficient / 2n) / maximumCoefficient)
+    / Number(precision);
+
+  return 6 + 50 * Math.min(1, Math.max(0, ratio));
 }
 
 // The years the year control offers: every year represented by an included

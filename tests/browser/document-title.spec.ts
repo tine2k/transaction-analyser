@@ -9,7 +9,7 @@ const screens = [
   { path: '/categories', title: 'Categories · Expenses' },
   { path: '/people', title: 'People · Expenses' },
   { path: '/monthly', title: 'Monthly · Expenses' },
-  { path: '/monthly-totals', title: 'Monthly totals · Expenses' },
+  { path: '/yearly', title: 'Yearly · Expenses' },
   { path: '/monthly-average', title: 'Monthly average · Expenses' },
   { path: '/imports', title: 'Imports · Expenses' },
 ];

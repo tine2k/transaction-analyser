@@ -92,9 +92,28 @@ On the Monthly screen at narrow widths, the summary figures SHALL stack or share
 - **WHEN** the stacked bar is shown at a narrow width
 - **THEN** its segments stay within the bar's width and every legend entry remains readable
 
-### Requirement: Wide tables scroll within their own region on narrow screens
+### Requirement: The Yearly screen reflows its figures and matrix
 
-The system SHALL preserve the semantic table structure and all columns, rows, and cell values for categories, people, monthly totals, and the Monthly category table. The transactions table SHALL remain a semantic table from the `sm` breakpoint up and SHALL preserve its columns and values there. Below `sm`, transactions SHALL be presented as the card list defined by `transaction-table` rather than as a horizontally scrolling table, and every transaction value SHALL remain present in its card. When a table is wider than the viewport, its containing region SHALL provide horizontal scrolling without making the page itself wider. The scrollable region SHALL be reachable and operable by touch and keyboard, and it SHALL NOT change sorting, filtering, row order, or displayed values.
+On the Yearly screen at narrow widths, the summary cards SHALL stack or share a row according to the available width, the year pills SHALL remain reachable without page-level horizontal overflow, and the category-by-month matrix SHALL scroll within its own region. Category names, every month cell, and every total SHALL remain present and readable.
+
+#### Scenario: The Yearly screen reflows on a phone
+
+- **WHEN** the `/yearly` route is shown at a 320 CSS-pixel viewport width
+- **THEN** the summary cards fit the page, the year pills remain reachable, the matrix scrolls within its own region, every category, month, and total remains available, and the page has no horizontal overflow
+
+#### Scenario: The year pills remain reachable
+
+- **WHEN** the year pills do not fit on one line
+- **THEN** they wrap or scroll within their own region without widening the page or hiding a year
+
+#### Scenario: The matrix keeps every value
+
+- **WHEN** the Yearly matrix is wider than its containing region
+- **THEN** every category row, month column, and total remains present in the semantic table and can be reached by scrolling its containing region
+
+### Requirement: Wide tables and the Yearly matrix scroll within their own region
+
+The system SHALL preserve the semantic table structure and all columns, rows, and cell values for categories, people, the Yearly matrix, and the Monthly category table. The transactions table SHALL remain a semantic table from the `sm` breakpoint up and SHALL preserve its columns and values there. Below `sm`, transactions SHALL be presented as the card list defined by `transaction-table` rather than as a horizontally scrolling table, and every transaction value SHALL remain present in its card. When a table is wider than the viewport, its containing region SHALL provide horizontal scrolling without making the page itself wider. The scrollable region SHALL be reachable and operable by touch and keyboard, and it SHALL NOT change sorting, filtering, row order, or displayed values.
 
 #### Scenario: The transactions table is browsable on a phone
 
@@ -108,8 +127,13 @@ The system SHALL preserve the semantic table structure and all columns, rows, an
 
 #### Scenario: The monthly comparison table retains its data
 
-- **WHEN** the monthly totals table has more category columns than fit in the viewport
-- **THEN** every month, category heading, and cell remains present in the semantic table and can be reached by scrolling its containing region
+- **WHEN** the former monthly totals table is reached through `/monthly-totals`
+- **THEN** it redirects to `/yearly`, where the Yearly matrix retains its data
+
+#### Scenario: The Yearly matrix retains its data
+
+- **WHEN** the Yearly matrix has more month columns than fit in the viewport
+- **THEN** every category, month heading, month cell, and total remains present in the semantic table and can be reached by scrolling its containing region
 
 #### Scenario: The Monthly category table retains its data
 

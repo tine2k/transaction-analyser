@@ -85,6 +85,17 @@
   );
 }
 
+/* The Yearly matrix is the one place where a cell background encodes magnitude.
+   The percentage comes from the row-relative helper, so the exact amount stays
+   the authoritative value. */
+.yearly-tint {
+  background-color: color-mix(
+    in srgb,
+    var(--color-brand) var(--yearly-tint),
+    var(--color-surface)
+  );
+}
+
 /* Intentional wide-table overflow is handled by each table's own scroll region. */
 html,
 body {

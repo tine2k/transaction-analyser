@@ -412,7 +412,7 @@ test.describe('redesigned transactions screen', () => {
     expect(mobile.filterRadius).toBe('18px');
     expect(mobile.filterPadding).toBe(14);
     expect(mobile.cardRadius).toBe('18px');
-    expect(mobile.cardShadow).toBe('none');
+    expect(mobile.cardShadow).toContain('rgba(40, 30, 120, 0.08)');
     expect(mobile.cardPadding).toBe(16);
     expect(mobile.cardGap).toBe(10);
     expect(mobile.cardCount).toBe(3);
@@ -446,7 +446,7 @@ test.describe('redesigned transactions screen', () => {
     });
 
     expect(empty.sheetRadius).toBe('18px');
-    expect(empty.sheetShadow).not.toContain('rgba(40, 30, 120, 0.08)');
+    expect(empty.sheetShadow).toContain('rgba(40, 30, 120, 0.08)');
     expect(empty.sheetTop).toBe(40);
     expect(empty.messageSize).toBe('14px');
     expect(empty.messageAlign).toBe('center');
@@ -467,7 +467,7 @@ test.describe('redesigned transactions screen', () => {
       'Categories',
       'People',
       'Monthly',
-      'Monthly totals',
+      'Yearly',
       'Monthly average',
       'Imports',
     ]);

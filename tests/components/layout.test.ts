@@ -42,7 +42,7 @@ describe('default layout navigation', () => {
       ['Categories', '/categories'],
       ['People', '/people'],
       ['Monthly', '/monthly'],
-      ['Monthly totals', '/monthly-totals'],
+      ['Yearly', '/yearly'],
       ['Monthly average', '/monthly-average'],
       ['Imports', '/imports'],
     ]);
@@ -64,10 +64,11 @@ describe('default layout navigation', () => {
     expect(people.findAll('nav a')[2]?.attributes('aria-current')).toBe('page');
     await people.unmount();
 
-    route.path = '/monthly-totals';
-    const monthlyTotals = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(monthlyTotals.findAll('nav a')[4]?.attributes('aria-current')).toBe('page');
-    await monthlyTotals.unmount();
+    route.path = '/yearly';
+    const yearly = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
+    expect(yearly.findAll('nav a')[4]?.text()).toBe('Yearly');
+    expect(yearly.findAll('nav a')[4]?.attributes('aria-current')).toBe('page');
+    await yearly.unmount();
 
     route.path = '/monthly-average';
     const monthlyAverage = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });

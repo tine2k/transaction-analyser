@@ -63,7 +63,7 @@ const routes = [
   { path: '/categories', heading: 'Categories' },
   { path: '/people', heading: 'People' },
   { path: '/monthly', heading: 'Monthly' },
-  { path: '/monthly-totals', heading: 'Monthly totals' },
+  { path: '/yearly', heading: 'Yearly' },
   { path: '/monthly-average', heading: 'Monthly average' },
   { path: '/imports', heading: 'Imports' },
   { path: '/route-that-does-not-exist', heading: 'This page does not exist' },
@@ -204,8 +204,10 @@ for (const viewport of viewports) {
           await expectNoPageOverflow(page);
         }
 
-        if (viewport.width <= 390 && route.path === '/monthly-totals') {
-          const region = page.getByRole('region', { name: 'Monthly category totals table' });
+        if (viewport.width <= 390 && route.path === '/yearly') {
+          await expect(page.getByTestId('year-pill')).toHaveCount(1);
+          await expect(page.getByTestId('yearly-row')).toHaveCount(9);
+          const region = page.getByRole('region', { name: 'Yearly category matrix' });
           await expect(region).toBeVisible();
           await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
             .toBe(true);

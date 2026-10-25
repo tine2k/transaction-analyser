@@ -3,7 +3,10 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+# pnpm-workspace.yaml lists arm64 because the development machines share one
+# install. The build container needs its own platform's native packages instead,
+# including x64 on CI runners.
+RUN corepack enable && pnpm install --frozen-lockfile --cpu "$(node -p process.arch)" --os "$(node -p process.platform)"
 
 COPY . .
 RUN pnpm run build

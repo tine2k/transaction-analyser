@@ -4,6 +4,7 @@
 .ocx
 openspec
 node_modules
+.pnpm-store
 .nuxt
 .output
 coverage

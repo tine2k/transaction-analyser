@@ -161,18 +161,26 @@ for (const viewport of viewports) {
           await expectPhoneControlsToBeTouchSized(page);
         }
 
-        if (viewport.width <= 390 && route.path === '/') {
+        if (route.path === '/') {
           await expect(page.getByTestId('person-filter')).toBeVisible();
           await expect(page.getByTestId('category-filter')).toBeVisible();
           await expect(page.getByTestId('period-filter')).toBeVisible();
-          await expect(page.locator('thead th', { hasText: 'Person' })).toHaveCount(1);
 
-          const region = page.getByRole('region', { name: 'Transactions table' });
-          await expect(region).toBeVisible();
-          await region.focus();
-          await page.keyboard.press('ArrowRight');
-          await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-          await expectNoPageOverflow(page);
+          if (viewport.width <= 390) {
+            await expect(page.getByTestId('transaction-card')).toHaveCount(1);
+            await expect(page.getByTestId('transactions-scroll')).toHaveCount(0);
+            const card = page.getByTestId('transaction-card').first();
+            await expect(card).toContainText('Uncategorised transaction');
+            await expect(card).toContainText('-3.25');
+            await expect(card).toContainText('Local shop');
+            await expect(card).toContainText('Default');
+            await expect(card).toContainText('No counterparty account');
+            await expectNoPageOverflow(page);
+          } else {
+            const region = page.getByRole('region', { name: 'Transactions table' });
+            await expect(region).toBeVisible();
+            await expect(page.getByTestId('transaction-card')).toHaveCount(0);
+          }
         }
 
         if (viewport.width <= 390 && route.path === '/categories') {          await page.getByTestId('add-window').click();

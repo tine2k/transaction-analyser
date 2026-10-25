@@ -71,7 +71,7 @@ test('the masthead names the application', async ({ page }) => {
   await expect(page.getByRole('banner')).not.toContainText('Transaction Analyser');
 });
 
-test('every route uses the display family inside the bounded frame without external font requests', async ({ page }) => {
+test('every route uses the display family inside the full-width frame without external font requests', async ({ page }) => {
   await page.setViewportSize({ width: 1720, height: 1200 });
   const externalFonts: string[] = [];
   page.on('request', (request) => {
@@ -100,8 +100,8 @@ test('every route uses the display family inside the bounded frame without exter
     expect(metrics.bodyFamily, screen.path).toContain('Plus Jakarta Sans');
     expect(metrics.headingFamily, screen.path).toContain('Plus Jakarta Sans');
     expect(metrics.headingWeight, screen.path).toBe('800');
-    expect(metrics.mainWidth, screen.path).toBeLessThanOrEqual(1280);
-    expect(metrics.mainX, screen.path).toBeGreaterThan(0);
+    expect(metrics.mainWidth, screen.path).toBe(1720);
+    expect(metrics.mainX, screen.path).toBe(0);
     expect(metrics.noOverflow, screen.path).toBe(true);
   }
 

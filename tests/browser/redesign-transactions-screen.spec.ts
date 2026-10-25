@@ -69,6 +69,11 @@ async function interceptApi(page: Page, transactionRows = transactions): Promise
       return;
     }
 
+    if (pathname === '/api/people' && method === 'GET') {
+      await route.fulfill({ json: [] });
+      return;
+    }
+
     if (pathname === '/api/transactions/category-assignments' && method === 'POST') {
       await route.fulfill({ json: {} });
       return;
@@ -103,6 +108,7 @@ test.describe('redesigned transactions screen', () => {
         headerTop: Number.parseFloat(window.getComputedStyle(headerBox).paddingTop),
         headerLeft: Number.parseFloat(window.getComputedStyle(headerBox).paddingLeft),
         headerMax: window.getComputedStyle(headerInner).maxWidth,
+        headerWidth: headerInner.getBoundingClientRect().width,
         linkSize: window.getComputedStyle(link).fontSize,
         linkWeight: window.getComputedStyle(link).fontWeight,
         linkTop: Number.parseFloat(window.getComputedStyle(link).paddingTop),
@@ -123,19 +129,20 @@ test.describe('redesigned transactions screen', () => {
     expect(desktop.wordmarkSpacing).toBeLessThan(0);
     expect(desktop.headerTop).toBe(14);
     expect(desktop.headerLeft).toBe(40);
-    expect(desktop.headerMax).toBe('1280px');
+    expect(desktop.headerMax).toBe('none');
+    expect(desktop.headerWidth).toBe(1640);
     expect(desktop.linkSize).toBe('14px');
     expect(desktop.linkWeight).toBe('600');
     expect(desktop.linkTop).toBe(10);
     expect(desktop.linkLeft).toBe(16);
     expect(desktop.linkHeight).toBeGreaterThanOrEqual(40);
     expect(desktop.linkRadius).toBeGreaterThanOrEqual(9999);
-    expect(desktop.mainMax).toBe('1280px');
+    expect(desktop.mainMax).toBe('none');
     expect(desktop.mainTop).toBe(32);
     expect(desktop.mainLeft).toBe(40);
     expect(desktop.mainBottom).toBe(64);
-    expect(desktop.mainWidth).toBeLessThanOrEqual(1280);
-    expect(desktop.mainX).toBeGreaterThan(0);
+    expect(desktop.mainWidth).toBe(1720);
+    expect(desktop.mainX).toBe(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await openWithAllCategories(page);
@@ -176,6 +183,32 @@ test.describe('redesigned transactions screen', () => {
     expect(mobile.mainLeft).toBe(16);
     expect(mobile.mainBottom).toBe(32);
     expect(mobile.mainWidth).toBeLessThanOrEqual(390);
+  });
+
+  test('applies the full-width frame to every route', async ({ page }) => {
+    await interceptApi(page);
+    await page.goto('/people', { waitUntil: 'networkidle' });
+    await expect(page.getByRole('heading', { level: 1, name: 'People' })).toBeVisible();
+
+    const frame = await page.evaluate(() => {
+      const headerInner = document.querySelector('header > div > div') as HTMLElement;
+      const main = document.querySelector('main') as HTMLElement;
+      return {
+        headerMax: window.getComputedStyle(headerInner).maxWidth,
+        headerWidth: headerInner.getBoundingClientRect().width,
+        mainMax: window.getComputedStyle(main).maxWidth,
+        mainWidth: main.getBoundingClientRect().width,
+        mainX: main.getBoundingClientRect().x,
+        mainLeft: Number.parseFloat(window.getComputedStyle(main).paddingLeft),
+      };
+    });
+
+    expect(frame.headerMax).toBe('none');
+    expect(frame.headerWidth).toBe(1640);
+    expect(frame.mainMax).toBe('none');
+    expect(frame.mainWidth).toBe(1720);
+    expect(frame.mainX).toBe(0);
+    expect(frame.mainLeft).toBe(40);
   });
 
   test('matches the mock transaction typography, sheets, controls, and table', async ({ page }) => {
@@ -302,7 +335,7 @@ test.describe('redesigned transactions screen', () => {
       const select = document.querySelector('[data-testid="person-filter"]') as HTMLElement;
       const searchButton = document.querySelector('[data-testid="search-submit"]') as HTMLElement;
       const filterSheet = document.querySelector('[data-testid="filter-sheet"]') as HTMLElement;
-      const tableSheet = document.querySelector('[data-testid="table-sheet"]') as HTMLElement;
+      const card = document.querySelector('[data-testid="transaction-card"]') as HTMLElement;
       const pill = document.querySelector('[data-testid="row-category-select"]') as HTMLElement;
       const pillLabel = pill.closest('label') as HTMLElement;
 
@@ -319,8 +352,12 @@ test.describe('redesigned transactions screen', () => {
         buttonLeft: Number.parseFloat(style(searchButton).paddingLeft),
         filterRadius: style(filterSheet).borderRadius,
         filterPadding: Number.parseFloat(style(filterSheet).paddingTop),
-        tableRadius: style(tableSheet).borderRadius,
-        tableShadow: style(tableSheet).boxShadow,
+        cardRadius: style(card).borderRadius,
+        cardShadow: style(card).boxShadow,
+        cardPadding: Number.parseFloat(style(card).paddingTop),
+        cardGap: Number.parseFloat(style(card).rowGap),
+        cardCount: document.querySelectorAll('[data-testid="transaction-card"]').length,
+        tableCount: document.querySelectorAll('[data-testid="transactions-scroll"]').length,
         pillHeight: pill.getBoundingClientRect().height,
         pillLabelHeight: pillLabel.getBoundingClientRect().height,
       };
@@ -338,8 +375,12 @@ test.describe('redesigned transactions screen', () => {
     expect(mobile.buttonLeft).toBe(18);
     expect(mobile.filterRadius).toBe('18px');
     expect(mobile.filterPadding).toBe(14);
-    expect(mobile.tableRadius).toBe('18px');
-    expect(mobile.tableShadow).not.toContain('rgba(40, 30, 120, 0.08)');
+    expect(mobile.cardRadius).toBe('18px');
+    expect(mobile.cardShadow).toBe('none');
+    expect(mobile.cardPadding).toBe(16);
+    expect(mobile.cardGap).toBe(10);
+    expect(mobile.cardCount).toBe(3);
+    expect(mobile.tableCount).toBe(0);
     expect(mobile.pillHeight).toBeLessThan(44);
     expect(mobile.pillLabelHeight).toBeGreaterThanOrEqual(44);
   });
@@ -559,9 +600,14 @@ test.describe('redesigned transactions screen', () => {
         .map((element) => `${element.tagName}.${(element as HTMLElement).className}`));
       expect(offenders).toEqual([]);
 
-      const tableRegion = page.getByTestId('transactions-scroll');
-      expect(await tableRegion.evaluate((element) => element.scrollWidth > element.clientWidth))
-        .toBe(viewport.width < 1024);
+      if (viewport.width < 640) {
+        await expect(page.getByTestId('transaction-card')).toHaveCount(3);
+        await expect(page.getByTestId('transactions-scroll')).toHaveCount(0);
+      } else {
+        const tableRegion = page.getByTestId('transactions-scroll');
+        expect(await tableRegion.evaluate((element) => element.scrollWidth > element.clientWidth))
+          .toBe(viewport.width < 1024);
+      }
 
       if (viewport.width <= 390) {
         const shortControls = await page.locator(

@@ -5,6 +5,10 @@
 // the analysis screens, and the imports screen. The link for the screen currently
 // shown is marked as the current one.
 //
+// The masthead's inner content and the main frame span the viewport at every width:
+// padding, not a centered maximum-width column, keeps content off the edge. Screens
+// that need a readable measure bound their own forms rather than the shared frame.
+//
 // See openspec/changes/add-category-management/specs/category-management-screen/spec.md
 // and openspec/changes/add-people/specs/category-management-screen/spec.md
 import { IconMenu2, IconX } from '@tabler/icons-vue';
@@ -49,7 +53,7 @@ watch(() => route.path, () => {
   <div class="min-h-screen text-ink">
     <header class="brand-bar">
       <div class="px-4 pb-3 pt-3.5 sm:px-10 sm:py-3.5">
-        <div class="mx-auto flex w-full max-w-[1280px] flex-col gap-3 md:flex-row md:items-center md:justify-start md:gap-8">
+        <div class="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-start md:gap-8">
           <div class="flex items-center justify-between gap-4">
             <p class="font-display text-xl font-extrabold tracking-normal text-white md:tracking-[-0.02em]">
               Expenses
@@ -92,7 +96,7 @@ watch(() => route.path, () => {
       </div>
     </header>
 
-    <main class="mx-auto w-full min-w-0 max-w-[1280px] px-4 py-5 pb-8 sm:px-10 sm:py-8 sm:pb-16">
+    <main class="w-full min-w-0 px-4 py-5 pb-8 sm:px-10 sm:py-8 sm:pb-16">
       <slot />
     </main>
   </div>

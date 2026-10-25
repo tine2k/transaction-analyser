@@ -143,6 +143,24 @@ const { data: storedCategories } = useFetch<StoredCategory[]>('/api/categories',
 const router = useRouter();
 const route = router.currentRoute;
 
+// The phone presentation matches Tailwind's `sm` breakpoint from below. One
+// presentation is rendered at a time: the card list is not a second hidden copy
+// of the table, so a transaction, its category select, and its test id exist once.
+const PHONE_MEDIA_QUERY = '(max-width: 639.98px)';
+
+function phoneMediaQuery(): MediaQueryList | null {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(PHONE_MEDIA_QUERY)
+    : null;
+}
+
+const phoneQuery = phoneMediaQuery();
+const phoneViewport = ref(phoneQuery?.matches ?? false);
+
+function syncPhoneViewport(event?: MediaQueryListEvent): void {
+  phoneViewport.value = event?.matches ?? phoneQuery?.matches ?? false;
+}
+
 function queryString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
@@ -399,15 +417,16 @@ function setPeriodQuery(value: string): void {
   void router.replace({ path: '/', query });
 }
 
-function setSortQuery(sort: TransactionSort): void {
-  void router.replace({
-    path: '/',
-    query: {
-      ...route.value.query,
-      sort: sort.column,
-      direction: sort.direction,
-    },
-  });
+function setSortQuery(sort: TransactionSort | null): void {
+  const query = { ...route.value.query };
+  if (sort === null) {
+    delete query.sort;
+    delete query.direction;
+  } else {
+    query.sort = sort.column;
+    query.direction = sort.direction;
+  }
+  void router.replace({ path: '/', query });
 }
 
 // The form's submit path and the Clear control both end here. Applying is an
@@ -456,6 +475,39 @@ function ariaSortFor(column: SortColumn): 'ascending' | 'descending' | 'none' {
     return 'none';
   }
   return activeSort.value.direction === 'asc' ? 'ascending' : 'descending';
+}
+
+// The phone sort control writes the same route values as a table header. A
+// different column starts ascending; choosing the active column again keeps its
+// direction. Default order removes both values.
+function chooseSortColumn(value: string): void {
+  if (value === '') {
+    activeSort.value = null;
+    setSortQuery(null);
+    return;
+  }
+  if (!isSortColumn(value)) {
+    return;
+  }
+  const next: TransactionSort = {
+    column: value,
+    direction: activeSort.value?.column === value ? activeSort.value.direction : 'asc',
+  };
+  activeSort.value = next;
+  setSortQuery(next);
+}
+
+function toggleSortDirection(): void {
+  const current = activeSort.value;
+  if (current === null) {
+    return;
+  }
+  const next: TransactionSort = {
+    column: current.column,
+    direction: current.direction === 'asc' ? 'desc' : 'asc',
+  };
+  activeSort.value = next;
+  setSortQuery(next);
 }
 
 watch(
@@ -740,6 +792,19 @@ watch(
 
 watch(() => transactions.value, continuePresentation);
 
+// The two presentations have different batch triggers: the desktop sentinel
+// must not keep observing while cards are shown, and returning to the table
+// re-arms the reader's position.
+watch(phoneViewport, (phone) => {
+  if (phone) {
+    batchObserver?.disconnect();
+    return;
+  }
+  if (canObserveProximity()) {
+    watchBatchPosition();
+  }
+});
+
 const visibleTotal = computed(() =>
   sumSignedAmountStrings(visibleTransactions.value.map(({ amount }) => amount)),
 );
@@ -909,16 +974,17 @@ function elementOf(node: Node): Element | null {
   return node.nodeType === 1 ? node as Element : node.parentElement;
 }
 
-// A selection only counts when both of its ends sit in the same table cell, so
-// a drag across cells cannot produce a pattern.
-function selectedCell(selection: Selection): HTMLElement | null {
+// A selection only counts when both of its ends sit in the same field: one
+// table cell or one labelled region of a phone card. A drag across fields cannot
+// produce a pattern.
+function selectedField(selection: Selection): HTMLElement | null {
   if (selection.rangeCount === 0) {
     return null;
   }
   const range = selection.getRangeAt(0);
-  const startCell = elementOf(range.startContainer)?.closest('td') ?? null;
-  const endCell = elementOf(range.endContainer)?.closest('td') ?? null;
-  return startCell !== null && startCell === endCell ? startCell : null;
+  const startField = elementOf(range.startContainer)?.closest('td, [data-transaction-field]') ?? null;
+  const endField = elementOf(range.endContainer)?.closest('td, [data-transaction-field]') ?? null;
+  return startField !== null && startField === endField ? startField : null;
 }
 
 function focusWithinBar(): boolean {
@@ -933,14 +999,14 @@ function clearCaptured(): void {
 
 function handleSelectionChange(): void {
   const selection = window.getSelection();
-  const cell = selection === null ? null : selectedCell(selection);
-  const insideTable = cell !== null && tableRegion.value !== null && tableRegion.value.contains(cell);
-  const text = insideTable ? (selection?.toString() ?? '').trim() : '';
-  const transactionId = insideTable
-    ? cell?.closest('tr')?.getAttribute('data-transaction-id') ?? null
+  const field = selection === null ? null : selectedField(selection);
+  const insideList = field !== null && tableRegion.value !== null && tableRegion.value.contains(field);
+  const text = insideList ? (selection?.toString() ?? '').trim() : '';
+  const transactionId = insideList
+    ? field?.closest('[data-transaction-id]')?.getAttribute('data-transaction-id') ?? null
     : null;
 
-  if (!insideTable || [...text].length < 3 || transactionId === null) {
+  if (!insideList || [...text].length < 3 || transactionId === null) {
     // Focusing the bar's own control collapses the document selection, so the
     // captured text must survive that.
     if (!focusWithinBar()) {
@@ -1191,6 +1257,8 @@ async function refreshTransactions(): Promise<void> {
 onMounted(() => {
   document.addEventListener('selectionchange', handleSelectionChange);
   document.addEventListener('keydown', handleKeydown);
+  phoneQuery?.addEventListener('change', syncPhoneViewport);
+  syncPhoneViewport();
   // The data can already be present at mount, which the data watcher alone
   // would not report, so the fill is started here as well.
   continuePresentation();
@@ -1199,6 +1267,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('selectionchange', handleSelectionChange);
   document.removeEventListener('keydown', handleKeydown);
+  phoneQuery?.removeEventListener('change', syncPhoneViewport);
   presentationGeneration.value += 1;
   batchObserver?.disconnect();
   batchObserver = null;
@@ -1244,27 +1313,29 @@ onBeforeUnmount(() => {
         class="mt-3.5 rounded-panel-mobile bg-surface p-3.5 shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:py-5 sm:shadow-sheet"
         data-testid="filter-sheet"
       >
-        <div class="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))] xl:items-end">
-          <div class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
+        <div class="grid w-full grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))] xl:items-end">
+          <div class="col-span-2 grid min-w-0 gap-1.5 text-xs font-bold text-muted xl:col-span-1">
             <label for="transaction-search">Search transactions</label>
-            <form class="flex min-w-0 flex-wrap items-center gap-2" @submit.prevent="applySearch">
-              <input
-                id="transaction-search"
-                v-model="searchText"
-                type="search"
-                data-testid="transaction-search"
-                autocomplete="off"
-                :aria-describedby="searchActive ? 'filters-paused-note' : undefined"
-                placeholder="Purpose, counterparty, account"
-                class="min-h-12 w-full min-w-0 flex-1 rounded-control border border-rule-strong bg-surface px-3.5 py-2 text-[15px] text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-11 sm:px-4 sm:text-sm"
-              >
-              <button
-                type="submit"
-                data-testid="search-submit"
-                class="inline-flex min-h-12 shrink-0 items-center justify-center rounded-control bg-brand px-[18px] py-2 text-sm font-bold text-white hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-11 sm:px-[22px]"
-              >
-                Search
-              </button>
+            <form class="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center" @submit.prevent="applySearch">
+              <div class="flex w-full min-w-0 items-center gap-2 sm:flex-1">
+                <input
+                  id="transaction-search"
+                  v-model="searchText"
+                  type="search"
+                  data-testid="transaction-search"
+                  autocomplete="off"
+                  :aria-describedby="searchActive ? 'filters-paused-note' : undefined"
+                  placeholder="Purpose, counterparty, account"
+                  class="min-h-12 min-w-0 flex-1 rounded-control border border-rule-strong bg-surface px-3.5 py-2 text-[15px] text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-11 sm:px-4 sm:text-sm"
+                >
+                <button
+                  type="submit"
+                  data-testid="search-submit"
+                  class="inline-flex min-h-12 shrink-0 items-center justify-center rounded-control bg-brand px-[18px] py-2 text-sm font-bold text-white hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-11 sm:px-[22px]"
+                >
+                  Search
+                </button>
+              </div>
               <button
                 v-if="searchText !== '' || searchActive"
                 type="button"
@@ -1312,7 +1383,7 @@ onBeforeUnmount(() => {
               </optgroup>
             </select>
           </label>
-          <label class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
+          <label class="col-span-2 grid min-w-0 gap-1.5 text-xs font-bold text-muted xl:col-span-1">
             Category
             <select
               v-model="categoryFilter"
@@ -1373,153 +1444,318 @@ onBeforeUnmount(() => {
       <div
         v-else
         data-testid="table-sheet"
-        class="mt-3.5 overflow-hidden rounded-panel-mobile bg-surface shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:pb-4 sm:pt-2 sm:shadow-sheet"
+        :class="phoneViewport
+          ? 'mt-3.5'
+          : 'mt-3.5 overflow-hidden rounded-panel-mobile bg-surface shadow-none sm:mt-6 sm:rounded-panel sm:px-6 sm:pb-4 sm:pt-2 sm:shadow-sheet'"
       >
-        <p id="transactions-scroll-help" class="px-4 pt-3 text-xs text-muted sm:hidden">
-          Scroll horizontally to view all transaction columns.
-        </p>
         <div
+          v-if="phoneViewport"
           ref="tableRegion"
-          role="region"
-          aria-label="Transactions table"
-          aria-describedby="transactions-scroll-help"
-          tabindex="0"
-          data-testid="transactions-scroll"
-          class="max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand"
+          data-testid="transaction-cards"
+          class="flex flex-col gap-3.5"
         >
-        <table class="w-max min-w-full border-collapse text-left text-sm">
-          <thead>
-            <tr class="border-b border-rule text-xs uppercase tracking-[0.06em] text-muted">
-              <th scope="col" class="px-2 py-0.5 font-bold">
-                <label class="flex min-h-11 items-center justify-center">
-                  <input
-                    type="checkbox"
-                    data-testid="select-all-visible"
-                    :checked="allVisibleSelected"
-                    :indeterminate="someVisibleSelected && !allVisibleSelected"
-                    class="size-5 rounded-sheet border-rule-strong text-brand focus:ring-brand"
-                    @change="toggleAllVisible"
-                  >
-                  <span class="sr-only">Select all shown transactions</span>
-                </label>
-              </th>
-              <th
-                v-for="column in sortableColumns"
-                :key="column.column"
-                scope="col"
-                :aria-sort="ariaSortFor(column.column)"
-                class="px-2 py-0.5 font-bold"
+          <div class="flex flex-col gap-2" data-testid="phone-transactions-toolbar">
+            <label class="inline-flex min-h-11 items-center gap-2 text-xs font-bold text-muted">
+              <input
+                type="checkbox"
+                data-testid="select-all-visible"
+                :checked="allVisibleSelected"
+                :indeterminate="someVisibleSelected && !allVisibleSelected"
+                class="size-5 rounded-sheet border-rule-strong text-brand focus:ring-brand"
+                @change="toggleAllVisible"
               >
-                <button
-                  type="button"
-                  :data-testid="`sort-${column.column}`"
-                  :class="[
-                    'flex min-h-11 w-full items-center gap-1 rounded-control font-bold text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
-                    column.align === 'right' ? 'justify-end' : 'justify-start',
-                  ]"
-                  @click="activateSort(column.column)"
+              Select all shown transactions
+            </label>
+            <div class="flex min-w-0 items-center gap-2">
+              <label for="mobile-sort" class="sr-only">Sort by</label>
+              <select
+                id="mobile-sort"
+                data-testid="mobile-sort"
+                :value="activeSort?.column ?? ''"
+                class="min-h-12 min-w-0 flex-1 rounded-control border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                @change="chooseSortColumn(($event.target as HTMLSelectElement).value)"
+              >
+                <option value="">Default order</option>
+                <option v-for="column in sortableColumns" :key="column.column" :value="column.column">
+                  {{ column.label }}
+                </option>
+              </select>
+              <button
+                type="button"
+                data-testid="mobile-sort-direction"
+                :disabled="activeSort === null"
+                :aria-label="`Sort direction: ${activeSort?.direction === 'desc' ? 'descending' : 'ascending'}`"
+                class="inline-flex min-h-12 shrink-0 items-center justify-center rounded-control border border-rule-strong bg-surface px-3 text-xs font-bold text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
+                @click="toggleSortDirection"
+              >
+                {{ activeSort?.direction === 'desc' ? 'Descending' : 'Ascending' }}
+              </button>
+            </div>
+          </div>
+
+          <article
+            v-for="transaction in presentedTransactions"
+            :key="transaction.id"
+            v-memo="rowMemo(transaction)"
+            data-testid="transaction-card"
+            :data-transaction-id="transaction.id"
+            :aria-busy="markers.has(transaction.id) ? 'true' : undefined"
+            class="flex flex-col gap-2.5 rounded-panel-mobile bg-surface p-4"
+          >
+            <div class="flex items-start gap-2">
+              <label class="flex min-h-11 min-w-11 items-center justify-center">
+                <input
+                  type="checkbox"
+                  data-testid="row-select"
+                  :checked="selectedIds.has(transaction.id)"
+                  class="size-5 rounded-sheet border-rule-strong text-brand focus:ring-brand"
+                  @change="toggleSelected(transaction.id)"
                 >
-                  <span>{{ column.label }}</span>
-                  <span
-                    v-if="activeSort?.column === column.column"
-                    aria-hidden="true"
-                    class="text-brand"
-                  >{{ activeSort.direction === 'asc' ? '↑' : '↓' }}</span>
-                </button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="transaction in presentedTransactions"
-              :key="transaction.id"
-              v-memo="rowMemo(transaction)"
-              :data-transaction-id="transaction.id"
-              :aria-busy="markers.has(transaction.id) ? 'true' : undefined"
-              class="border-b border-rule transition-colors last:border-b-0 hover:bg-paper/60"
-            >
-              <td class="px-2 py-0">
-                <label class="flex min-h-11 items-center justify-center">
-                  <input
-                    type="checkbox"
-                    data-testid="row-select"
-                    :checked="selectedIds.has(transaction.id)"
-                    class="size-5 rounded-sheet border-rule-strong text-brand focus:ring-brand"
-                    @change="toggleSelected(transaction.id)"
-                  >
-                  <span class="sr-only">Select {{ transaction.purpose }}</span>
-                </label>
-              </td>
-              <td class="whitespace-nowrap px-2 py-[13px] font-semibold tabular-nums text-ink">
+                <span class="sr-only">Select {{ transaction.purpose }}</span>
+              </label>
+              <div class="flex min-w-0 flex-1 items-start justify-between gap-3">
+                <span
+                  data-transaction-field="purpose"
+                  class="min-w-0 break-words text-[15px] font-bold text-ink"
+                >{{ transaction.purpose }}</span>
+                <span
+                  data-transaction-field="amount"
+                  class="shrink-0 whitespace-nowrap text-[15px] font-extrabold tabular-nums text-ink"
+                >{{ transaction.amount }}</span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span
+                v-if="markers.has(transaction.id)"
+                aria-hidden="true"
+                data-testid="row-updating"
+                class="inline-block size-2 shrink-0 rounded-full bg-muted align-middle"
+              ></span>
+              <span
+                v-if="transaction.categoryAssignment === 'manual'"
+                data-testid="manual-assignment-marker"
+                class="inline-flex shrink-0 text-muted align-middle"
+              >
+                <AppIcon :icon="IconMapPin" :size="14" />
+                <span class="sr-only">Manually assigned</span>
+              </span>
+              <label class="relative inline-flex min-h-11 min-w-0 items-center">
+                <select
+                  data-testid="row-category-select"
+                  :value="transaction.category?.id ?? ''"
+                  :disabled="rowInFlight(transaction.id)"
+                  :aria-label="`Category for ${transaction.purpose}`"
+                  class="max-w-full min-w-0 appearance-none truncate rounded-pill border py-[5px] pl-3 pr-8 text-xs font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
+                  :class="transaction.category === null ? 'border-rule-strong bg-surface text-ink' : ''"
+                  :style="categoryPillStyle(transaction.category)"
+                  @change="chooseRowCategory(transaction, $event)"
+                >
+                  <option value="">Uncategorised</option>
+                  <option v-for="category in pickerCategories" :key="category.id" :value="category.id">
+                    {{ category.label }}
+                  </option>
+                </select>
+                <AppIcon
+                  :icon="IconChevronDown"
+                  :size="14"
+                  class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted"
+                />
+              </label>
+              <span v-if="markers.has(transaction.id)" class="sr-only">Updating category</span>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-1 text-xs text-muted">
+              <span data-transaction-field="bookingDate">
+                Booked
                 <time :datetime="transaction.bookingDate">{{ formatCalendarDate(transaction.bookingDate) }}</time>
-              </td>
-              <td class="whitespace-nowrap px-2 py-[13px] tabular-nums text-ink">
+              </span>
+              <span data-transaction-field="valueDate">
+                Value
                 <time :datetime="transaction.valueDate">{{ formatCalendarDate(transaction.valueDate) }}</time>
-              </td>
-              <td class="px-2 py-[13px] text-ink">{{ transaction.purpose }}</td>
-              <td class="px-2 py-[13px] text-ink">{{ transaction.counterpartyName }}</td>
-              <td class="px-2 py-[13px] text-ink">
+              </span>
+            </div>
+
+            <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-t border-rule pt-2 text-xs text-muted">
+              <dt class="font-bold">Counterparty</dt>
+              <dd data-transaction-field="counterpartyName" class="min-w-0 break-words text-right text-ink">
+                {{ transaction.counterpartyName }}
+              </dd>
+              <dt class="font-bold">Account</dt>
+              <dd data-transaction-field="counterpartyAccount" class="min-w-0 break-words text-right text-ink">
                 <template v-if="transaction.counterpartyAccount !== null">
                   {{ transaction.counterpartyAccount }}
                 </template>
                 <template v-else>
-                  <span aria-hidden="true" class="text-muted">—</span>
+                  <span aria-hidden="true">—</span>
                   <span class="sr-only">No counterparty account</span>
                 </template>
-              </td>
-              <td class="px-2 py-[13px] text-ink">{{ transaction.person.name }}</td>
-              <td class="px-2 py-0 text-ink">
-                <span class="inline-flex min-w-0 items-center gap-1.5">
-                  <span
-                    v-if="markers.has(transaction.id)"
-                    aria-hidden="true"
-                    data-testid="row-updating"
-                    class="inline-block size-2 shrink-0 rounded-full bg-muted align-middle"
-                  ></span>
-                  <span
-                    v-if="transaction.categoryAssignment === 'manual'"
-                    data-testid="manual-assignment-marker"
-                    class="inline-flex shrink-0 text-muted align-middle"
-                  >
-                    <AppIcon :icon="IconMapPin" :size="14" />
-                    <span class="sr-only">Manually assigned</span>
-                  </span>
-                  <label class="relative inline-flex min-h-11 min-w-0 items-center">
-                    <select
-                      data-testid="row-category-select"
-                      :value="transaction.category?.id ?? ''"
-                      :disabled="rowInFlight(transaction.id)"
-                      :aria-label="`Category for ${transaction.purpose}`"
-                      class="max-w-56 min-w-0 appearance-none truncate rounded-pill border py-[5px] pl-3 pr-8 text-xs font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
-                      :class="transaction.category === null ? 'border-rule-strong bg-surface text-ink' : ''"
-                      :style="categoryPillStyle(transaction.category)"
-                      @change="chooseRowCategory(transaction, $event)"
-                    >
-                      <option value="">Uncategorised</option>
-                      <option v-for="category in pickerCategories" :key="category.id" :value="category.id">
-                        {{ category.label }}
-                      </option>
-                    </select>
-                    <AppIcon
-                      :icon="IconChevronDown"
-                      :size="14"
-                      class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted"
-                    />
-                  </label>
-                </span>
-                <span v-if="markers.has(transaction.id)" class="sr-only">Updating category</span>
-              </td>
-              <td class="whitespace-nowrap px-2 py-[13px] text-right font-bold tabular-nums text-ink">{{ transaction.amount }}</td>
-            </tr>
-          </tbody>
-        </table>
+              </dd>
+              <dt class="font-bold">Person</dt>
+              <dd data-transaction-field="person" class="min-w-0 break-words text-right text-ink">
+                {{ transaction.person.name }}
+              </dd>
+            </dl>
+          </article>
+
+          <button
+            v-if="hasMoreRows()"
+            type="button"
+            data-testid="load-more"
+            class="inline-flex min-h-12 w-full items-center justify-center rounded-control bg-brand px-[18px] py-2 text-sm font-bold text-white hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            @click="extendPresentation"
+          >
+            Load more
+          </button>
         </div>
-        <div
-          ref="batchSentinel"
-          aria-hidden="true"
-          data-testid="transactions-batch-sentinel"
-          class="h-px w-full"
-        ></div>
+
+        <template v-else>
+          <p id="transactions-scroll-help" class="px-4 pt-3 text-xs text-muted">
+            Scroll horizontally to view all transaction columns.
+          </p>
+          <div
+            ref="tableRegion"
+            role="region"
+            aria-label="Transactions table"
+            aria-describedby="transactions-scroll-help"
+            tabindex="0"
+            data-testid="transactions-scroll"
+            class="max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand"
+          >
+            <table class="w-max min-w-full border-collapse text-left text-sm">
+              <thead>
+                <tr class="border-b border-rule text-xs uppercase tracking-[0.06em] text-muted">
+                  <th scope="col" class="px-2 py-0.5 font-bold">
+                    <label class="flex min-h-11 items-center justify-center">
+                      <input
+                        type="checkbox"
+                        data-testid="select-all-visible"
+                        :checked="allVisibleSelected"
+                        :indeterminate="someVisibleSelected && !allVisibleSelected"
+                        class="size-5 rounded-sheet border-rule-strong text-brand focus:ring-brand"
+                        @change="toggleAllVisible"
+                      >
+                      <span class="sr-only">Select all shown transactions</span>
+                    </label>
+                  </th>
+                  <th
+                    v-for="column in sortableColumns"
+                    :key="column.column"
+                    scope="col"
+                    :aria-sort="ariaSortFor(column.column)"
+                    class="px-2 py-0.5 font-bold"
+                  >
+                    <button
+                      type="button"
+                      :data-testid="`sort-${column.column}`"
+                      :class="[
+                        'flex min-h-11 w-full items-center gap-1 rounded-control font-bold text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
+                        column.align === 'right' ? 'justify-end' : 'justify-start',
+                      ]"
+                      @click="activateSort(column.column)"
+                    >
+                      <span>{{ column.label }}</span>
+                      <span
+                        v-if="activeSort?.column === column.column"
+                        aria-hidden="true"
+                        class="text-brand"
+                      >{{ activeSort.direction === 'asc' ? '↑' : '↓' }}</span>
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="transaction in presentedTransactions"
+                  :key="transaction.id"
+                  v-memo="rowMemo(transaction)"
+                  :data-transaction-id="transaction.id"
+                  :aria-busy="markers.has(transaction.id) ? 'true' : undefined"
+                  class="border-b border-rule transition-colors last:border-b-0 hover:bg-paper/60"
+                >
+                  <td class="px-2 py-0">
+                    <label class="flex min-h-11 items-center justify-center">
+                      <input
+                        type="checkbox"
+                        data-testid="row-select"
+                        :checked="selectedIds.has(transaction.id)"
+                        class="size-5 rounded-sheet border-rule-strong text-brand focus:ring-brand"
+                        @change="toggleSelected(transaction.id)"
+                      >
+                      <span class="sr-only">Select {{ transaction.purpose }}</span>
+                    </label>
+                  </td>
+                  <td class="whitespace-nowrap px-2 py-[13px] font-semibold tabular-nums text-ink">
+                    <time :datetime="transaction.bookingDate">{{ formatCalendarDate(transaction.bookingDate) }}</time>
+                  </td>
+                  <td class="whitespace-nowrap px-2 py-[13px] tabular-nums text-ink">
+                    <time :datetime="transaction.valueDate">{{ formatCalendarDate(transaction.valueDate) }}</time>
+                  </td>
+                  <td class="px-2 py-[13px] text-ink">{{ transaction.purpose }}</td>
+                  <td class="px-2 py-[13px] text-ink">{{ transaction.counterpartyName }}</td>
+                  <td class="px-2 py-[13px] text-ink">
+                    <template v-if="transaction.counterpartyAccount !== null">
+                      {{ transaction.counterpartyAccount }}
+                    </template>
+                    <template v-else>
+                      <span aria-hidden="true" class="text-muted">—</span>
+                      <span class="sr-only">No counterparty account</span>
+                    </template>
+                  </td>
+                  <td class="px-2 py-[13px] text-ink">{{ transaction.person.name }}</td>
+                  <td class="px-2 py-0 text-ink">
+                    <span class="inline-flex min-w-0 items-center gap-1.5">
+                      <span
+                        v-if="markers.has(transaction.id)"
+                        aria-hidden="true"
+                        data-testid="row-updating"
+                        class="inline-block size-2 shrink-0 rounded-full bg-muted align-middle"
+                      ></span>
+                      <span
+                        v-if="transaction.categoryAssignment === 'manual'"
+                        data-testid="manual-assignment-marker"
+                        class="inline-flex shrink-0 text-muted align-middle"
+                      >
+                        <AppIcon :icon="IconMapPin" :size="14" />
+                        <span class="sr-only">Manually assigned</span>
+                      </span>
+                      <label class="relative inline-flex min-h-11 min-w-0 items-center">
+                        <select
+                          data-testid="row-category-select"
+                          :value="transaction.category?.id ?? ''"
+                          :disabled="rowInFlight(transaction.id)"
+                          :aria-label="`Category for ${transaction.purpose}`"
+                          class="max-w-56 min-w-0 appearance-none truncate rounded-pill border py-[5px] pl-3 pr-8 text-xs font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
+                          :class="transaction.category === null ? 'border-rule-strong bg-surface text-ink' : ''"
+                          :style="categoryPillStyle(transaction.category)"
+                          @change="chooseRowCategory(transaction, $event)"
+                        >
+                          <option value="">Uncategorised</option>
+                          <option v-for="category in pickerCategories" :key="category.id" :value="category.id">
+                            {{ category.label }}
+                          </option>
+                        </select>
+                        <AppIcon
+                          :icon="IconChevronDown"
+                          :size="14"
+                          class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted"
+                        />
+                      </label>
+                    </span>
+                    <span v-if="markers.has(transaction.id)" class="sr-only">Updating category</span>
+                  </td>
+                  <td class="whitespace-nowrap px-2 py-[13px] text-right font-bold tabular-nums text-ink">{{ transaction.amount }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div
+            ref="batchSentinel"
+            aria-hidden="true"
+            data-testid="transactions-batch-sentinel"
+            class="h-px w-full"
+          ></div>
+        </template>
       </div>
     </template>
 

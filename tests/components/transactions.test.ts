@@ -232,6 +232,15 @@ function counterpartyNode(wrapper: Awaited<ReturnType<typeof mountTransactions>>
   return wrapper.get(`[data-transaction-id="${transactionId}"] td:nth-child(5)`).element.firstChild as Node;
 }
 
+function cardFieldNode(
+  wrapper: Awaited<ReturnType<typeof mountTransactions>>,
+  transactionId: string,
+  field: string,
+): Node {
+  return wrapper.get(`[data-transaction-id="${transactionId}"] [data-transaction-field="${field}"]`)
+    .element.firstChild as Node;
+}
+
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -905,6 +914,28 @@ describe('transaction pattern shortcut', () => {
       'Travel',
     ]);
     expect(wrapper.get('[data-testid="pattern-shortcut-preview"]').text()).toContain('Matches 12 stored transactions');
+  });
+
+  it('accepts a selection inside one card field and rejects a cross-field selection', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })));
+    const wrapper = await mountTransactions();
+
+    expect(wrapper.findAll('[data-testid="transaction-card"]').length).toBeGreaterThan(0);
+    expect(wrapper.find('[data-testid="transactions-scroll"]').exists()).toBe(false);
+
+    const purpose = cardFieldNode(wrapper, '1', 'purpose');
+    setSelection(purpose, purpose, 'Uncategorised purchase');
+    await flushPromises();
+    expect(wrapper.get('[data-testid="pattern-shortcut-text"]').text()).toBe('Uncategorised purchase');
+
+    clearSelection();
+    setSelection(purpose, cardFieldNode(wrapper, '1', 'counterpartyName'), 'Uncategorised purchaseShop');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="pattern-shortcut-bar"]').exists()).toBe(false);
   });
 
   it('shows no bar for a short selection, a multi-cell selection, or a selection outside the table', async () => {

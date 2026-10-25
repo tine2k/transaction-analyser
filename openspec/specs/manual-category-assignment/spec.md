@@ -31,6 +31,8 @@ transactions the operation wrote. Every answer SHALL be JSON.
 - **WHEN** a request names the same transaction more than once
 - **THEN** the transaction is assigned once and counted once in the answer
 
+
+
 ### Requirement: Clearing the manual assignment re-evaluates the named transactions immediately
 
 When the body's category is `null`, the system SHALL clear every named transaction's manual
@@ -52,6 +54,8 @@ NOT create, change, or delete a category.
 
 - **WHEN** a clearing runs
 - **THEN** no category is created, changed, or deleted
+
+
 
 ### Requirement: The operation applies to every named transaction or to none
 
@@ -75,6 +79,8 @@ a storage identity SHALL likewise be refused with no stored change.
 - **WHEN** a request names stored transactions and a category that is not stored
 - **THEN** the request is answered with a client error and no transaction is changed
 
+
+
 ### Requirement: The operation is serialized with category changes
 
 The operation SHALL run as one unit, so a category create, edit, delete, append, or a concurrent
@@ -91,6 +97,8 @@ referencing a category the operation could not have observed in full.
 - **WHEN** two assignments are submitted concurrently
 - **THEN** both complete and every named transaction holds the category one of the two named last
 
+
+
 ### Requirement: The operation changes only category references
 
 The operation SHALL change only each named transaction's category reference and manual-assignment
@@ -106,6 +114,8 @@ counterparty account exactly as they were. It SHALL create, change, or delete no
 
 - **WHEN** the operation runs
 - **THEN** no category is created, changed, or deleted
+
+
 
 ### Requirement: A refused or failed operation is reported as an error, never as a success
 
@@ -129,14 +139,11 @@ connection string.
 - **WHEN** the operation reports a failure
 - **THEN** the response body contains no database address, user name, password, or connection string
 
+
+
 ### Requirement: The transactions table offers a per-row category select
 
-The category column of every transaction row SHALL offer an assignment control: a select whose
-choices are the stored categories — each hidden category marked as hidden — and an `Uncategorised`
-choice. Choosing a stored category SHALL invoke the assignment operation for that transaction and
-that category; choosing `Uncategorised` SHALL invoke it with `null`, clearing any manual assignment.
-The browser SHALL NOT create a category, evaluate a regular expression, or decide an assignment
-itself.
+The category area of every transaction row or card SHALL offer an assignment control: a select whose choices are the stored categories — each hidden category marked as hidden — and an `Uncategorised` choice. Choosing a stored category SHALL invoke the assignment operation for that transaction and that category; choosing `Uncategorised` SHALL invoke it with `null`, clearing any manual assignment. The browser SHALL NOT create a category, evaluate a regular expression, or decide an assignment itself.
 
 #### Scenario: Choosing a category assigns the row
 
@@ -162,6 +169,11 @@ itself.
 
 - **WHEN** a category is chosen in a row's control
 - **THEN** no category is created and the server performs the assignment
+
+#### Scenario: A phone card offers the same assignment control
+
+- **WHEN** a transaction is presented as a phone card
+- **THEN** its category area offers the same stored categories, hidden markers, `Uncategorised` choice, and assignment behavior as the table row
 
 ### Requirement: A manually assigned row carries a marker
 
@@ -189,33 +201,36 @@ exposed to assistive technology. A row assigned by the matching rule SHALL carry
 - **WHEN** a row carries the marker
 - **THEN** every value shown in that row is unchanged
 
+
+
 ### Requirement: The table offers row selection with a select-all control
 
-The table SHALL give each transaction row a selection checkbox and its header a select-all checkbox.
-The select-all control SHALL select every row currently shown and SHALL clear the selection when
-every shown row is already selected, and it SHALL reflect whether all, some, or none of the shown
-rows are selected. Changing the category or period filter SHALL clear the selection, so no row that
-is no longer shown remains selected.
+The transaction list SHALL give each transaction row or card a selection checkbox. The desktop table SHALL carry a select-all checkbox in its header, and the phone card list SHALL carry a select-all checkbox in the toolbar above the cards. The select-all control SHALL select every item currently shown and SHALL clear the selection when every shown item is already selected, and it SHALL reflect whether all, some, or none of the shown items are selected. Changing the category or period filter SHALL clear the selection, so no item that is no longer shown remains selected.
 
 #### Scenario: The header control selects every shown row
 
-- **WHEN** the header select-all control is used and not every shown row is selected
+- **WHEN** the table header select-all control is used and not every shown row is selected
 - **THEN** every row currently shown becomes selected
 
 #### Scenario: The header control clears the selection
 
-- **WHEN** every shown row is selected and the header control is used
-- **THEN** no row remains selected
+- **WHEN** every shown item is selected and the header or card-toolbar control is used
+- **THEN** no item remains selected
 
 #### Scenario: A partial selection is reflected
 
-- **WHEN** some but not all shown rows are selected
-- **THEN** the header control reflects that only part of the shown rows are selected
+- **WHEN** some but not all shown items are selected
+- **THEN** the header or card-toolbar select-all control reflects that only part of the shown items are selected
 
 #### Scenario: A filter change clears the selection
 
-- **WHEN** the category or period filter changes while rows are selected
-- **THEN** no row remains selected
+- **WHEN** the category or period filter changes while items are selected
+- **THEN** no item remains selected
+
+#### Scenario: The phone toolbar control selects every shown card
+
+- **WHEN** the card toolbar select-all control is used and not every shown card is selected
+- **THEN** every card currently shown becomes selected
 
 ### Requirement: A bulk bar assigns the selected transactions together
 
@@ -245,6 +260,8 @@ clearing their manual assignments.
 - **WHEN** a stored category is hidden and the bulk bar is inspected
 - **THEN** the hidden category is among the choices and is marked as hidden
 
+
+
 ### Requirement: The bulk bar clears the selection on success or on request
 
 The bulk bar SHALL offer a control that clears the selection without invoking an assignment, and a
@@ -265,6 +282,8 @@ selected.
 
 - **WHEN** no row is selected
 - **THEN** the bulk bar is not shown
+
+
 
 ### Requirement: An in-flight assignment disables its control
 
@@ -287,6 +306,8 @@ assignment in flight SHALL disable the bulk bar's controls without disabling the
 - **WHEN** the assignment answers
 - **THEN** the control is enabled again
 
+
+
 ### Requirement: Each affected row carries a marker until its result is reflected
 
 From the moment an assignment is sent, each row it names SHALL carry a visible marker, and the
@@ -307,6 +328,8 @@ change, replace, or hide any transaction value, and SHALL be exposed to assistiv
 
 - **WHEN** a row carries the marker
 - **THEN** every value shown in that row is unchanged
+
+
 
 ### Requirement: The system refreshes once after assignments settle and updates in place
 
@@ -330,6 +353,8 @@ refresh SHALL leave the displayed rows in place and report that they could not b
 - **WHEN** the refresh request fails
 - **THEN** the previously displayed rows remain and the failure is reported
 
+
+
 ### Requirement: A failed assignment is reported and changes nothing, and a retry needs no re-selection
 
 A failed assignment SHALL be reported distinctly and SHALL change no displayed transaction or
@@ -352,6 +377,8 @@ remain the value it had.
 - **WHEN** an assignment started from a row's control fails
 - **THEN** the row's displayed category remains the value it had
 
+
+
 ### Requirement: The assignment controls are operable by keyboard and touch
 
 The row's assignment control, the selection checkboxes, the select-all control, and the bulk bar's
@@ -367,6 +394,8 @@ least 44 CSS pixels high. They SHALL NOT require a precision pointer.
 
 - **WHEN** the controls are shown on a touch viewport
 - **THEN** each provides a touch target at least 44 CSS pixels high
+
+
 
 ### Requirement: A refresh after an assignment re-presents only the rows it changed
 
@@ -391,3 +420,4 @@ When the refresh that follows an assignment arrives, the system SHALL re-present
 
 - **WHEN** the refresh shows the same category as displayed for a transaction whose assignment is now manual
 - **THEN** that row is re-presented and carries the manual-assignment marker
+

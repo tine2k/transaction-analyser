@@ -25,6 +25,8 @@ The system SHALL render the shared frame, its navigation, and each existing scre
 - **WHEN** the user zooms the page on a phone
 - **THEN** text and controls scale normally, and the application does not lock the viewport against user scaling
 
+
+
 ### Requirement: All application destinations remain reachable from mobile navigation
 
 The shared navigation SHALL keep links to all seven existing routes available on narrow and wide viewports. On narrow viewports it SHALL use a compact disclosure control rather than allowing the link row to overflow. The control SHALL expose its expanded state to assistive technology, support keyboard activation, and keep the current route distinguishable. Activating a destination SHALL navigate to the same route as the corresponding wide-screen link.
@@ -48,6 +50,8 @@ The shared navigation SHALL keep links to all seven existing routes available on
 
 - **WHEN** a route is rendered at a wide viewport
 - **THEN** all seven route links are directly visible and the current route remains distinguishable
+
+
 
 ### Requirement: Screen controls and visualizations reflow for mobile use
 
@@ -78,13 +82,20 @@ The system SHALL adapt each screen's filters, category forms, people forms, acti
 - **WHEN** a user operates navigation, form actions, or filters on a phone
 - **THEN** buttons, navigation links, and form controls have hit areas at least 44 CSS pixels high, standalone disclosure controls have hit areas at least 44 CSS pixels wide and high, keyboard focus is visible, and existing labels and behavior are retained
 
+
+
 ### Requirement: Wide tables scroll within their own region on narrow screens
 
-The system SHALL preserve the existing semantic table structure, all columns, rows, and cell values for transactions, categories, people, and monthly totals. When a table is wider than the viewport, its containing region SHALL provide horizontal scrolling without making the page itself wider. The scrollable region SHALL be reachable and operable by touch and keyboard, and it SHALL NOT change sorting, filtering, row order, or displayed values.
+The system SHALL preserve the semantic table structure and all columns, rows, and cell values for categories, people, and monthly totals. The transactions table SHALL remain a semantic table from the `sm` breakpoint up and SHALL preserve its columns and values there. Below `sm`, transactions SHALL be presented as the card list defined by `transaction-table` rather than as a horizontally scrolling table, and every transaction value SHALL remain present in its card. When a table is wider than the viewport, its containing region SHALL provide horizontal scrolling without making the page itself wider. The scrollable region SHALL be reachable and operable by touch and keyboard, and it SHALL NOT change sorting, filtering, row order, or displayed values.
 
 #### Scenario: The transactions table is browsable on a phone
 
-- **WHEN** the transactions table is wider than a phone viewport
+- **WHEN** the transactions route is rendered below the `sm` breakpoint
+- **THEN** the page presents transaction cards instead of a table region, every transaction value is available in its card, and the page viewport remains within the screen width
+
+#### Scenario: The transactions table is browsable from `sm` up
+
+- **WHEN** the transactions table is wider than its containing region at a width from `sm` up
 - **THEN** the user can scroll the table region horizontally to read every column, including the person column, while the page viewport remains within the screen width
 
 #### Scenario: The monthly comparison table retains its data

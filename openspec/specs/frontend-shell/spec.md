@@ -8,7 +8,7 @@ Defines the browser half of the application: that every route renders inside one
 
 ### Requirement: Every route renders inside one default layout
 
-The system SHALL render every route inside one default layout, which supplies the application's frame: the document's shared metadata, the page container, and the shared heading area. No route SHALL be able to render outside that layout. The layout SHALL apply to the failure page as well as to the routes, so that a failure is presented in the same frame as a successful page. The system SHALL NOT add a second layout, and SHALL NOT let a route opt out of the default one. The frame's page container SHALL span the full width of the viewport, and SHALL NOT constrain itself to a centered maximum-width column, so that the frame uses the horizontal room a large display provides. The frame SHALL hold a horizontal padding inset so its content is not flush against the viewport edge.
+The system SHALL render every route inside one default layout, which supplies the application's frame: the document's shared metadata, the page container, and the shared heading area. No route SHALL be able to render outside that layout. The layout SHALL apply to the failure page as well as to the routes, so that a failure is presented in the same frame as a successful page. The system SHALL NOT add a second layout, and SHALL NOT let a route opt out of the default one. The frame's page container and the masthead's inner content SHALL span the full width of the viewport, and SHALL NOT constrain themselves to a centered maximum-width column, so that the frame uses the horizontal room a large display provides. The frame SHALL use 32px top, 40px horizontal, and 64px bottom padding at desktop widths, and 20px top, 16px horizontal, and 32px bottom padding at phone widths, so its content is not flush against the viewport edge. The frame SHALL remain within the viewport at every supported width and SHALL NOT introduce page-level horizontal overflow.
 
 #### Scenario: A route renders inside the frame
 
@@ -28,7 +28,12 @@ The system SHALL render every route inside one default layout, which supplies th
 #### Scenario: The frame spans the viewport width
 
 - **WHEN** a route is rendered on a display wider than the frame's content
-- **THEN** the frame's container extends to the full width of the viewport rather than stopping at a centered maximum-width column, with only a horizontal padding inset between the content and the viewport edge
+- **THEN** the frame's container and the masthead's inner content extend to the full width of the viewport rather than stopping at a centered maximum-width column, with only the named padding inset between the content and the viewport edge
+
+#### Scenario: Desktop and phone padding follow the design
+
+- **WHEN** a route is rendered at a desktop width and again at a phone width
+- **THEN** the frame uses 32px top, 40px horizontal, and 64px bottom padding on desktop, and 20px top, 16px horizontal, and 32px bottom padding on the phone
 
 ### Requirement: The application names itself Expenses wherever a person reads it
 
@@ -56,6 +61,8 @@ volume names, database name, and package name SHALL keep the project name.
 
 - **WHEN** the repository, container image, container names, database name, or package name is inspected
 - **THEN** it carries the project name rather than `Expenses`
+
+
 
 ### Requirement: The document carries the application's installable identity
 
@@ -95,6 +102,8 @@ launches in the browser.
 - **WHEN** the delivered document and its assets are inspected, and the page is used
 - **THEN** the icon, manifest, theme colour, and favicon requests are served by the application itself, with no request to another origin
 
+
+
 ### Requirement: Every route names itself in the browser tab
 
 The document title SHALL name the screen shown, then the application: `Transactions · Expenses` for
@@ -126,6 +135,8 @@ names no screen SHALL show `Expenses` alone.
 
 - **WHEN** any route's document title is read
 - **THEN** it contains `Expenses` exactly once
+
+
 
 ### Requirement: The browser routes are rendered by the browser and reached from the menu bar
 
@@ -202,6 +213,8 @@ match.
 - **WHEN** the application is shown
 - **THEN** the menu bar links to the transactions route, the category management route, the people management route, the analytics route, the monthly totals route, the monthly average route, and the imports route, and following each link reaches that screen
 
+
+
 ### Requirement: Styling arrives through one stylesheet, with no component library
 
 The system SHALL load one stylesheet as part of the application, and that stylesheet SHALL
@@ -253,6 +266,8 @@ visualization.
 - **WHEN** the delivered page and its assets are inspected, and the page is used
 - **THEN** icons are delivered by the application itself, with no request to another origin for an icon
 
+
+
 ### Requirement: The application renders with one themed palette
 
 The system SHALL define the application's palette once as theme tokens with explicit roles: a paper ground, a surface, ink and muted text, rules, a failure color, and a brand color with a soft companion. Every route, including the failure page, SHALL render with those roles. The brand role SHALL identify the shared menu bar, the current navigation link, primary actions, and selection controls. Colour in content SHALL identify categories, mark failures, or mark destructive actions: the system SHALL NOT apply decorative accent colours to content controls beyond the brand roles named above, and the failure color SHALL be used only for failures and destructive actions.
@@ -281,6 +296,8 @@ The system SHALL define the application's palette once as theme tokens with expl
 
 - **WHEN** a button, link, filter, or select that is not the shared navigation, a primary action, or a selection control is rendered
 - **THEN** its resting, hover, and focus states use the theme's ink, muted, and rule values rather than the brand hue
+
+
 
 ### Requirement: Type is set in three roles
 
@@ -311,6 +328,8 @@ The system SHALL set the application masthead and page titles in a display weigh
 - **WHEN** the delivered page and its assets are inspected
 - **THEN** the typefaces are served by the application itself, with no request to another origin
 
+
+
 ### Requirement: The interface and display face is Plus Jakarta Sans
 
 The system SHALL self-host Plus Jakarta Sans and use it for the masthead, page titles, interface text, tables, and controls, with display text using the family's heavier weights up to 800. Machine-generated strings — category patterns, counterparty accounts, and import timestamps — SHALL remain in the monospaced face. No request for these faces SHALL leave the application's origin.
@@ -335,6 +354,8 @@ The system SHALL self-host Plus Jakarta Sans and use it for the masthead, page t
 - **WHEN** the delivered page and its assets are inspected
 - **THEN** the Plus Jakarta Sans faces are served by the application itself, cover weights 400 through 800, and make no request to another origin
 
+
+
 ### Requirement: Amounts are never distinguished by color
 
 The system SHALL present every euro amount in the theme's ink color. It SHALL NOT encode an amount's sign, magnitude, or category membership as a color: a negative amount SHALL be distinguished only by the sign that `euro-value-display` requires it to be shown with, and the failure color SHALL NOT be applied to an amount.
@@ -353,6 +374,8 @@ The system SHALL present every euro amount in the theme's ink color. It SHALL NO
 
 - **WHEN** any amount, including a large negative sum, is displayed
 - **THEN** it does not use the failure color
+
+
 
 ### Requirement: Content surfaces are sheets separated by rules
 
@@ -378,6 +401,8 @@ The system SHALL separate content with the surface color over the paper ground. 
 - **WHEN** the transactions screen shows its fixed action bars
 - **THEN** those bars may carry a stronger shadow because they float above the table
 
+
+
 ### Requirement: The browser is never given a database address
 
 The system SHALL NOT deliver the database address, a user name, a password, or any part of a connection string to the browser, whether in a rendered document, in a delivered client asset, or in any response. The system SHALL NOT deliver any configuration value intended for the server alone. The browser SHALL reach the server's functionality only through same-origin requests to the API, and the system SHALL NOT require a cross-origin request from the page.
@@ -397,6 +422,8 @@ The system SHALL NOT deliver the database address, a user name, a password, or a
 - **WHEN** the page makes a request for data or for a status
 - **THEN** the request is a same-origin request to the API, and no request to another origin is required or made
 
+
+
 ### Requirement: The browser holds no identity and no credential
 
 The system SHALL present no login, no account, no sign-in control, and no user identity, and the browser SHALL store no credential for this application in a cookie, in local storage, or in session storage. The shell SHALL NOT send a stored token with a request.
@@ -415,6 +442,8 @@ The system SHALL present no login, no account, no sign-in control, and no user i
 
 - **WHEN** the page makes a request to the API
 - **THEN** the request carries no token and no authorization header of the application's own
+
+
 
 ### Requirement: The shell performs no domain work
 
@@ -485,6 +514,8 @@ derive a value from transaction data for display.
 - **WHEN** a sync run writes
 - **THEN** it writes through the server process, not through the browser, and the browser cannot change what it writes
 
+
+
 ### Requirement: The menu bar carries the application's identity and the current screen
 
 The shared menu bar SHALL present the application name `Expenses` and one visibly labelled link for each of the seven routes. The link for the current route SHALL be distinguishable without relying on colour alone. The bar SHALL NOT introduce a destination beyond the seven routes. On narrow viewports the bar SHALL keep a labelled disclosure control for the same links.
@@ -514,6 +545,8 @@ The shared menu bar SHALL present the application name `Expenses` and one visibl
 - **WHEN** the menu bar is rendered at a narrow viewport width
 - **THEN** the labelled disclosure control remains available, exposes the same seven links, and keeps its expanded state available to assistive technology
 
+
+
 ### Requirement: The shared masthead uses the design's type and size scale
 
 The system SHALL render the masthead wordmark at 20px and weight 800, desktop navigation links at 14px and weight 600 with 10px vertical and 16px horizontal padding, and mobile navigation links at 15px and weight 600 with a 12px corner radius and a hit area at least 48px high. The menu bar SHALL use 14px vertical padding on desktop and 14px top with 12px bottom padding on mobile.
@@ -528,16 +561,4 @@ The system SHALL render the masthead wordmark at 20px and weight 800, desktop na
 - **WHEN** the menu bar is rendered at a mobile width
 - **THEN** the wordmark remains 20px and 800 weight, each navigation link computes to 15px and 600 weight, and each link is at least 48px high with 12px corners
 
-### Requirement: The shared main frame is bounded and padded to the design
 
-The system SHALL centre the shared main content frame at a maximum width of 1280px. The frame SHALL use 32px top, 40px horizontal, and 64px bottom padding at desktop widths, and 20px top, 16px horizontal, and 32px bottom padding at mobile widths. The frame SHALL remain within the viewport at every supported width and SHALL NOT introduce page-level horizontal overflow.
-
-#### Scenario: Desktop frame is bounded
-
-- **WHEN** a route is rendered in a viewport wider than 1280px
-- **THEN** the main frame is no wider than 1280px, is horizontally centred, and uses the design's desktop padding
-
-#### Scenario: Mobile frame fits the viewport
-
-- **WHEN** a route is rendered at a phone width
-- **THEN** the main frame uses the design's mobile padding and the page has no horizontal overflow outside an intentional table scroll region

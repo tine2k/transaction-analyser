@@ -1,33 +1,69 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  The application icon: a spending pie chart in the application's own category inks,
-  on the paper ground. This file is the only place the geometry is drawn; the PNGs
-  beside it are rendered from it by tools/render-app-icon.mjs.
+  The application icon: the four-wedge logo mark on the brand-gradient tile.
 
-  Field 180, disc 158.4 (88%), seams 5.544 (3.5% of the disc) in the paper colour so
-  the wedge separation survives an operating system that flattens the colours.
-  Wedges run clockwise from twelve o'clock: 54% / 28% / 18%.
+  The on-screen mark is drawn in app/components/AppLogo.vue; this file is the
+  installable copy. tests/unit/app-logo-geometry.test.ts compares the wedge paths,
+  fills, and the pink wedge's offset so the two cannot drift.
 
-  See openspec/changes/add-application-icon-and-name/design.md D1.
+  The field is square and full bleed. iOS and Android apply their own corner mask,
+  and the mark sits at 62.5% of the field, well inside the maskable safe zone.
+  The seams are transparent, so the gradient shows through them.
+
+  Regenerate the PNGs beside this file with `node tools/render-app-icon.mjs`.
+  See openspec/changes/replace-application-logo/design.md D1, D3, D4.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-  <rect width="180" height="180" fill="#f6f6f3" />
+  <defs>
+    <linearGradient id="logo-icon-ground" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="173.9" y2="46.6">
+      <stop offset="0" stop-color="#0F1B5C" />
+      <stop offset="0.4" stop-color="#1E2A9E" />
+      <stop offset="0.7" stop-color="#2F3FC2" />
+      <stop offset="1" stop-color="#1D6FA8" />
+    </linearGradient>
+    <radialGradient
+      id="logo-icon-sheen-top"
+      gradientUnits="userSpaceOnUse"
+      cx="0"
+      cy="0"
+      r="1"
+      gradientTransform="translate(162 -54) scale(81 288)"
+    >
+      <stop offset="0" stop-color="#2296C8" stop-opacity="0.55" />
+      <stop offset="0.65" stop-color="#2296C8" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient
+      id="logo-icon-sheen-bottom"
+      gradientUnits="userSpaceOnUse"
+      cx="0"
+      cy="0"
+      r="1"
+      gradientTransform="translate(90 252) scale(72 270)"
+    >
+      <stop offset="0" stop-color="#128C96" stop-opacity="0.4" />
+      <stop offset="0.7" stop-color="#128C96" stop-opacity="0" />
+    </radialGradient>
+    <mask id="logo-icon-seams">
+      <rect width="32" height="32" fill="#fff" />
+      <g stroke="#000" stroke-width="1.8">
+        <path d="M16 16L16.00 -6.00" />
+        <path d="M16 16L27.00 35.05" />
+        <path d="M16 16L-2.02 28.62" />
+        <path d="M16 16L-2.02 3.38" />
+      </g>
+    </mask>
+  </defs>
 
-  <g fill="none">
-    <!-- 0deg -> 194.4deg, 54% -->
-    <path fill="#2f5fa8" d="M90 90 L90 10.8 A79.2 79.2 0 1 1 70.3038 166.7118 Z" />
-    <!-- 194.4deg -> 295.2deg, 28% -->
-    <path fill="#d97a2b" d="M90 90 L70.3038 166.7118 A79.2 79.2 0 0 1 18.3377 56.2783 Z" />
-    <!-- 295.2deg -> 360deg, 18% -->
-    <path fill="#3e8e5a" d="M90 90 L18.3377 56.2783 A79.2 79.2 0 0 1 90 10.8 Z" />
+  <rect width="180" height="180" fill="url(#logo-icon-ground)" />
+  <rect width="180" height="180" fill="url(#logo-icon-sheen-bottom)" />
+  <rect width="180" height="180" fill="url(#logo-icon-sheen-top)" />
+
+  <g transform="translate(33.75 33.75) scale(3.515625)">
+    <g mask="url(#logo-icon-seams)">
+      <path d="M16 16L16.00 2.00A14 14 0 0 1 23.00 28.12Z" fill="#FF8A3D" />
+      <path d="M16 16L23.00 28.12A14 14 0 0 1 4.53 24.03Z" fill="#9B7BFF" />
+      <path d="M16 16L4.53 24.03A14 14 0 0 1 4.53 7.97Z" fill="#2DD4BF" />
+      <path transform="translate(-0.74 -1.42)" d="M16 16L4.53 7.97A14 14 0 0 1 16.00 2.00Z" fill="#FF5FA8" />
+    </g>
   </g>
-
-  <g stroke="#f6f6f3" stroke-width="5.544" stroke-linecap="butt">
-    <path d="M90 90 L90 10.8" />
-    <path d="M90 90 L70.3038 166.7118" />
-    <path d="M90 90 L18.3377 56.2783" />
-  </g>
-
-  <!-- Caps the point where the three seams meet, so no wedge tip pokes into the hub. -->
-  <circle cx="90" cy="90" r="3.6" fill="#f6f6f3" />
 </svg>

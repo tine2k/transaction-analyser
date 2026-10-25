@@ -8,12 +8,27 @@ mockNuxtImport('useRoute', () => () => route);
 import DefaultLayout from '../../app/layouts/default.vue';
 
 describe('default layout navigation', () => {
-  it('names the application in the brand bar', async () => {
+  it('names the application in the brand bar and puts the decorative mark before it', async () => {
     route.path = '/';
     const wrapper = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
 
-    expect(wrapper.get('header p').text()).toBe('Expenses');
-    expect(wrapper.get('header').classes()).toContain('brand-bar');
+    const header = wrapper.get('header');
+    const wordmark = header.get('p');
+    const logo = header.get('svg[data-testid="application-logo"]');
+
+    expect(wordmark.text()).toBe('Expenses');
+    expect(header.classes()).toContain('brand-bar');
+    expect(logo.attributes('width')).toBe('30');
+    expect(logo.attributes('height')).toBe('30');
+    expect(logo.attributes('aria-hidden')).toBe('true');
+    expect(logo.attributes('aria-label')).toBeUndefined();
+    expect(logo.find('title').exists()).toBe(false);
+    expect(logo.text()).toBe('');
+    expect(wordmark.element.previousElementSibling).toBe(logo.element);
+    expect(logo.element.closest('a')).toBeNull();
+    expect(header.findAll('a')).toHaveLength(7);
+    expect(header.findAll('button')).toHaveLength(1);
+    expect(header.text().match(/Expenses/g)).toHaveLength(1);
     await wrapper.unmount();
   });
 

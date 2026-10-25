@@ -185,6 +185,42 @@ test.describe('redesigned transactions screen', () => {
     expect(mobile.mainWidth).toBeLessThanOrEqual(390);
   });
 
+  test('shows the logo mark beside the wordmark at desktop and phone widths', async ({ page }) => {
+    await openWithAllCategories(page);
+
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('/?category=all', { waitUntil: 'networkidle' });
+      await expect(page.getByTestId('visible-count')).toHaveText('3 transactions');
+
+      const logo = page.getByTestId('application-logo');
+      await expect(logo).toBeVisible();
+
+      const metrics = await page.evaluate(() => {
+        const mark = document.querySelector('[data-testid="application-logo"]') as SVGSVGElement;
+        const wordmark = document.querySelector('header p') as HTMLElement;
+        const markBox = mark.getBoundingClientRect();
+        const wordmarkBox = wordmark.getBoundingClientRect();
+        return {
+          markWidth: markBox.width,
+          markHeight: markBox.height,
+          markRight: markBox.right,
+          wordmarkLeft: wordmarkBox.left,
+          markCentre: markBox.top + markBox.height / 2,
+          wordmarkCentre: wordmarkBox.top + wordmarkBox.height / 2,
+          pageWidth: window.innerWidth,
+          pageScrollWidth: document.documentElement.scrollWidth,
+        };
+      });
+
+      expect(metrics.markWidth).toBe(30);
+      expect(metrics.markHeight).toBe(30);
+      expect(metrics.wordmarkLeft - metrics.markRight).toBeCloseTo(10, 0);
+      expect(Math.abs(metrics.markCentre - metrics.wordmarkCentre)).toBeLessThan(2);
+      expect(metrics.pageScrollWidth).toBeLessThanOrEqual(metrics.pageWidth);
+    }
+  });
+
   test('applies the full-width frame to every route', async ({ page }) => {
     await interceptApi(page);
     await page.goto('/people', { waitUntil: 'networkidle' });

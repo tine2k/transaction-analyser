@@ -842,6 +842,24 @@ describe('API integration', () => {
     expect(await runs()).toEqual([{ id: '1', name: 'Household' }, null]);
   });
 
+  // See openspec/changes/replace-application-logo/specs/frontend-shell/spec.md
+  it('serves the vector icon with the four-wedge mark on the gradient ground', async () => {
+    const response = await request('/icon.svg');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('image/svg+xml');
+
+    const svg = await response.text();
+    for (const fill of ['#FF8A3D', '#9B7BFF', '#2DD4BF', '#FF5FA8']) {
+      expect(svg).toContain(`fill="${fill}"`);
+    }
+    expect(svg).toContain('id="logo-icon-ground"');
+    // The replaced pie-chart artwork must not survive in the served asset.
+    for (const oldFill of ['#2f5fa8', '#d97a2b', '#3e8e5a']) {
+      expect(svg.toLowerCase()).not.toContain(oldFill);
+    }
+  });
+
   // The home-screen identity: iOS reads the touch icon rather than the manifest, and
   // an opaque PNG is required because transparency is rendered as black.
   // See openspec/changes/add-application-icon-and-name/specs/frontend-shell/spec.md

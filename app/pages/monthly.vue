@@ -228,7 +228,7 @@ function transactionLocation(categoryKey: string) {
     </p>
 
     <template v-else-if="transactions">
-      <div class="mt-4 flex flex-col gap-3 rounded-panel bg-surface p-4 shadow-sheet sm:p-5" data-testid="monthly-filter-panel">
+      <div class="mt-4 flex flex-col gap-3 rounded-panel border border-card-border bg-surface p-4 shadow-sheet sm:p-5" data-testid="monthly-filter-panel">
         <fieldset class="flex flex-wrap items-center gap-4 text-sm text-muted" data-testid="expense-type-filter">
           <legend class="sr-only">Expense type filter</legend>
           <label class="inline-flex min-h-11 items-center gap-2">
@@ -295,13 +295,13 @@ function transactionLocation(categoryKey: string) {
       </div>
 
       <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="monthly-summary">
-        <section class="min-w-0 rounded-panel bg-surface p-5 shadow-sheet sm:p-6" data-testid="monthly-summary-card">
+        <section class="min-w-0 rounded-panel border border-card-border bg-surface p-5 shadow-sheet sm:p-6" data-testid="monthly-summary-card">
           <h2 class="text-sm font-semibold text-muted">Total moved</h2>
           <p class="mt-1.5 text-3xl font-extrabold tracking-[-0.02em] text-ink tabular-nums" data-testid="total-moved-value">
             {{ formatEuroAmount(breakdown.total) }}
           </p>
         </section>
-        <section class="min-w-0 rounded-panel bg-surface p-5 shadow-sheet sm:p-6" data-testid="monthly-summary-card">
+        <section class="min-w-0 rounded-panel border border-card-border bg-surface p-5 shadow-sheet sm:p-6" data-testid="monthly-summary-card">
           <h2 class="text-sm font-semibold text-muted">Transactions</h2>
           <p class="mt-1.5 text-3xl font-extrabold tracking-[-0.02em] text-ink tabular-nums" data-testid="transaction-count-value">
             {{ breakdown.transactionCount }}
@@ -309,7 +309,7 @@ function transactionLocation(categoryKey: string) {
         </section>
       </div>
 
-      <section class="mt-5 rounded-panel bg-surface p-5 shadow-sheet sm:p-6" data-testid="monthly-bar-panel">
+      <section class="mt-5 rounded-panel border border-card-border bg-surface p-5 shadow-sheet sm:p-6" data-testid="monthly-bar-panel">
         <h2 class="font-display text-lg font-bold text-ink" data-testid="bar-heading">
           {{ barHeading }}
         </h2>
@@ -366,7 +366,7 @@ function transactionLocation(categoryKey: string) {
             aria-label="Monthly category table"
             aria-describedby="monthly-table-scroll-help"
             tabindex="0"
-            class="max-w-full overflow-x-auto rounded-panel bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            class="max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             data-testid="monthly-category-scroll"
           >
             <table

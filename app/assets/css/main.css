@@ -47,8 +47,9 @@
    panel, control, and pill radii, and the resting sheet elevation. The brand
    role covers the shared menu bar, primary actions, and selection controls. */
 @theme {
-  --color-paper: #f5f4fa;
+  --color-paper: #e9e7f5;
   --color-surface: #ffffff;
+  --color-card-border: #d3cfea;
   --color-ink: #201e3e;
   --color-muted: #5f5c78;
   --color-rule: #e6e4ef;

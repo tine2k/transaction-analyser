@@ -293,11 +293,13 @@ test.describe('redesigned transactions screen', () => {
         filterTop: Number.parseFloat(style(filterSheet).paddingTop),
         filterLeft: Number.parseFloat(style(filterSheet).paddingLeft),
         filterShadow: style(filterSheet).boxShadow,
+        filterBorder: style(filterSheet).border,
         tableRadius: style(tableSheet).borderRadius,
         tableTop: Number.parseFloat(style(tableSheet).paddingTop),
         tableLeft: Number.parseFloat(style(tableSheet).paddingLeft),
         tableBottom: Number.parseFloat(style(tableSheet).paddingBottom),
         tableShadow: style(tableSheet).boxShadow,
+        tableBorder: style(tableSheet).border,
         headerSize: style(headerRow).fontSize,
         headerWeight: style(sortButton).fontWeight,
         headerSpacing: Number.parseFloat(style(headerRow).letterSpacing),
@@ -338,11 +340,13 @@ test.describe('redesigned transactions screen', () => {
     expect(desktop.filterTop).toBe(20);
     expect(desktop.filterLeft).toBe(24);
     expect(desktop.filterShadow).toContain('rgba(40, 30, 120, 0.08)');
+    expect(desktop.filterBorder).toBe('1px solid rgb(211, 207, 234)');
     expect(desktop.tableRadius).toBe('20px');
     expect(desktop.tableTop).toBe(8);
     expect(desktop.tableLeft).toBe(24);
     expect(desktop.tableBottom).toBe(16);
     expect(desktop.tableShadow).toContain('rgba(40, 30, 120, 0.08)');
+    expect(desktop.tableBorder).toBe('1px solid rgb(211, 207, 234)');
     expect(desktop.headerSize).toBe('12px');
     expect(desktop.headerWeight).toBe('700');
     expect(desktop.headerSpacing).toBeCloseTo(0.72, 1);
@@ -391,6 +395,7 @@ test.describe('redesigned transactions screen', () => {
         filterPadding: Number.parseFloat(style(filterSheet).paddingTop),
         cardRadius: style(card).borderRadius,
         cardShadow: style(card).boxShadow,
+        cardBorder: style(card).border,
         cardPadding: Number.parseFloat(style(card).paddingTop),
         cardGap: Number.parseFloat(style(card).rowGap),
         cardCount: document.querySelectorAll('[data-testid="transaction-card"]').length,
@@ -414,6 +419,7 @@ test.describe('redesigned transactions screen', () => {
     expect(mobile.filterPadding).toBe(14);
     expect(mobile.cardRadius).toBe('18px');
     expect(mobile.cardShadow).toContain('rgba(40, 30, 120, 0.08)');
+    expect(mobile.cardBorder).toBe('1px solid rgb(211, 207, 234)');
     expect(mobile.cardPadding).toBe(16);
     expect(mobile.cardGap).toBe(10);
     expect(mobile.cardCount).toBe(3);
@@ -532,14 +538,18 @@ test.describe('redesigned transactions screen', () => {
       return {
         filterBackground: window.getComputedStyle(filterSheet).backgroundColor,
         filterRadius: window.getComputedStyle(filterSheet).borderRadius,
+        filterBorder: window.getComputedStyle(filterSheet).border,
         tableBackground: window.getComputedStyle(tableSheet).backgroundColor,
         tableRadius: window.getComputedStyle(tableSheet).borderRadius,
+        tableBorder: window.getComputedStyle(tableSheet).border,
       };
     });
     expect(sheetStyles.filterBackground).toBe('rgb(255, 255, 255)');
     expect(sheetStyles.tableBackground).toBe('rgb(255, 255, 255)');
     expect(sheetStyles.filterRadius).toBe('20px');
     expect(sheetStyles.tableRadius).toBe('20px');
+    expect(sheetStyles.filterBorder).toBe('1px solid rgb(211, 207, 234)');
+    expect(sheetStyles.tableBorder).toBe('1px solid rgb(211, 207, 234)');
 
     const headers = page.locator('thead th');
     await expect(headers).toHaveCount(9);

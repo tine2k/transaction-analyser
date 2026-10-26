@@ -34,7 +34,7 @@ export default defineNuxtConfig({
       ],
       meta: [
         { name: 'apple-mobile-web-app-title', content: 'Expenses' },
-        { name: 'theme-color', content: '#F6F6F3' },
+        { name: 'theme-color', content: '#E9E7F5' },
       ],
     },
   },

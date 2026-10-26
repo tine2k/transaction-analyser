@@ -145,6 +145,7 @@ test.describe('phone transactions cards', () => {
       return {
         radius: cardStyle.borderRadius,
         shadow: cardStyle.boxShadow,
+        border: cardStyle.border,
         padding: Number.parseFloat(cardStyle.paddingTop),
         gap: Number.parseFloat(cardStyle.rowGap),
         background: cardStyle.backgroundColor,
@@ -165,6 +166,7 @@ test.describe('phone transactions cards', () => {
 
     expect(metrics.radius).toBe('18px');
     expect(metrics.shadow).toContain('rgba(40, 30, 120, 0.08)');
+    expect(metrics.border).toBe('1px solid rgb(211, 207, 234)');
     expect(metrics.padding).toBe(16);
     expect(metrics.gap).toBe(10);
     expect(metrics.background).toBe('rgb(255, 255, 255)');
@@ -273,7 +275,9 @@ test.describe('phone transactions cards', () => {
           const element = document.querySelector(selector) as HTMLElement;
           return element.getBoundingClientRect();
         };
-        const sheet = rect('[data-testid="filter-sheet"]');
+        const sheetElement = document.querySelector('[data-testid="filter-sheet"]') as HTMLElement;
+        const sheetStyle = window.getComputedStyle(sheetElement);
+        const sheet = sheetElement.getBoundingClientRect();
         return {
           search: rect('[data-testid="transaction-search"]'),
           searchButton: rect('[data-testid="search-submit"]'),
@@ -281,6 +285,11 @@ test.describe('phone transactions cards', () => {
           period: rect('[data-testid="period-filter"]'),
           category: rect('[data-testid="category-filter"]'),
           sheetWidth: sheet.width,
+          sheetContentWidth: sheet.width
+            - Number.parseFloat(sheetStyle.borderLeftWidth)
+            - Number.parseFloat(sheetStyle.borderRightWidth)
+            - Number.parseFloat(sheetStyle.paddingLeft)
+            - Number.parseFloat(sheetStyle.paddingRight),
           pageWidth: window.innerWidth,
           bodyWidth: document.body.scrollWidth,
         };
@@ -292,7 +301,7 @@ test.describe('phone transactions cards', () => {
     expect(phone.search.x + phone.search.width).toBeLessThanOrEqual(phone.searchButton.x + 1);
     expect(Math.abs(phone.person.y - phone.period.y)).toBeLessThan(2);
     expect(phone.category.y).toBeGreaterThan(phone.person.y + phone.person.height);
-    expect(phone.category.width).toBeGreaterThan(phone.sheetWidth - 30);
+    expect(phone.category.width).toBeGreaterThan(phone.sheetContentWidth - 1);
     expect(phone.bodyWidth).toBeLessThanOrEqual(phone.pageWidth);
 
     await expect(page.getByTestId('transaction-search')).toHaveAccessibleName('Search transactions');
@@ -305,7 +314,7 @@ test.describe('phone transactions cards', () => {
     const narrow = await layout();
     expect(Math.abs(narrow.search.y - narrow.searchButton.y)).toBeLessThan(2);
     expect(Math.abs(narrow.person.y - narrow.period.y)).toBeLessThan(2);
-    expect(narrow.category.width).toBeGreaterThan(narrow.sheetWidth - 30);
+    expect(narrow.category.width).toBeGreaterThan(narrow.sheetContentWidth - 1);
     expect(narrow.bodyWidth).toBeLessThanOrEqual(narrow.pageWidth);
   });
 

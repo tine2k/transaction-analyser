@@ -423,11 +423,15 @@ describe('imports page', () => {
     expect(wrapper.get('[data-testid="test-notification-status"]').text()).toContain('could not be sent');
   });
 
-  it('rests the import log on the sheet elevation', async () => {
+  it('presents the import log on the card surface', async () => {
     mocks.useFetch.mockReturnValue(response(runs));
 
     const wrapper = await mountSuspended(Imports);
 
-    expect(wrapper.get('[data-testid="imports-scroll"]').classes()).toContain('shadow-sheet');
+    const log = wrapper.get('[data-testid="imports-scroll"]');
+    expect(log.classes()).toContain('shadow-sheet');
+    expect(log.classes()).toContain('border-card-border');
+    expect(log.classes()).toContain('rounded-panel');
+    expect(log.classes()).toContain('bg-surface');
   });
 });

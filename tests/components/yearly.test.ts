@@ -349,16 +349,22 @@ describe('yearly page', () => {
     expect(empty.text()).toContain(`No category data for ${currentYear}.`);
   });
 
-  it('rests every analysis surface on the sheet elevation', async () => {
+  it('presents every analysis surface on the card surface', async () => {
     mocks.useFetch.mockReturnValue(response(currentYearTransactions()));
 
     const wrapper = await mountSuspended(Yearly, { route: '/yearly' });
 
-    expect(wrapper.get('[data-testid="yearly-filter-panel"]').classes()).toContain('shadow-sheet');
+    for (const surface of [
+      wrapper.get('[data-testid="yearly-filter-panel"]'),
+      wrapper.get('[data-testid="yearly-matrix-scroll"]'),
+    ]) {
+      expect(surface.classes()).toContain('shadow-sheet');
+      expect(surface.classes()).toContain('border-card-border');
+    }
     const summaries = wrapper.findAll('[data-testid="yearly-summary-card"]');
     expect(summaries).toHaveLength(2);
     expect(summaries.every((card) => card.classes().includes('shadow-sheet'))).toBe(true);
-    expect(wrapper.get('[data-testid="yearly-matrix-scroll"]').classes()).toContain('shadow-sheet');
+    expect(summaries.every((card) => card.classes().includes('border-card-border'))).toBe(true);
 
     const tableSection = wrapper.get('[data-testid="yearly-table-section"]');
     expect(tableSection.classes()).toContain('mt-4');

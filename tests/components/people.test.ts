@@ -207,10 +207,14 @@ describe('people management page', () => {
     expect(wrapper.get('[data-testid="person-name-input"]').classes()).toContain('min-h-11');
   });
 
-  it('rests the form and people table on the sheet elevation', async () => {
+  it('presents the form and people table on the card surface', async () => {
     const wrapper = await mountSuspended(People);
 
-    expect(wrapper.get('form').classes()).toContain('shadow-sheet');
-    expect(wrapper.get('[data-testid="people-scroll"]').classes()).toContain('shadow-sheet');
+    for (const element of [wrapper.get('form'), wrapper.get('[data-testid="people-scroll"]')]) {
+      expect(element.classes()).toContain('shadow-sheet');
+      expect(element.classes()).toContain('border-card-border');
+      expect(element.classes()).toContain('rounded-panel');
+      expect(element.classes()).toContain('bg-surface');
+    }
   });
 });

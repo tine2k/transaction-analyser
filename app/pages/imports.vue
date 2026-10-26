@@ -229,7 +229,7 @@ function sourceLabel(source: string): string {
       role="region"
       aria-label="Import log"
       tabindex="0"
-      class="mt-6 max-w-full overflow-x-auto rounded-sheet border border-rule-strong bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      class="mt-6 max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
       data-testid="imports-scroll"
     >
       <table class="w-max min-w-full border-collapse text-left text-sm" data-testid="imports-table">

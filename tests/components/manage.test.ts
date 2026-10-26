@@ -60,6 +60,15 @@ describe('manage hub', () => {
       .toBe('Last run: Success · 2026-10-26 06:00:00 UTC');
   });
 
+  it('presents the management directory on the card surface', async () => {
+    const wrapper = await mountSuspended(Manage);
+
+    const sheet = wrapper.get('[data-testid="manage-sheet"]');
+    expect(sheet.classes()).toContain('shadow-sheet');
+    expect(sheet.classes()).toContain('border-card-border');
+    expect(sheet.classes()).toContain('bg-surface');
+  });
+
   it('offers no form, sync control, or destructive action', async () => {
     const wrapper = await mountSuspended(Manage);
 

@@ -225,7 +225,7 @@ function sortArrow(column: 'amount' | 'category'): string {
     <p v-else-if="pending" class="mt-4 text-muted">Loading monthly category averages…</p>
     <template v-else-if="transactions">
       <div
-        class="mt-4 rounded-panel bg-surface p-4 shadow-sheet sm:p-5"
+        class="mt-4 rounded-panel border border-card-border bg-surface p-4 shadow-sheet sm:p-5"
         data-testid="monthly-average-filter-panel"
       >
         <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
@@ -307,7 +307,7 @@ function sortArrow(column: 'amount' | 'category'): string {
         <section
           v-for="figure in summaryFigures"
           :key="figure.key"
-          class="min-w-0 rounded-panel bg-surface p-5 shadow-sheet sm:p-6"
+          class="min-w-0 rounded-panel border border-card-border bg-surface p-5 shadow-sheet sm:p-6"
           data-testid="monthly-average-summary-card"
         >
           <h2 class="text-sm font-semibold text-muted">{{ figure.label }}</h2>
@@ -333,7 +333,7 @@ function sortArrow(column: 'amount' | 'category'): string {
           aria-label="Monthly average category table"
           aria-describedby="monthly-average-table-scroll-help"
           tabindex="0"
-          class="max-w-full overflow-x-auto rounded-panel bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          class="max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           data-testid="monthly-average-table"
         >
           <table class="w-full min-w-[940px] border-collapse text-left text-sm">

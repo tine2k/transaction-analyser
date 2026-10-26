@@ -1,11 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
+import { contrastRatio } from './contrast';
 
-// One representative content surface on every route carries the resting sheet
-// shadow at both a phone and a desktop width. The API is intercepted, so the
-// check exercises the rendered surfaces rather than live data.
+// One representative content surface on every route is a white bordered card
+// with the resting shadow at both a phone and a desktop width, over the lavender
+// paper ground. The API is intercepted, so the check exercises the rendered
+// surfaces rather than live data.
 //
-// See openspec/changes/unify-surface-elevation-and-euro-formatting/specs/frontend-shell/spec.md
-// and tasks.md 5.1.
+// See openspec/changes/restyle-page-background-and-cards/specs/frontend-shell/spec.md
+// and tasks.md 5.1 and 5.2.
 
 const today = new Date();
 const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -100,26 +102,80 @@ const routes = [
   { path: '/imports', surface: 'imports-scroll' },
 ] as const;
 
-async function expectRestingShadowOnEveryRoute(page: Page): Promise<void> {
+async function expectCardOnEveryRoute(page: Page, viewport: 'desktop' | 'phone'): Promise<void> {
   await interceptApi(page);
 
   for (const route of routes) {
     await page.goto(route.path, { waitUntil: 'networkidle' });
 
+    const ground = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+    expect(ground, `${route.path} should use the lavender ground`).toBe('rgb(233, 231, 245)');
+
     const surface = page.getByTestId(route.surface).first();
     await expect(surface, `${route.path} should show its surface`).toBeVisible();
 
-    const shadow = await surface.evaluate((element) => window.getComputedStyle(element).boxShadow);
-    expect(shadow, `${route.path} should carry the resting shadow`)
+    const card = await surface.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return {
+        background: style.backgroundColor,
+        borderWidth: style.borderTopWidth,
+        borderStyle: style.borderTopStyle,
+        borderColor: style.borderTopColor,
+        radius: style.borderTopLeftRadius,
+        shadow: style.boxShadow,
+      };
+    });
+
+    expect(card.background, `${route.path} should have a white card`).toBe('rgb(255, 255, 255)');
+    expect(card.borderWidth, `${route.path} should have a 1px card border`).toBe('1px');
+    expect(card.borderStyle, `${route.path} should have a solid card border`).toBe('solid');
+    expect(card.borderColor, `${route.path} should use the card border colour`).toBe('rgb(211, 207, 234)');
+    expect(card.shadow, `${route.path} should carry the resting shadow`)
       .toContain('rgba(40, 30, 120, 0.08)');
+    expect(card.radius, `${route.path} should use the expected card radius`)
+      .toBe(viewport === 'phone' && route.path === '/' ? '18px' : '20px');
   }
 }
 
-test('every route rests its content surface at desktop width', async ({ page }) => {
-  await expectRestingShadowOnEveryRoute(page);
+test('every route presents a card at desktop width', async ({ page }) => {
+  await expectCardOnEveryRoute(page, 'desktop');
 });
 
-test('every route rests its content surface at phone width', async ({ page }) => {
+test('every route presents a card at phone width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await expectRestingShadowOnEveryRoute(page);
+  await expectCardOnEveryRoute(page, 'phone');
+});
+
+test('the failure page uses the same lavender ground', async ({ page }) => {
+  await page.goto('/route-that-does-not-exist', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: 'This page does not exist' })).toBeVisible();
+
+  const ground = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+  expect(ground).toBe('rgb(233, 231, 245)');
+});
+
+test('ink and muted text stay legible on the paper ground', async ({ page }) => {
+  await interceptApi(page);
+  await page.goto('/', { waitUntil: 'networkidle' });
+
+  const colors = await page.evaluate(() => {
+    const ink = document.createElement('span');
+    ink.className = 'text-ink';
+    const muted = document.createElement('span');
+    muted.className = 'text-muted';
+    document.body.append(ink, muted);
+
+    const result = {
+      ground: window.getComputedStyle(document.body).backgroundColor,
+      ink: window.getComputedStyle(ink).color,
+      muted: window.getComputedStyle(muted).color,
+    };
+
+    ink.remove();
+    muted.remove();
+    return result;
+  });
+
+  expect(contrastRatio(colors.ink, colors.ground)).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio(colors.muted, colors.ground)).toBeGreaterThanOrEqual(4.5);
 });

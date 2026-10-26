@@ -83,7 +83,7 @@ const importsFailed = computed(() =>
     </p>
 
     <div
-      class="mt-6 overflow-hidden rounded-panel-mobile bg-surface shadow-sheet sm:rounded-panel"
+      class="mt-6 overflow-hidden rounded-panel-mobile border border-card-border bg-surface shadow-sheet sm:rounded-panel"
       data-testid="manage-sheet"
     >
       <NuxtLink

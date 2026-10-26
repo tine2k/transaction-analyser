@@ -294,13 +294,21 @@ describe('monthly category average page', () => {
     ]);
   });
 
-  it('rests the comparison table on the sheet elevation and exposes its accessibility contract', async () => {
+  it('presents the comparison table on the card surface and exposes its accessibility contract', async () => {
     mocks.useFetch.mockReturnValue(response(sampleTransactions()));
 
     const wrapper = await mountSuspended(MonthlyAverage);
     const region = wrapper.get('[data-testid="monthly-average-table"]');
 
     expect(region.classes()).toContain('shadow-sheet');
+    expect(region.classes()).toContain('border-card-border');
+    for (const surface of [
+      wrapper.get('[data-testid="monthly-average-filter-panel"]'),
+      wrapper.get('[data-testid="monthly-average-summary-card"]'),
+    ]) {
+      expect(surface.classes()).toContain('shadow-sheet');
+      expect(surface.classes()).toContain('border-card-border');
+    }
     expect(region.attributes('role')).toBe('region');
     expect(region.attributes('aria-label')).toBe('Monthly average category table');
     expect(region.attributes('tabindex')).toBe('0');

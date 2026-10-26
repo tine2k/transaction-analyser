@@ -186,7 +186,7 @@ The Yearly matrix SHALL tint each populated month cell's background by the cell'
 
 ### Requirement: Populated Yearly cells link to their transactions
 
-Each populated month cell SHALL link to the transactions screen at `/` with `month=YYYY-MM`, the cell's category as `category` — the category identity or `uncategorised` — and the selected person as `person=<id>` when one is selected. Each populated `Total` cell SHALL link with `year=YYYY`, the category, and the selected person. A blank cell SHALL NOT be a link. Links SHALL add no data request and change no stored data.
+Each populated month cell SHALL link to the transactions screen at `/` with `month=YYYY-MM`, the cell's category as `category` — the category identity or `uncategorised` — and the selected person as `person=<id>` when one is selected. Each populated `Total` cell SHALL link with `year=YYYY`, the category, and the selected person. A populated month cell's link SHALL fill the cell so the whole cell is its interactive and hover area. A blank cell SHALL NOT be a link. Links SHALL add no data request and change no stored data.
 
 #### Scenario: A populated month cell links to its month and category
 
@@ -217,6 +217,11 @@ Each populated month cell SHALL link to the transactions screen at `/` with `mon
 
 - **WHEN** the pointer is over a linked cell
 - **THEN** the cell presents a hover affordance that marks it as interactive
+
+#### Scenario: A populated month cell's hover covers the whole cell
+
+- **WHEN** the pointer is over any part of a populated month cell, including the area above or below its amount within the row
+- **THEN** the entire cell presents the hover affordance and activates the month link
 
 #### Scenario: Links add no data access
 

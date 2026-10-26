@@ -112,6 +112,42 @@ test('the yearly screen presents a selected year, cards, matrix, and links', asy
   expect(transactionRequests).toBe(1);
 });
 
+test('a populated month link fills its cell and hovers at the cell edge', async ({ page }) => {
+  await interceptTransactions(page);
+  await page.goto('/yearly?year=2025', { waitUntil: 'networkidle' });
+
+  const cell = page
+    .getByTestId('yearly-month-cell')
+    .filter({ has: page.getByTestId('yearly-month-link') })
+    .first();
+  const link = cell.getByTestId('yearly-month-link');
+
+  const cellBox = await cell.boundingBox();
+  const linkBox = await link.boundingBox();
+  expect(cellBox).not.toBeNull();
+  expect(linkBox).not.toBeNull();
+
+  const cellContentBox = await cell.evaluate((element) => ({
+    width: element.clientWidth,
+    height: element.clientHeight,
+  }));
+
+  expect(Math.round(linkBox!.height)).toBe(cellContentBox.height);
+  expect(Math.round(linkBox!.width)).toBe(cellContentBox.width);
+
+  const backgroundBefore = await link.evaluate((element) => getComputedStyle(element).backgroundColor);
+
+  // The cell's lower edge is outside the amount text but must still belong to the link.
+  await page.mouse.move(
+    cellBox!.x + cellBox!.width / 2,
+    cellBox!.y + cellContentBox.height - 1,
+  );
+
+  await expect.poll(() => link.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe(backgroundBefore);
+  expect(await link.evaluate((element) => element.matches(':hover'))).toBe(true);
+});
+
 test('the yearly expense-type filter narrows rows and cards', async ({ page }) => {
   await interceptTransactions(page);
   await page.goto('/yearly?year=2025', { waitUntil: 'networkidle' });

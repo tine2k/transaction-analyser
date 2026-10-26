@@ -385,7 +385,7 @@ function totalLocation(categoryKey: string) {
                   </span>
                 </td>
                 <td
-                  class="whitespace-nowrap px-3 py-2 text-right font-bold tabular-nums text-ink sm:px-5"
+                  class="whitespace-nowrap px-3 text-right font-bold tabular-nums text-ink sm:px-5"
                   data-testid="yearly-total-cell"
                 >
                   <NuxtLink

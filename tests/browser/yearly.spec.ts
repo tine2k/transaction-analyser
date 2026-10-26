@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { contrastRatio } from './contrast';
 
 // The Yearly screen: one selected year as a category-by-month matrix, its two
@@ -7,6 +7,7 @@ import { contrastRatio } from './contrast';
 // transaction data.
 //
 // See openspec/changes/replace-monthly-totals-with-yearly-screen/specs/monthly-category-totals-table/spec.md
+// and openspec/changes/align-yearly-table-links/specs/monthly-category-totals-table/spec.md
 
 const transactions = [
   {
@@ -83,6 +84,19 @@ async function interceptTransactions(page: Page, json: unknown = transactions): 
   });
 }
 
+async function verticalCenter(locator: Locator): Promise<number> {
+  return locator.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const rect = range.getBoundingClientRect();
+    if (rect.height > 0) {
+      return rect.top + rect.height / 2;
+    }
+    const own = element.getBoundingClientRect();
+    return own.top + own.height / 2;
+  });
+}
+
 test('the yearly screen presents a selected year, cards, matrix, and links', async ({ page }) => {
   let transactionRequests = 0;
   page.on('request', (request) => {
@@ -147,6 +161,37 @@ test('a populated month link fills its cell and hovers at the cell edge', async 
   await expect.poll(() => link.evaluate((element) => getComputedStyle(element).backgroundColor))
     .not.toBe(backgroundBefore);
   expect(await link.evaluate((element) => element.matches(':hover'))).toBe(true);
+});
+
+test('the yearly matrix centers its labels, month links, and total link on one vertical axis', async ({ page }) => {
+  await interceptTransactions(page);
+  await page.goto('/yearly?year=2025', { waitUntil: 'networkidle' });
+
+  const row = page.getByTestId('yearly-row').filter({ hasText: 'Groceries' });
+
+  async function expectOneVerticalAxis(): Promise<void> {
+    const monthCenter = await verticalCenter(row.getByTestId('yearly-month-link').first());
+    const centers = [
+      await verticalCenter(row.locator('th span').last()),
+      monthCenter,
+      await verticalCenter(row.locator('[data-month-key="2025-04"] span')),
+      await verticalCenter(row.getByTestId('yearly-total-link')),
+    ];
+
+    for (const center of centers) {
+      expect(Math.abs(center - monthCenter)).toBeLessThanOrEqual(1);
+    }
+
+    const heights = await row
+      .locator('[data-testid="yearly-month-link"], [data-testid="yearly-total-link"]')
+      .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
+    expect(heights.length).toBeGreaterThan(0);
+    expect(heights.every((height) => height >= 44)).toBe(true);
+  }
+
+  await expectOneVerticalAxis();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectOneVerticalAxis();
 });
 
 test('every yearly category dot clears 3:1 against the matrix surface', async ({ page }) => {

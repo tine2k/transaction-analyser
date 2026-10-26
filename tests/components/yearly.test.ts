@@ -104,6 +104,32 @@ describe('yearly page', () => {
     expect(wrapper.get('[data-testid="yearly-matrix"]').classes()).toContain('min-w-[1100px]');
   });
 
+  it('centers every matrix cell and link content vertically', async () => {
+    mocks.useFetch.mockReturnValue(response(currentYearTransactions()));
+
+    const wrapper = await mountSuspended(Yearly, { route: '/yearly' });
+    const cells = wrapper.get('[data-testid="yearly-matrix"]').findAll('th, td');
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells.every((cell) => cell.classes().includes('align-middle'))).toBe(true);
+
+    const centeredBox = ['flex', 'min-h-11', 'items-center', 'justify-end', 'px-2'];
+    const monthLinks = wrapper.findAll('[data-testid="yearly-month-link"]');
+    expect(monthLinks.length).toBeGreaterThan(0);
+    for (const link of monthLinks) {
+      expect(link.classes()).toEqual(expect.arrayContaining(centeredBox));
+    }
+
+    const placeholders = wrapper.findAll('[data-testid="yearly-month-cell"] > span');
+    expect(placeholders.length).toBeGreaterThan(0);
+    for (const placeholder of placeholders) {
+      expect(placeholder.classes()).toEqual(expect.arrayContaining(centeredBox));
+    }
+
+    const totalLink = wrapper.get('[data-testid="yearly-total-link"]');
+    expect(totalLink.classes()).toEqual(expect.arrayContaining(centeredBox));
+    expect(wrapper.get('[data-testid="yearly-total-cell"]').classes()).not.toContain('py-2');
+  });
+
   it('keeps the home colour for two categories that share a family', async () => {
     mocks.useFetch.mockReturnValue(response([
       transaction(currentYear, 1, '-10.00', category('1', 'Groceries')),

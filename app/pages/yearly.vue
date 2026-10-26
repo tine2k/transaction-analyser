@@ -332,16 +332,16 @@ function totalLocation(categoryKey: string) {
             </caption>
             <thead>
               <tr class="text-xs uppercase tracking-[0.06em] text-muted">
-                <th scope="col" class="px-3 py-3 font-bold sm:px-5">Category</th>
+                <th scope="col" class="px-3 py-3 align-middle font-bold sm:px-5">Category</th>
                 <th
                   v-for="month in matrix.months"
                   :key="month.key"
                   scope="col"
-                  class="px-2 py-3 text-right font-bold"
+                  class="px-2 py-3 text-right align-middle font-bold"
                 >
                   {{ month.label.slice(0, 3) }}
                 </th>
-                <th scope="col" class="px-3 py-3 text-right font-bold sm:px-5">Total</th>
+                <th scope="col" class="px-3 py-3 text-right align-middle font-bold sm:px-5">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -352,7 +352,7 @@ function totalLocation(categoryKey: string) {
                 data-testid="yearly-row"
                 :data-category-key="row.key"
               >
-                <th scope="row" class="whitespace-nowrap px-3 py-2 font-semibold sm:px-5">
+                <th scope="row" class="whitespace-nowrap px-3 py-2 align-middle font-semibold sm:px-5">
                   <span class="inline-flex min-w-0 items-center gap-2">
                     <span
                       aria-hidden="true"
@@ -366,7 +366,7 @@ function totalLocation(categoryKey: string) {
                 <td
                   v-for="(month, index) in matrix.months"
                   :key="month.key"
-                  class="p-0 text-right tabular-nums text-ink"
+                  class="p-0 text-right align-middle tabular-nums text-ink"
                   :class="cellClass(cellAmount(row, index), row.maximum)"
                   :style="cellTintStyle(cellAmount(row, index), row.maximum)"
                   data-testid="yearly-month-cell"
@@ -375,23 +375,23 @@ function totalLocation(categoryKey: string) {
                   <NuxtLink
                     v-if="!isZeroAmountString(cellAmount(row, index))"
                     :to="monthLocation(month.key, row.key)"
-                    class="block min-h-11 px-2 py-2 transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
+                    class="flex min-h-11 items-center justify-end px-2 transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
                     data-testid="yearly-month-link"
                   >
                     {{ cellText(cellAmount(row, index), index) }}
                   </NuxtLink>
-                  <span v-else class="block px-2 py-2">
+                  <span v-else class="flex min-h-11 items-center justify-end px-2">
                     {{ cellText(cellAmount(row, index), index) }}
                   </span>
                 </td>
                 <td
-                  class="whitespace-nowrap px-3 text-right font-bold tabular-nums text-ink sm:px-5"
+                  class="whitespace-nowrap px-3 align-middle text-right font-bold tabular-nums text-ink sm:px-5"
                   data-testid="yearly-total-cell"
                 >
                   <NuxtLink
                     v-if="!isZeroAmountString(row.total)"
                     :to="totalLocation(row.key)"
-                    class="inline-flex min-h-11 items-center px-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                    class="flex min-h-11 items-center justify-end px-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                     data-testid="yearly-total-link"
                   >
                     {{ formatEuroAmount(row.total) }}

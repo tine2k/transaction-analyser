@@ -104,6 +104,23 @@ describe('yearly page', () => {
     expect(wrapper.get('[data-testid="yearly-matrix"]').classes()).toContain('min-w-[1100px]');
   });
 
+  it('keeps the home colour for two categories that share a family', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      transaction(currentYear, 1, '-10.00', category('1', 'Groceries')),
+      transaction(currentYear, 1, '-5.00', category('21', 'Household')),
+    ]));
+
+    const wrapper = await mountSuspended(Yearly, { route: '/yearly' });
+    const groceries = wrapper.get(
+      '[data-testid="yearly-row"][data-category-key="category:1"] [data-testid="category-color"]',
+    ).attributes('style');
+    const household = wrapper.get(
+      '[data-testid="yearly-row"][data-category-key="category:21"] [data-testid="category-color"]',
+    ).attributes('style');
+
+    expect(household).toBe(groceries);
+  });
+
   it('selects a URL year and states the twelve-month divisor', async () => {
     const pastYear = currentYear - 1;
     mocks.useFetch.mockReturnValue(response([

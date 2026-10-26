@@ -57,6 +57,20 @@ const manyCategories = Array.from({ length: 10 }, (_, index) => ({
   category: { id: String(index + 1), name: `Category ${index + 1}`, hidden: false, expenseType: null },
 }));
 
+function categoryTransaction(categoryId: string, categoryName: string, amount: string) {
+  return {
+    id: `category-${categoryId}`,
+    bookingDate: '2025-03-05',
+    valueDate: '2025-03-05',
+    amount,
+    purpose: `March ${categoryName}`,
+    counterpartyName: 'Shop',
+    counterpartyAccount: null,
+    person: anna,
+    category: { id: categoryId, name: categoryName, hidden: false, expenseType: null },
+  };
+}
+
 async function interceptTransactions(page: Page): Promise<void> {
   await page.route('**/api/transactions', async (route) => {
     await route.fulfill({ json: transactions });
@@ -126,6 +140,123 @@ test('the Other segment and legend use the same visible neutral', async ({ page 
   expect(colors.segment).toBe(colors.legend);
   expect(colors.categorySegments).not.toContain(colors.segment);
   expect(contrastRatio(colors.segment, colors.surface)).toBeGreaterThanOrEqual(3);
+});
+
+test('similar-sized top-eight categories with the same home colour are separated', async ({ page }) => {
+  await page.route('**/api/transactions', async (route) => {
+    await route.fulfill({
+      json: [
+        categoryTransaction('1', 'Groceries', '-100.00'),
+        categoryTransaction('21', 'Household', '-105.00'),
+      ],
+    });
+  });
+  await page.goto('/monthly?month=2025-03', { waitUntil: 'networkidle' });
+
+  const colors = await page.evaluate(() => {
+    const background = (selector: string) => {
+      const element = document.querySelector(selector) as HTMLElement | null;
+      return element === null ? '' : window.getComputedStyle(element).backgroundColor;
+    };
+    const householdLegend = Array.from(
+      document.querySelectorAll('[data-testid="bar-legend-item"]'),
+    ).find((item) => item.textContent?.includes('Household'));
+
+    return {
+      groceriesSegment: background('[data-testid="bar-segment"][data-category-key="category:1"]'),
+      householdSegment: background('[data-testid="bar-segment"][data-category-key="category:21"]'),
+      householdLegend: householdLegend === undefined
+        ? ''
+        : window.getComputedStyle(
+          householdLegend.querySelector('span[aria-hidden="true"]') as HTMLElement,
+        ).backgroundColor,
+      householdRow: background(
+        '[data-testid="category-row"][data-category-key="category:21"] [data-testid="category-color"]',
+      ),
+    };
+  });
+
+  expect(colors.householdSegment).not.toBe(colors.groceriesSegment);
+  expect(colors.householdLegend).toBe(colors.householdSegment);
+  expect(colors.householdRow).toBe(colors.householdSegment);
+});
+
+test('a category outside the top eight keeps its home colour', async ({ page }) => {
+  await page.route('**/api/transactions', async (route) => {
+    await route.fulfill({
+      json: [
+        categoryTransaction('1', 'Groceries', '-100.00'),
+        categoryTransaction('2', 'Rent', '-90.00'),
+        categoryTransaction('3', 'Transport', '-80.00'),
+        categoryTransaction('4', 'Utilities', '-70.00'),
+        categoryTransaction('5', 'Internet', '-60.00'),
+        categoryTransaction('6', 'Phone', '-50.00'),
+        categoryTransaction('7', 'Insurance', '-40.00'),
+        categoryTransaction('8', 'Health', '-30.00'),
+        categoryTransaction('21', 'Household', '-1.00'),
+      ],
+    });
+  });
+  await page.goto('/monthly?month=2025-03', { waitUntil: 'networkidle' });
+
+  const colors = await page.evaluate(() => {
+    const background = (key: string) => {
+      const element = document.querySelector(
+        `[data-testid="category-row"][data-category-key="${key}"] [data-testid="category-color"]`,
+      ) as HTMLElement | null;
+      return element === null ? '' : window.getComputedStyle(element).backgroundColor;
+    };
+
+    return {
+      topEight: background('category:1'),
+      outside: background('category:21'),
+      rows: document.querySelectorAll('[data-testid="category-row"]').length,
+    };
+  });
+
+  expect(colors.rows).toBe(9);
+  expect(colors.outside).toBe(colors.topEight);
+});
+
+test('every category bar mark, legend swatch, and table dot clears 3:1', async ({ page }) => {
+  await page.route('**/api/transactions', async (route) => {
+    await route.fulfill({ json: manyCategories });
+  });
+  await page.goto('/monthly?month=2025-03', { waitUntil: 'networkidle' });
+
+  const marks = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="monthly-bar-panel"]') as HTMLElement;
+    const table = document.querySelector('[data-testid="monthly-category-scroll"]') as HTMLElement;
+    const panelSurface = window.getComputedStyle(panel).backgroundColor;
+    const tableSurface = window.getComputedStyle(table).backgroundColor;
+    const background = (element: Element | null) =>
+      element === null ? '' : window.getComputedStyle(element).backgroundColor;
+
+    return [
+      ...Array.from(document.querySelectorAll('[data-testid="bar-segment"]')).map((element) => ({
+        kind: 'bar segment',
+        colour: background(element),
+        surface: panelSurface,
+      })),
+      ...Array.from(
+        document.querySelectorAll('[data-testid="bar-legend-item"] span[aria-hidden="true"]'),
+      ).map((element) => ({
+        kind: 'legend swatch',
+        colour: background(element),
+        surface: panelSurface,
+      })),
+      ...Array.from(document.querySelectorAll('[data-testid="category-color"]')).map((element) => ({
+        kind: 'table dot',
+        colour: background(element),
+        surface: tableSurface,
+      })),
+    ];
+  });
+
+  expect(marks.length).toBeGreaterThan(0);
+  for (const mark of marks) {
+    expect(contrastRatio(mark.colour, mark.surface), mark.kind).toBeGreaterThanOrEqual(3);
+  }
 });
 
 test('every category share bar meets the 3:1 contrast floor against its track', async ({ page }) => {

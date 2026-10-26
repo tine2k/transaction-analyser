@@ -73,4 +73,17 @@ test('the trend and share bars are solid category colours above 3:1', async ({ p
     expect(contrastRatio(fill.backgroundColor, 'rgb(255, 255, 255)'))
       .toBeGreaterThanOrEqual(3);
   }
+
+  const dots = await page.locator('[data-testid="category-color"]').evaluateAll((elements) => {
+    const table = document.querySelector('[data-testid="monthly-average-table"]') as HTMLElement;
+    const surface = window.getComputedStyle(table).backgroundColor;
+    return elements.map((element) => ({
+      colour: window.getComputedStyle(element).backgroundColor,
+      surface,
+    }));
+  });
+  expect(dots.length).toBeGreaterThan(0);
+  for (const dot of dots) {
+    expect(contrastRatio(dot.colour, dot.surface)).toBeGreaterThanOrEqual(3);
+  }
 });

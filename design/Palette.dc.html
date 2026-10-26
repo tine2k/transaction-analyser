@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Palette</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap">
+<style>body{margin:0;font-family:"Plus Jakarta Sans",system-ui,sans-serif;background:#F5F4FB;color:#1B1840}</style>
+</helmet>
+<div style="width:1360px;padding:48px 40px;box-sizing:border-box;background:#F5F4FB">
+<h1 style="margin:0;font-size:34px;font-weight:800;letter-spacing:-.02em">Category palette</h1>
+<p style="margin:6px 0 28px;color:#524E7D;font-size:15px">20 colors · each has a strong main color for dots and bars, a soft tint and a dark ink for chips</p>
+<div style="display:flex;height:48px;border-radius:14px;overflow:hidden;gap:2px;margin-bottom:24px">
+<sc-for list="{{colors}}" as="c" hint-placeholder-count="20"><div style="flex:1;background:{{c.main}}"></div></sc-for>
+</div>
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px">
+<sc-for list="{{colors}}" as="c" hint-placeholder-count="20">
+<div style="background:#fff;border-radius:20px;padding:12px;box-shadow:0 1px 3px rgba(40,30,120,.08)">
+<div style="height:84px;border-radius:12px;background:{{c.main}}"></div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin:12px 4px 10px"><b style="font-size:15px">{{c.num}} · {{c.name}}</b><span style="font-size:12px;color:#524E7D">{{c.main}}</span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 4px 4px">
+<span style="padding:5px 12px;border-radius:999px;font-size:12px;font-weight:700;background:{{c.tint}};color:{{c.ink}}">{{c.name}}</span>
+<span style="font-size:11px;color:#524E7D;text-align:right">{{c.tint}}<br>{{c.ink}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":1180}}'>
+class Component extends DCLogic {
+renderVals() {
+const P=[['Violet','#6D3CF2','#E4DCFF','#3A1CA8'],['Orange','#FF8A3D','#FFE3CC','#7A2E00'],['Teal','#12A594','#CFF3EC','#07564B'],['Pink','#E0409A','#FFD9EA','#8A0F4F'],['Blue','#2F7BFF','#D9E6FF','#12408F'],
+['Amber','#E5B100','#FFF0BF','#5C4500'],['Orchid','#B04FD8','#F3DCFA','#6A1E8A'],['Green','#1E9E4A','#D6F5E0','#0B5132'],['Indigo','#3F4FD6','#DDE0FB','#1E2A8A'],['Coral','#FF6B57','#FFDDD7','#8A2112'],
+['Cyan','#00B8C4','#CCF1F4','#045A61'],['Raspberry','#B8286B','#F7D5E5','#6B0F3C'],['Lime','#8FC31F','#E8F5C8','#476000'],['Sky','#1FA8E0','#D2EEFA','#07587A'],['Red','#E03A4E','#FFD6DB','#8A1428'],
+['Mint','#2DC98A','#D2F6E5','#0A5C3C'],['Plum','#7B3FA0','#E9DBF3','#45185F'],['Sand','#C99A5B','#F4E7D3','#6B4719'],['Slate','#5B6B8C','#DDE2EE','#2A3550'],['Navy','#2A4A7F','#D6E0F0','#14284A']];
+return {colors:P.map((c,i)=>({num:String(i+1).padStart(2,'0'),name:c[0],main:c[1],tint:c[2],ink:c[3]}))};
+}
+}
+</script>
+</body>
+</html>

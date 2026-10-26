@@ -91,6 +91,33 @@ describe('monthly category average page', () => {
     expect(wrapper.get('caption').text()).toContain('12 months');
   });
 
+  it('keeps the home colour for two categories that share a family', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      {
+        bookingDate: currentMonth.startDate,
+        amount: '-10.00',
+        person: { id: '1', name: 'Default' },
+        category: { id: '1', name: 'Groceries', hidden: false, expenseType: null },
+      },
+      {
+        bookingDate: currentMonth.startDate,
+        amount: '-5.00',
+        person: { id: '1', name: 'Default' },
+        category: { id: '21', name: 'Household', hidden: false, expenseType: null },
+      },
+    ]));
+
+    const wrapper = await mountSuspended(MonthlyAverage);
+    const groceries = wrapper.get(
+      '[data-testid="category-average"][data-category-key="category:1"] [data-testid="category-color"]',
+    ).attributes('style');
+    const household = wrapper.get(
+      '[data-testid="category-average"][data-category-key="category:21"] [data-testid="category-color"]',
+    ).attributes('style');
+
+    expect(household).toBe(groceries);
+  });
+
   it('uses touch-sized controls and keeps long category names wrappable', async () => {
     mocks.useFetch.mockReturnValue(response([
       {

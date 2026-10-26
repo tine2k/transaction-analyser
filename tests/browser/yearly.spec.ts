@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { contrastRatio } from './contrast';
 
 // The Yearly screen: one selected year as a category-by-month matrix, its two
 // summary cards, the retained filters, and the cell links. The API is
@@ -146,6 +147,25 @@ test('a populated month link fills its cell and hovers at the cell edge', async 
   await expect.poll(() => link.evaluate((element) => getComputedStyle(element).backgroundColor))
     .not.toBe(backgroundBefore);
   expect(await link.evaluate((element) => element.matches(':hover'))).toBe(true);
+});
+
+test('every yearly category dot clears 3:1 against the matrix surface', async ({ page }) => {
+  await interceptTransactions(page);
+  await page.goto('/yearly?year=2025', { waitUntil: 'networkidle' });
+
+  const dots = await page.locator('[data-testid="category-color"]').evaluateAll((elements) => {
+    const matrix = document.querySelector('[data-testid="yearly-matrix-scroll"]') as HTMLElement;
+    const surface = window.getComputedStyle(matrix).backgroundColor;
+    return elements.map((element) => ({
+      colour: window.getComputedStyle(element).backgroundColor,
+      surface,
+    }));
+  });
+
+  expect(dots.length).toBeGreaterThan(0);
+  for (const dot of dots) {
+    expect(contrastRatio(dot.colour, dot.surface)).toBeGreaterThanOrEqual(3);
+  }
 });
 
 test('the yearly expense-type filter narrows rows and cards', async ({ page }) => {

@@ -22,6 +22,7 @@ import {
   getLocalDateString,
   getPersonChoices,
   isZeroAmountString,
+  resolveMonthlyCategoryColors,
   resolvePersonChoice,
   resolveSelectedMonth,
   type CategorySpendingTransaction,
@@ -138,14 +139,19 @@ const subtitle = computed(() => {
 });
 
 // The colour map covers every returned category, not only the selected month,
-// so a category keeps its colour as the month, person, or filters change.
+// so a category keeps its identity colour as the month, person, or filters
+// change. The top-eight resolver may move a similarly sized category off its
+// home colour for this page only.
 const categoryColorMap = computed(() => createCategoryColorMap(
   (transactions.value ?? []).map(({ category }) =>
     category === null ? 'uncategorised' : `category:${category.id}`),
 ));
+const resolvedCategoryColors = computed(() => resolveMonthlyCategoryColors(breakdown.value.top));
 
 function categoryColor(key: string): string {
-  return categoryColorMap.value.get(key) ?? CATEGORY_COLOR_PALETTE[0];
+  return resolvedCategoryColors.value.get(key)
+    ?? categoryColorMap.value.get(key)
+    ?? CATEGORY_COLOR_PALETTE[0];
 }
 
 function sharePercent(amount: string): number {

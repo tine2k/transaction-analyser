@@ -55,7 +55,11 @@ const transactions = [
   },
 ];
 
-async function interceptApi(page: Page, transactionRows = transactions): Promise<void> {
+async function interceptApi(
+  page: Page,
+  transactionRows = transactions,
+  categoryRows = categories,
+): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const { pathname } = new URL(route.request().url());
     const method = route.request().method();
@@ -66,7 +70,7 @@ async function interceptApi(page: Page, transactionRows = transactions): Promise
     }
 
     if (pathname === '/api/categories' && method === 'GET') {
-      await route.fulfill({ json: categories });
+      await route.fulfill({ json: categoryRows });
       return;
     }
 
@@ -571,6 +575,7 @@ test.describe('redesigned transactions screen', () => {
         categorisedBackground: window.getComputedStyle(categorised).backgroundColor,
         categorisedColor: window.getComputedStyle(categorised).color,
         categorisedRadius: window.getComputedStyle(categorised).borderRadius,
+        categorisedText: (categorised as HTMLSelectElement).selectedOptions[0]?.text ?? '',
         uncategorisedBackground: window.getComputedStyle(uncategorised).backgroundColor,
         uncategorisedText: (uncategorised as HTMLSelectElement).selectedOptions[0]?.text ?? '',
       };
@@ -578,6 +583,7 @@ test.describe('redesigned transactions screen', () => {
     expect(pills.categorisedBackground).not.toBe(pills.uncategorisedBackground);
     expect(pills.categorisedBackground).not.toBe('rgba(0, 0, 0, 0)');
     expect(pills.categorisedColor).not.toBe('');
+    expect(pills.categorisedText).toBe('Groceries');
     expect(contrastRatio(pills.categorisedColor, pills.categorisedBackground)).toBeGreaterThanOrEqual(4.5);
     expect(Number.parseFloat(pills.categorisedRadius)).toBeGreaterThanOrEqual(9999);
     expect(pills.uncategorisedBackground).toBe('rgb(255, 255, 255)');
@@ -586,6 +592,65 @@ test.describe('redesigned transactions screen', () => {
     await expect(page.getByRole('button', { name: 'Previous', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Next', exact: true })).toHaveCount(0);
     await expect(page.getByTestId('transactions-batch-sentinel')).toHaveCount(1);
+  });
+
+  test('keeps the home family for categories the Monthly resolver would separate', async ({ page }) => {
+    const householdCategory = {
+      id: '21',
+      name: 'Household',
+      patterns: ['home'],
+      hidden: false,
+      windows: [],
+    };
+    await interceptApi(page, [
+      {
+        ...transactions[0],
+        id: 'groceries',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+      {
+        ...transactions[0],
+        id: 'household',
+        purpose: 'Household shop',
+        category: { id: '21', name: 'Household', hidden: false },
+      },
+    ], [...categories, householdCategory]);
+    await page.goto('/?category=all', { waitUntil: 'networkidle' });
+
+    const backgrounds = await page.evaluate(() => {
+      const background = (transactionId: string) => {
+        const select = document.querySelector(
+          `[data-transaction-id="${transactionId}"] [data-testid="row-category-select"]`,
+        ) as HTMLElement | null;
+        return select === null ? '' : window.getComputedStyle(select).backgroundColor;
+      };
+
+      return {
+        groceries: background('groceries'),
+        household: background('household'),
+      };
+    });
+
+    expect(backgrounds.household).toBe(backgrounds.groceries);
+  });
+
+  test('every categorised pill name clears 4.5:1 against its tint', async ({ page }) => {
+    await openWithAllCategories(page);
+
+    const pills = await page.locator('[data-testid="row-category-select"]').evaluateAll((elements) =>
+      elements
+        .filter((element) => (element as HTMLSelectElement).value !== '')
+        .map((element) => ({
+          name: (element as HTMLSelectElement).selectedOptions[0]?.text ?? '',
+          colour: window.getComputedStyle(element).color,
+          ground: window.getComputedStyle(element).backgroundColor,
+        })));
+
+    expect(pills.length).toBeGreaterThan(0);
+    for (const pill of pills) {
+      expect(pill.name).not.toBe('');
+      expect(contrastRatio(pill.colour, pill.ground), pill.name).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   test('keeps the category pill operable as the assignment control', async ({ page }) => {

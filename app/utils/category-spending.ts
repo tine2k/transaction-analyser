@@ -86,17 +86,190 @@ export type CategoryMonthlyAverageData = {
 
 type DecimalParts = { coefficient: bigint; scale: number };
 
-export const CATEGORY_COLOR_PALETTE = [
-  '#6D3CF2', '#D96A1F', '#12A594', '#E0409A', '#2F7BFF',
-  '#A87F00', '#B42318', '#0E7490', '#1E9E4A',
-] as const;
+export type CategoryColorFamily = Readonly<{
+  name: string;
+  main: string;
+  tint: string;
+  ink: string;
+}>;
 
+// The design's twenty category colour families. The main value identifies the
+// category in dots and bars; the tint is the pill ground and the ink is the pill
+// text. Eight mains are darkened from the mock just enough to clear 3:1 on white;
+// every tint and ink value is the design value.
+export const CATEGORY_COLOR_FAMILIES = [
+  { name: 'Violet', main: '#6D3CF2', tint: '#E4DCFF', ink: '#3A1CA8' },
+  { name: 'Orange', main: '#DF7A3D', tint: '#FFE3CC', ink: '#7A2E00' },
+  { name: 'Teal', main: '#12A594', tint: '#CFF3EC', ink: '#07564B' },
+  { name: 'Pink', main: '#E0409A', tint: '#FFD9EA', ink: '#8A0F4F' },
+  { name: 'Blue', main: '#2F7BFF', tint: '#D9E6FF', ink: '#12408F' },
+  { name: 'Amber', main: '#B88F0E', tint: '#FFF0BF', ink: '#5C4500' },
+  { name: 'Orchid', main: '#B04FD8', tint: '#F3DCFA', ink: '#6A1E8A' },
+  { name: 'Green', main: '#1E9E4A', tint: '#D6F5E0', ink: '#0B5132' },
+  { name: 'Indigo', main: '#3F4FD6', tint: '#DDE0FB', ink: '#1E2A8A' },
+  { name: 'Coral', main: '#F56856', tint: '#FFDDD7', ink: '#8A2112' },
+  { name: 'Cyan', main: '#04A4B3', tint: '#CCF1F4', ink: '#045A61' },
+  { name: 'Raspberry', main: '#B8286B', tint: '#F7D5E5', ink: '#6B0F3C' },
+  { name: 'Lime', main: '#78A225', tint: '#E8F5C8', ink: '#476000' },
+  { name: 'Sky', main: '#1F9FD6', tint: '#D2EEFA', ink: '#07587A' },
+  { name: 'Red', main: '#E03A4E', tint: '#FFD6DB', ink: '#8A1428' },
+  { name: 'Mint', main: '#2BA87C', tint: '#D2F6E5', ink: '#0A5C3C' },
+  { name: 'Plum', main: '#7B3FA0', tint: '#E9DBF3', ink: '#45185F' },
+  { name: 'Sand', main: '#B88D58', tint: '#F4E7D3', ink: '#6B4719' },
+  { name: 'Slate', main: '#5B6B8C', tint: '#DDE2EE', ink: '#2A3550' },
+  { name: 'Navy', main: '#2A4A7F', tint: '#D6E0F0', ink: '#14284A' },
+] as const satisfies readonly CategoryColorFamily[];
+
+export const CATEGORY_COLOR_PALETTE = CATEGORY_COLOR_FAMILIES.map(({ main }) => main);
+
+const UNCATEGORISED_FAMILY: CategoryColorFamily = {
+  name: 'Uncategorised',
+  main: 'var(--color-muted)',
+  tint: 'var(--color-surface)',
+  ink: 'var(--color-ink)',
+};
+
+const CATEGORY_KEY_PATTERN = /^category:(\d+)$/;
+
+function categoryIdentity(key: string): bigint | null {
+  const match = CATEGORY_KEY_PATTERN.exec(key);
+  return match === null ? null : BigInt(match[1]!);
+}
+
+function categoryFamilyIndex(key: string): number | null {
+  const identity = categoryIdentity(key);
+  if (identity === null) {
+    return null;
+  }
+
+  const length = BigInt(CATEGORY_COLOR_FAMILIES.length);
+  return Number(((identity - 1n) % length + length) % length);
+}
+
+export function getCategoryColorFamily(key: string): CategoryColorFamily {
+  if (key === 'uncategorised') {
+    return UNCATEGORISED_FAMILY;
+  }
+
+  const index = categoryFamilyIndex(key);
+  return index === null ? CATEGORY_COLOR_FAMILIES[0] : CATEGORY_COLOR_FAMILIES[index]!;
+}
+
+// A category's colour depends only on its identity, never on the other keys in
+// the collection, their order, or the screen showing them.
 export function createCategoryColorMap(categoryKeys: string[]): Map<string, string> {
-  const sortedKeys = [...new Set(categoryKeys)].sort();
-  return new Map(sortedKeys.map((key, index) => [
+  return new Map([...new Set(categoryKeys)].map((key) => [
     key,
-    CATEGORY_COLOR_PALETTE[index % CATEGORY_COLOR_PALETTE.length]!,
+    getCategoryColorFamily(key).main,
   ]));
+}
+
+function colorChannels(hex: string): [number, number, number] {
+  return [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16)) as
+    [number, number, number];
+}
+
+function colorLab(hex: string): [number, number, number] {
+  const [red, green, blue] = colorChannels(hex).map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  const x = (red * 0.4124 + green * 0.3576 + blue * 0.1805) / 0.95047;
+  const y = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+  const z = (red * 0.0193 + green * 0.1192 + blue * 0.9505) / 1.08883;
+  const transform = (value: number) =>
+    value > 0.008856 ? Math.cbrt(value) : 7.787 * value + 16 / 116;
+
+  return [
+    116 * transform(y) - 16,
+    500 * (transform(x) - transform(y)),
+    200 * (transform(y) - transform(z)),
+  ];
+}
+
+function colorDistance(left: string, right: string): number {
+  const leftLab = colorLab(left);
+  const rightLab = colorLab(right);
+  return Math.hypot(
+    leftLab[0] - rightLab[0],
+    leftLab[1] - rightLab[1],
+    leftLab[2] - rightLab[2],
+  );
+}
+
+function chooseReplacement(
+  resolved: Map<string, string>,
+  available: Array<{ family: CategoryColorFamily; index: number }>,
+): string {
+  if (available.length === 0) {
+    const used = new Set(resolved.values());
+    return CATEGORY_COLOR_PALETTE.find((color) => !used.has(color)) ?? CATEGORY_COLOR_PALETTE[0]!;
+  }
+
+  const usedColors = [...resolved.values()];
+  let bestIndex = 0;
+  let bestDistance = -1;
+
+  for (const [index, candidate] of available.entries()) {
+    const distance = usedColors.length === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.min(...usedColors.map((color) => colorDistance(candidate.family.main, color)));
+    if (distance > bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+
+  const [chosen] = available.splice(bestIndex, 1);
+  return chosen!.family.main;
+}
+
+// Resolve the Monthly top-eight colours. A stored category whose amount is
+// within ten percent of a category already on the same home colour yields to a
+// distinct family that no top-eight entry uses as its home. Categories whose
+// amounts differ enough to be distinguished by their bar widths keep the shared
+// home colour. The result is deterministic for the same entries.
+export function resolveMonthlyCategoryColors(
+  entries: Array<Pick<CategorySpendingTotal, 'key' | 'amount'>>,
+): Map<string, string> {
+  const groups = new Map<number, Array<{ key: string; amount: string; identity: bigint }>>();
+
+  for (const entry of entries) {
+    const identity = categoryIdentity(entry.key);
+    const familyIndex = categoryFamilyIndex(entry.key);
+    if (identity === null || familyIndex === null) {
+      continue;
+    }
+
+    const group = groups.get(familyIndex) ?? [];
+    group.push({ key: entry.key, amount: entry.amount, identity });
+    groups.set(familyIndex, group);
+  }
+
+  const homeFamilies = new Set(groups.keys());
+  const available = CATEGORY_COLOR_FAMILIES
+    .map((family, index) => ({ family, index }))
+    .filter(({ index }) => !homeFamilies.has(index));
+  const resolved = new Map<string, string>();
+
+  for (const [familyIndex, group] of groups) {
+    group.sort((left, right) =>
+      left.identity < right.identity ? -1 : left.identity > right.identity ? 1 : 0);
+
+    const homeColor = CATEGORY_COLOR_PALETTE[familyIndex]!;
+    const keepers: string[] = [];
+
+    for (const entry of group) {
+      if (keepers.some((amount) => areAmountsWithinTenPercent(entry.amount, amount))) {
+        resolved.set(entry.key, chooseReplacement(resolved, available));
+      } else {
+        resolved.set(entry.key, homeColor);
+        keepers.push(entry.amount);
+      }
+    }
+  }
+
+  return resolved;
 }
 
 // The people the returned transactions represent, ordered by name ignoring case
@@ -158,6 +331,24 @@ export function compareDecimalStrings(left: string, right: string): number {
   const alignedLeft = leftDecimal.coefficient * powerOfTen(commonScale - leftDecimal.scale);
   const alignedRight = rightDecimal.coefficient * powerOfTen(commonScale - rightDecimal.scale);
   return alignedLeft < alignedRight ? -1 : alignedLeft > alignedRight ? 1 : 0;
+}
+
+// Whether two amounts differ by no more than ten percent of the larger amount.
+// Both values are read as absolute decimal magnitudes and compared with exact
+// integer arithmetic, so the Monthly separation rule never depends on a float.
+export function areAmountsWithinTenPercent(left: string, right: string): boolean {
+  const leftDecimal = parseDecimal(left);
+  const rightDecimal = parseDecimal(right);
+  const commonScale = Math.max(leftDecimal.scale, rightDecimal.scale);
+  const leftMagnitude = (leftDecimal.coefficient < 0n ? -leftDecimal.coefficient : leftDecimal.coefficient)
+    * powerOfTen(commonScale - leftDecimal.scale);
+  const rightMagnitude = (rightDecimal.coefficient < 0n ? -rightDecimal.coefficient : rightDecimal.coefficient)
+    * powerOfTen(commonScale - rightDecimal.scale);
+  const larger = leftMagnitude > rightMagnitude ? leftMagnitude : rightMagnitude;
+  const difference = leftMagnitude > rightMagnitude
+    ? leftMagnitude - rightMagnitude
+    : rightMagnitude - leftMagnitude;
+  return difference * 100n <= larger * 10n;
 }
 
 export function sumAbsoluteAmountStrings(amounts: string[]): string {

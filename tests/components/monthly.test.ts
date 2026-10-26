@@ -93,6 +93,84 @@ describe('the Monthly screen', () => {
     expect(currentPill?.attributes('aria-pressed')).toBe('true');
   });
 
+  it('keeps a category colour when the visible category set changes', async () => {
+    const rent = { id: '2', name: 'Rent' };
+    mocks.useFetch.mockReturnValue(response([
+      currentMonthTransaction('-10.00', rent),
+    ]));
+
+    const alone = await mountSuspended(Monthly);
+    const aloneMark = alone.get(
+      '[data-testid="category-row"][data-category-key="category:2"] [data-testid="category-color"]',
+    ).attributes('style');
+
+    mocks.useFetch.mockReturnValue(response([
+      currentMonthTransaction('-10.00', rent),
+      currentMonthTransaction('-1.00', { id: '1', name: 'Groceries' }),
+    ]));
+
+    const withSibling = await mountSuspended(Monthly);
+    const withSiblingMark = withSibling.get(
+      '[data-testid="category-row"][data-category-key="category:2"] [data-testid="category-color"]',
+    ).attributes('style');
+
+    expect(aloneMark).toContain('background-color');
+    expect(withSiblingMark).toBe(aloneMark);
+  });
+
+  it('separates similar-sized categories that share a home colour', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      currentMonthTransaction('-100.00', { id: '1', name: 'Groceries' }, '01'),
+      currentMonthTransaction('-105.00', { id: '21', name: 'Household' }, '02'),
+    ]));
+
+    const wrapper = await mountSuspended(Monthly);
+    const groceriesSegment = wrapper.get(
+      '[data-testid="bar-segment"][data-category-key="category:1"]',
+    ).attributes('style');
+    const householdSegment = wrapper.get(
+      '[data-testid="bar-segment"][data-category-key="category:21"]',
+    ).attributes('style');
+    const householdLegend = wrapper.findAll('[data-testid="bar-legend-item"]')
+      .find((item) => item.text().includes('Household'))
+      ?.get('span[aria-hidden="true"]')
+      .attributes('style');
+    const householdRow = wrapper.get(
+      '[data-testid="category-row"][data-category-key="category:21"] [data-testid="category-color"]',
+    ).attributes('style');
+
+    expect(householdSegment).not.toBe(groceriesSegment);
+    const background = (style: string | undefined) =>
+      style?.match(/background-color:\s*([^;]+)/)?.[1];
+    expect(background(householdLegend)).toBe(background(householdSegment));
+    expect(background(householdRow)).toBe(background(householdSegment));
+  });
+
+  it('keeps the home colour on a category outside the top eight', async () => {
+    mocks.useFetch.mockReturnValue(response([
+      currentMonthTransaction('-100.00', { id: '1', name: 'Groceries' }, '01'),
+      currentMonthTransaction('-90.00', { id: '2', name: 'Rent' }, '02'),
+      currentMonthTransaction('-80.00', { id: '3', name: 'Transport' }, '03'),
+      currentMonthTransaction('-70.00', { id: '4', name: 'Utilities' }, '04'),
+      currentMonthTransaction('-60.00', { id: '5', name: 'Internet' }, '05'),
+      currentMonthTransaction('-50.00', { id: '6', name: 'Phone' }, '06'),
+      currentMonthTransaction('-40.00', { id: '7', name: 'Insurance' }, '07'),
+      currentMonthTransaction('-30.00', { id: '8', name: 'Health' }, '08'),
+      currentMonthTransaction('-1.00', { id: '21', name: 'Household' }, '09'),
+    ]));
+
+    const wrapper = await mountSuspended(Monthly);
+    const topEightHome = wrapper.get(
+      '[data-testid="category-row"][data-category-key="category:1"] [data-testid="category-color"]',
+    ).attributes('style');
+    const outsideHome = wrapper.get(
+      '[data-testid="category-row"][data-category-key="category:21"] [data-testid="category-color"]',
+    ).attributes('style');
+
+    expect(wrapper.findAll('[data-testid="category-row"]')).toHaveLength(9);
+    expect(outsideHome).toBe(topEightHome);
+  });
+
   it('reads the selected month from the URL and keeps the year control in step', async () => {
     const month = `${currentYear - 1}-03`;
     const replace = vi.fn();

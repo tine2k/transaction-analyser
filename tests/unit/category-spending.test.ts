@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CATEGORY_COLOR_FAMILIES,
   CATEGORY_COLOR_PALETTE,
+  areAmountsWithinTenPercent,
   averageDecimalString,
   createCategoryColorMap,
   createCategoryMonthlyAverageData,
@@ -14,6 +16,7 @@ import {
   getAvailableYears,
   getCalendarYearMonths,
   getCategoryBreakdown,
+  getCategoryColorFamily,
   getCategorySharePercent,
   getElapsedMonthsInYear,
   getLastCalendarMonths,
@@ -26,6 +29,7 @@ import {
   resolvePersonChoice,
   resolveSelectedMonth,
   resolveSelectedYear,
+  resolveMonthlyCategoryColors,
   sumAbsoluteAmountStrings,
   sumSignedAmountStrings,
   type CategorySpendingTransaction,
@@ -132,45 +136,144 @@ describe('decimal-safe signed transaction totals', () => {
   });
 });
 
+describe('similar amount comparison', () => {
+  it('accepts amounts below ten percent apart', () => {
+    expect(areAmountsWithinTenPercent('1000.00', '901.00')).toBe(true);
+    expect(areAmountsWithinTenPercent('901.00', '1000.00')).toBe(true);
+    expect(areAmountsWithinTenPercent('1000', '900.00')).toBe(true);
+  });
+
+  it('accepts exactly ten percent apart', () => {
+    expect(areAmountsWithinTenPercent('1000.00', '900.00')).toBe(true);
+    expect(areAmountsWithinTenPercent('900', '1000.000')).toBe(true);
+  });
+
+  it('rejects amounts more than ten percent apart', () => {
+    expect(areAmountsWithinTenPercent('1000.00', '899.00')).toBe(false);
+    expect(areAmountsWithinTenPercent('0', '0.01')).toBe(false);
+  });
+
+  it('treats two zero amounts as equal', () => {
+    expect(areAmountsWithinTenPercent('0', '0.000')).toBe(true);
+    expect(areAmountsWithinTenPercent('-0.00', '0')).toBe(true);
+  });
+});
+
 describe('stable category colors', () => {
-  it('assigns distinct palette colors by sorted identity regardless of input order', () => {
+  it('assigns colors by identity regardless of input order or other keys', () => {
     const keys = ['category:1', 'category:2', 'uncategorised'];
     const colorsInOrder = createCategoryColorMap(keys);
     const colorsInReverseOrder = createCategoryColorMap([...keys].reverse());
 
     expect(colorsInReverseOrder).toEqual(colorsInOrder);
-    expect(new Set(colorsInOrder.values()).size).toBe(keys.length);
-    expect([...colorsInOrder.values()]).toEqual(CATEGORY_COLOR_PALETTE.slice(0, keys.length));
+    expect(colorsInOrder.get('category:1')).toBe(CATEGORY_COLOR_PALETTE[0]);
+    expect(colorsInOrder.get('category:2')).toBe(CATEGORY_COLOR_PALETTE[1]);
+    expect(colorsInOrder.get('uncategorised')).toBe('var(--color-muted)');
   });
 
-  it('keeps every palette color at or above 3:1 against white', () => {
-    expect(CATEGORY_COLOR_PALETTE).toHaveLength(9);
+  it('keeps a category color when the visible category set changes', () => {
+    const alone = createCategoryColorMap(['category:2']);
+    const withNeighbours = createCategoryColorMap(['category:1', 'category:2', 'category:10']);
+
+    expect(alone.get('category:2')).toBe(withNeighbours.get('category:2'));
+  });
+
+  it('cycles deterministically when identities exceed the palette length', () => {
+    const colors = createCategoryColorMap(['category:1', 'category:21', 'category:41']);
+
+    expect(new Set(colors.values()).size).toBe(1);
+    expect(colors.get('category:1')).toBe(CATEGORY_COLOR_PALETTE[0]);
+  });
+
+  it('exposes the family roles for the category pill', () => {
+    const family = getCategoryColorFamily('category:2');
+
+    expect(family).toBe(CATEGORY_COLOR_FAMILIES[1]);
+    expect(family.tint).toBe('#FFE3CC');
+    expect(family.ink).toBe('#7A2E00');
+  });
+
+  it('keeps every palette main at or above 3:1 against white', () => {
+    expect(CATEGORY_COLOR_FAMILIES).toHaveLength(20);
+    expect(CATEGORY_COLOR_PALETTE).toHaveLength(20);
     expect(new Set(CATEGORY_COLOR_PALETTE).size).toBe(CATEGORY_COLOR_PALETTE.length);
 
-    for (const color of CATEGORY_COLOR_PALETTE) {
-      expect(contrastRatio(color, '#ffffff'), color).toBeGreaterThanOrEqual(3);
+    for (const family of CATEGORY_COLOR_FAMILIES) {
+      expect(contrastRatio(family.main, '#ffffff'), family.name).toBeGreaterThanOrEqual(3);
     }
   });
 
   it('keeps every category pill text at or above 4.5:1 on its tinted ground', () => {
-    for (const color of CATEGORY_COLOR_PALETTE) {
-      const ground = mixSrgb(color, '#ffffff', 0.16);
-      const text = mixSrgb(color, '#201e3e', 0.5);
-      expect(contrastRatio(text, ground), color).toBeGreaterThanOrEqual(4.5);
+    for (const family of CATEGORY_COLOR_FAMILIES) {
+      expect(contrastRatio(family.ink, family.tint), family.name).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
 
-function mixSrgb(foreground: string, background: string, foregroundWeight: number): string {
-  const channels = (color: string) => [1, 3, 5].map(
-    (start) => Number.parseInt(color.slice(start, start + 2), 16),
-  );
-  const foregroundChannels = channels(foreground);
-  const backgroundChannels = channels(background);
-  return `#${foregroundChannels.map((channel, index) => Math.round(
-    channel * foregroundWeight + backgroundChannels[index]! * (1 - foregroundWeight),
-  ).toString(16).padStart(2, '0')).join('')}`;
-}
+describe('monthly top-eight colour resolution', () => {
+  it('moves a similar-sized category off a shared home colour', () => {
+    const home = getCategoryColorFamily('category:21').main;
+    const resolved = resolveMonthlyCategoryColors([
+      { key: 'category:1', amount: '100.00' },
+      { key: 'category:21', amount: '105.00' },
+    ]);
+
+    expect(resolved.get('category:1')).toBe(CATEGORY_COLOR_PALETTE[0]);
+    expect(resolved.get('category:21')).not.toBe(CATEGORY_COLOR_PALETTE[0]);
+    expect(resolved.get('category:21')).not.toBe(home);
+    expect(getCategoryColorFamily('category:21').main).toBe(home);
+    expect(new Set(resolved.values()).size).toBe(2);
+  });
+
+  it('separates every similar-sized member of a three-category home group', () => {
+    const resolved = resolveMonthlyCategoryColors([
+      { key: 'category:1', amount: '100.00' },
+      { key: 'category:21', amount: '105.00' },
+      { key: 'category:41', amount: '110.00' },
+    ]);
+
+    const moved = [resolved.get('category:21'), resolved.get('category:41')];
+    expect(resolved.get('category:1')).toBe(CATEGORY_COLOR_PALETTE[0]);
+    expect(moved).not.toContain(CATEGORY_COLOR_PALETTE[0]);
+    expect(new Set(moved).size).toBe(2);
+    expect(new Set(resolved.values()).size).toBe(3);
+  });
+
+  it('keeps a shared colour when the bar widths are clearly different', () => {
+    const resolved = resolveMonthlyCategoryColors([
+      { key: 'category:1', amount: '100.00' },
+      { key: 'category:21', amount: '80.00' },
+    ]);
+
+    expect(resolved.get('category:1')).toBe(CATEGORY_COLOR_PALETTE[0]);
+    expect(resolved.get('category:21')).toBe(CATEGORY_COLOR_PALETTE[0]);
+  });
+
+  it('does not use another top-eight category home colour as a replacement', () => {
+    const resolved = resolveMonthlyCategoryColors([
+      { key: 'category:1', amount: '100.00' },
+      { key: 'category:21', amount: '105.00' },
+      { key: 'category:2', amount: '50.00' },
+    ]);
+
+    expect(resolved.get('category:2')).toBe(CATEGORY_COLOR_PALETTE[1]);
+    expect(resolved.get('category:21')).not.toBe(CATEGORY_COLOR_PALETTE[0]);
+    expect(resolved.get('category:21')).not.toBe(CATEGORY_COLOR_PALETTE[1]);
+  });
+
+  it('returns the same resolution for the same entries', () => {
+    const entries = [
+      { key: 'category:1', amount: '100.00' },
+      { key: 'category:21', amount: '105.00' },
+      { key: 'category:41', amount: '110.00' },
+    ];
+
+    const first = resolveMonthlyCategoryColors(entries);
+    const second = resolveMonthlyCategoryColors(entries);
+
+    expect([...second.entries()]).toEqual([...first.entries()]);
+  });
+});
 
 function relativeLuminance(color: string): number {
   const channels = [1, 3, 5].map((start) => {

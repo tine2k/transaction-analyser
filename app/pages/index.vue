@@ -3,6 +3,7 @@ import {
   compareDecimalStrings,
   createCategoryColorMap,
   formatEuroAmount,
+  getCategoryColorFamily,
   sumSignedAmountStrings,
   CATEGORY_COLOR_PALETTE,
 } from '../utils/category-spending';
@@ -554,17 +555,18 @@ function categoryColor(category: Category | null): string {
   return categoryColorMap.value.get(key) ?? CATEGORY_COLOR_PALETTE[0];
 }
 
-// The pastel ground, border, and text keep the category's hue while leaving the
-// label readable. Uncategorised keeps the neutral surface and rule styling.
+// The tint ground and ink text come from the category's colour family, so the
+// pill carries the same identity as the category's marks. Uncategorised keeps
+// the neutral surface and rule styling.
 function categoryPillStyle(category: Category | null): Record<string, string> {
   if (category === null) {
     return {};
   }
-  const color = categoryColor(category);
+  const family = getCategoryColorFamily(`category:${category.id}`);
   return {
-    backgroundColor: `color-mix(in srgb, ${color} 16%, white)`,
-    borderColor: `color-mix(in srgb, ${color} 32%, white)`,
-    color: `color-mix(in srgb, ${color} 50%, var(--color-ink))`,
+    backgroundColor: family.tint,
+    borderColor: `color-mix(in srgb, ${family.ink} 15%, ${family.tint})`,
+    color: family.ink,
   };
 }
 

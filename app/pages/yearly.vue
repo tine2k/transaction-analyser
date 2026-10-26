@@ -107,6 +107,7 @@ const displayedTransactions = computed(() =>
 const matrix = computed(() => createYearlyCategoryMatrixData(
   displayedTransactions.value,
   selectedYear.value,
+  today,
 ));
 
 const elapsedMonths = computed(() => getElapsedMonthsInYear(selectedYear.value, today));
@@ -130,19 +131,12 @@ function categoryFilterValue(key: string): string {
   return key === 'uncategorised' ? 'uncategorised' : key.replace(/^category:/, '');
 }
 
-function isElapsedMonth(index: number): boolean {
-  return index < elapsedMonths.value;
-}
-
 function cellAmount(row: YearlyCategoryRow, index: number): string {
   return row.cells[index] ?? '0';
 }
 
-function cellText(amount: string, index: number): string {
-  if (isZeroAmountString(amount)) {
-    return isElapsedMonth(index) ? '' : '–';
-  }
-  return formatEuroAmount(amount);
+function cellText(amount: string): string {
+  return isZeroAmountString(amount) ? '' : formatEuroAmount(amount);
 }
 
 function cellClass(amount: string, rowMaximum: string): string {
@@ -378,10 +372,10 @@ function totalLocation(categoryKey: string) {
                     class="block min-h-11 px-2 py-2 transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
                     data-testid="yearly-month-link"
                   >
-                    {{ cellText(cellAmount(row, index), index) }}
+                    {{ cellText(cellAmount(row, index)) }}
                   </NuxtLink>
                   <span v-else class="block px-2 py-2">
-                    {{ cellText(cellAmount(row, index), index) }}
+                    {{ cellText(cellAmount(row, index)) }}
                   </span>
                 </td>
                 <td

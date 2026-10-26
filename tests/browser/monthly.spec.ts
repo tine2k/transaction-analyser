@@ -57,9 +57,9 @@ const manyCategories = Array.from({ length: 10 }, (_, index) => ({
   category: { id: String(index + 1), name: `Category ${index + 1}`, hidden: false, expenseType: null },
 }));
 
-async function interceptTransactions(page: Page): Promise<void> {
+async function interceptTransactions(page: Page, json: unknown = transactions): Promise<void> {
   await page.route('**/api/transactions', async (route) => {
-    await route.fulfill({ json: transactions });
+    await route.fulfill({ json });
   });
 }
 
@@ -95,8 +95,60 @@ test('a month link selects that month, and changing month or year keeps the pers
   await expect(page.getByTestId('category-row')).toContainText('Travel');
 });
 
-test('the Other segment and legend use the same visible neutral', async ({ page }) => {
-  await page.route('**/api/transactions', async (route) => {
+test('the current year offers only elapsed months and falls back from a future link', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-06-15T12:00:00Z'));
+
+  const futureAwareTransactions = [
+    {
+      id: 'now',
+      bookingDate: '2026-06-05',
+      valueDate: '2026-06-05',
+      amount: '-10.00',
+      purpose: 'June shop',
+      counterpartyName: 'Shop',
+      counterpartyAccount: null,
+      person: anna,
+      category: { id: '7', name: 'Groceries', hidden: false, expenseType: null },
+    },
+    {
+      id: 'later',
+      bookingDate: '2026-07-05',
+      valueDate: '2026-07-05',
+      amount: '-20.00',
+      purpose: 'July shop',
+      counterpartyName: 'Shop',
+      counterpartyAccount: null,
+      person: anna,
+      category: { id: '8', name: 'Rent', hidden: false, expenseType: null },
+    },
+    {
+      id: 'next-year',
+      bookingDate: '2027-01-05',
+      valueDate: '2027-01-05',
+      amount: '-30.00',
+      purpose: 'Next year',
+      counterpartyName: 'Shop',
+      counterpartyAccount: null,
+      person: anna,
+      category: { id: '9', name: 'Travel', hidden: false, expenseType: null },
+    },
+  ];
+  await interceptTransactions(page, futureAwareTransactions);
+
+  await page.goto('/monthly?month=2026-06', { waitUntil: 'networkidle' });
+
+  await expect(page.getByTestId('month-pill')).toHaveCount(6);
+  await expect(page.getByTestId('year-select')).toHaveValue('2026');
+  await expect(page.getByTestId('year-select')).not.toContainText('2027');
+
+  await page.goto('/monthly?month=2026-07', { waitUntil: 'networkidle' });
+
+  await expect(page.locator('[data-testid="month-pill"][data-month-key="2026-06"]'))
+    .toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-testid="month-pill"][data-month-key="2026-07"]')).toHaveCount(0);
+});
+
+test('the Other segment and legend use the same visible neutral', async ({ page }) => {  await page.route('**/api/transactions', async (route) => {
     await route.fulfill({ json: manyCategories });
   });
   await page.goto('/monthly?month=2025-03', { waitUntil: 'networkidle' });

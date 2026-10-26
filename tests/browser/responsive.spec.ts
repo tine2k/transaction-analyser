@@ -217,7 +217,7 @@ for (const viewport of viewports) {
 
         if (route.path === '/monthly') {
           await expect(page.getByTestId('monthly-summary')).toBeVisible();
-          await expect(page.getByTestId('month-pill')).toHaveCount(12);
+          await expect(page.getByTestId('month-pill')).toHaveCount(new Date().getMonth() + 1);
           await expect(page.getByTestId('category-bar')).toBeVisible();
           await expect(page.getByTestId('category-row')).toHaveCount(9);
 

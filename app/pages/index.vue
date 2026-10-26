@@ -3,6 +3,9 @@ import {
   compareDecimalStrings,
   createCategoryColorMap,
   formatEuroAmount,
+  getLocalDateString,
+  isFutureMonthKey,
+  isFutureYear,
   sumSignedAmountStrings,
   CATEGORY_COLOR_PALETTE,
 } from '../utils/category-spending';
@@ -142,6 +145,7 @@ const { data: storedCategories } = useFetch<StoredCategory[]>('/api/categories',
 });
 const router = useRouter();
 const route = router.currentRoute;
+const today = getLocalDateString(new Date());
 
 // The phone presentation matches Tailwind's `sm` breakpoint from below. One
 // presentation is rendered at a time: the card list is not a second hidden copy
@@ -274,8 +278,14 @@ const periods = computed<PeriodGroups>(() => {
   const years: PeriodOption[] = [];
   const months: PeriodOption[] = [];
   for (const year of [...monthsByYear.keys()].sort((left, right) => right.localeCompare(left))) {
+    if (isFutureYear(Number(year), today)) {
+      continue;
+    }
     years.push({ value: year, label: year });
     for (const month of [...(monthsByYear.get(year) ?? [])].sort((left, right) => right.localeCompare(left))) {
+      if (isFutureMonthKey(month, today)) {
+        continue;
+      }
       months.push({ value: month, label: monthLabel(month) });
     }
   }
@@ -287,7 +297,7 @@ const periods = computed<PeriodGroups>(() => {
 // when the response is empty. Only represented periods can be offered by the
 // control, so an unrepresented current year cannot be selected.
 const defaultPeriod = computed(() => {
-  const year = String(new Date().getFullYear());
+  const year = today.slice(0, 4);
   if (periods.value.years.some((option) => option.value === year)) {
     return year;
   }

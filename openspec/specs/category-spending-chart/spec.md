@@ -20,28 +20,37 @@ The system SHALL provide a browser page at `/monthly` that requests the same-ori
 - **WHEN** returned transactions have booking dates in several calendar months
 - **THEN** only transactions whose booking date falls in the selected month contribute to any figure, bar segment, or table row
 
-### Requirement: A year and month control selects the displayed month
+### Requirement: The Monthly year control ends at the current year
 
-The page SHALL offer a year control and twelve month controls for choosing the displayed calendar month. The year control SHALL offer every calendar year represented by a returned transaction and the current calendar year, newest first. The twelve month controls SHALL always be present for the selected year, including months with no transaction.
+The page SHALL offer a year control for choosing the displayed calendar year. It SHALL offer every calendar year represented by a returned transaction up to the current calendar year, plus the current calendar year, newest first, and SHALL NOT offer a future year.
 
-#### Scenario: The year control offers represented years
+#### Scenario: The year control offers represented past years and the current year
 
-- **WHEN** returned transactions have booking dates in 2024, 2025, and 2026
-- **THEN** the year control offers 2026, 2025, 2024, and the current year when it differs, newest first
+- **WHEN** returned transactions have booking dates in 2024, 2025, and a future year, and the current year is 2026
+- **THEN** the year control offers 2026, 2025, and 2024, newest first, and does not offer the future year
 
-#### Scenario: Twelve month controls are always present
+### Requirement: The Monthly month controls cover only elapsed months
 
-- **WHEN** the page presents a selected year
+For the current calendar year the month controls SHALL cover January through the calendar month containing today; for a past calendar year they SHALL cover all twelve calendar months. The month controls SHALL be present for every month in that range, including months with no transaction, and no control SHALL be offered for a future month.
+
+#### Scenario: The current year stops at the current month
+
+- **WHEN** the page presents the current calendar year and the current month is October
+- **THEN** month controls are shown for January through October and no month control is shown for November or December
+
+#### Scenario: A past year keeps all twelve month controls
+
+- **WHEN** the page presents a calendar year before the current year
 - **THEN** twelve month controls are shown, one for each calendar month of that year
 
-#### Scenario: An empty month can be selected
+#### Scenario: An empty elapsed month can be selected
 
-- **WHEN** the selected year has no transaction in a month
+- **WHEN** the selected year has no transaction in an offered month
 - **THEN** that month's control remains available and selecting it shows the empty-month state rather than removing the control
 
 ### Requirement: The selected month is linkable and defaults to the current or newest month
 
-The selected month SHALL be carried in the route query as `month=YYYY-MM`. A supplied well-formed month SHALL be selected on load and its year SHALL be available in the year control. An absent or malformed month SHALL select the current calendar month when a returned transaction falls in it, otherwise the newest calendar month represented by a returned transaction, otherwise the current calendar month. Selecting a month SHALL NOT make another data request.
+The selected month SHALL be carried in the route query as `month=YYYY-MM`. A supplied well-formed month that is not a future month SHALL be selected on load and its year SHALL be available in the year control. A supplied future month SHALL be treated as an unavailable value and SHALL NOT be selected or added to the year control. An absent, malformed, or future month SHALL select the current calendar month when a returned transaction falls in it, otherwise the newest calendar month represented by a returned transaction that is not a future month, otherwise the current calendar month. Selecting a month SHALL NOT make another data request.
 
 #### Scenario: A month link initializes the page
 
@@ -55,8 +64,13 @@ The selected month SHALL be carried in the route query as `month=YYYY-MM`. A sup
 
 #### Scenario: The newest represented month is the fallback
 
-- **WHEN** the route carries no month and no returned transaction falls in the current calendar month
-- **THEN** the newest calendar month represented by a returned transaction is selected
+- **WHEN** the route carries no month, no returned transaction falls in the current calendar month, and returned transactions include both an elapsed month and a future month
+- **THEN** the newest elapsed calendar month represented by a returned transaction is selected
+
+#### Scenario: A future month link falls back
+
+- **WHEN** `/monthly` is opened with a well-formed month after the current calendar month
+- **THEN** the page selects the same month its current-or-newest rule would select without that value, and the year control does not offer the future month's year
 
 #### Scenario: No transactions select the current month
 

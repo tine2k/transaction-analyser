@@ -112,6 +112,88 @@ test('the yearly screen presents a selected year, cards, matrix, and links', asy
   expect(transactionRequests).toBe(1);
 });
 
+test('the current year hides future columns and a future year link falls back', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-06-15T12:00:00Z'));
+
+  const futureAwareTransactions = [
+    {
+      id: 'jan',
+      bookingDate: '2026-01-02',
+      valueDate: '2026-01-02',
+      amount: '-16.50',
+      purpose: 'January shop',
+      counterpartyName: 'REWE',
+      counterpartyAccount: null,
+      person: { id: '1', name: 'Default' },
+      category: { id: '1', name: 'Groceries', hidden: false, expenseType: 'recurring' },
+    },
+    {
+      id: 'jul',
+      bookingDate: '2026-07-02',
+      valueDate: '2026-07-02',
+      amount: '-10.00',
+      purpose: 'July shop',
+      counterpartyName: 'REWE',
+      counterpartyAccount: null,
+      person: { id: '1', name: 'Default' },
+      category: { id: '1', name: 'Groceries', hidden: false, expenseType: 'recurring' },
+    },
+    {
+      id: 'dec',
+      bookingDate: '2026-12-02',
+      valueDate: '2026-12-02',
+      amount: '-5.00',
+      purpose: 'Future only',
+      counterpartyName: 'Shop',
+      counterpartyAccount: null,
+      person: { id: '1', name: 'Default' },
+      category: { id: '3', name: 'Future only', hidden: false, expenseType: null },
+    },
+    {
+      id: 'rent',
+      bookingDate: '2026-02-05',
+      valueDate: '2026-02-05',
+      amount: '-100.00',
+      purpose: 'February rent',
+      counterpartyName: 'Landlord',
+      counterpartyAccount: null,
+      person: { id: '1', name: 'Default' },
+      category: { id: '2', name: 'Rent', hidden: false, expenseType: 'one-time' },
+    },
+    {
+      id: 'next-year',
+      bookingDate: '2027-01-05',
+      valueDate: '2027-01-05',
+      amount: '-1.00',
+      purpose: 'Next year',
+      counterpartyName: 'Shop',
+      counterpartyAccount: null,
+      person: { id: '1', name: 'Default' },
+      category: { id: '4', name: 'Next year', hidden: false, expenseType: null },
+    },
+  ];
+  await interceptTransactions(page, futureAwareTransactions);
+
+  await page.goto('/yearly?year=2026', { waitUntil: 'networkidle' });
+
+  await expect(page.getByTestId('yearly-month-cell')).toHaveCount(18);
+  await expect(page.locator('[data-testid="yearly-month-cell"][data-month-key="2026-11"]')).toHaveCount(0);
+  await expect(page.getByTestId('year-pill')).toHaveCount(1);
+  await expect(page.getByTestId('total-moved-value')).toHaveText('€ 131.50');
+
+  const futureOnly = page.getByTestId('yearly-row').filter({ hasText: 'Future only' });
+  await expect(futureOnly.getByTestId('yearly-total-cell')).toHaveText('€ 5.00');
+  await expect(futureOnly.getByTestId('yearly-month-cell')).toHaveCount(6);
+  await expect(futureOnly.getByTestId('yearly-month-cell').first()).toHaveText('');
+
+  await page.goto('/yearly?year=2027', { waitUntil: 'networkidle' });
+
+  await expect(page.getByTestId('year-pill')).toHaveCount(1);
+  await expect(page.locator('[data-testid="year-pill"][data-year="2026"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-testid="year-pill"][data-year="2027"]')).toHaveCount(0);
+  await expect(page.getByTestId('total-moved-value')).toHaveText('€ 131.50');
+});
+
 test('the yearly expense-type filter narrows rows and cards', async ({ page }) => {
   await interceptTransactions(page);
   await page.goto('/yearly?year=2025', { waitUntil: 'networkidle' });

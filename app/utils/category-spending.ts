@@ -611,6 +611,33 @@ export function getCalendarYearMonths(year: number): CalendarMonth[] {
   });
 }
 
+// A month key is in the future when it sorts after the month containing today.
+export function isFutureMonthKey(monthKey: string, today: string): boolean {
+  return monthKey > today.slice(0, 7);
+}
+
+// A calendar year is in the future when it sorts after the year containing
+// today. The current year is not a future year.
+export function isFutureYear(year: number, today: string): boolean {
+  if (!Number.isInteger(year)) {
+    throw new Error('calendar year must be an integer');
+  }
+
+  const currentYear = Number(today.slice(0, 4));
+  if (!Number.isInteger(currentYear)) {
+    throw new Error('today must be a YYYY-MM-DD date');
+  }
+
+  return year > currentYear;
+}
+
+// The calendar months of a year that have elapsed by today: all twelve for a
+// past year, January through the current month for the current year, and none
+// for a future year.
+export function getElapsedCalendarYearMonths(year: number, today: string): CalendarMonth[] {
+  return getCalendarYearMonths(year).slice(0, getElapsedMonthsInYear(year, today));
+}
+
 function getRepresentedYears(transactions: CategorySpendingTransaction[]): number[] {
   const years = new Set<number>();
   for (const { bookingDate } of excludeHiddenCategoryTransactions(transactions)) {
@@ -623,19 +650,23 @@ function getRepresentedYears(transactions: CategorySpendingTransaction[]): numbe
 }
 
 // The years the Yearly pills offer: every year represented by an included
-// returned transaction, the current year, and a well-formed selected year.
-// They are ordered oldest first so the pills read as a timeline.
+// returned transaction up to the current year, the current year, and a
+// well-formed selected year that is not in the future. They are ordered oldest
+// first so the pills read as a timeline.
 export function getYearlyYearOptions(
   transactions: CategorySpendingTransaction[],
   today: string,
   selectedYear?: number,
 ): number[] {
-  const years = new Set<number>(getRepresentedYears(transactions));
+  const years = new Set<number>(
+    getRepresentedYears(transactions).filter((year) => !isFutureYear(year, today)),
+  );
   const currentYear = Number(today.slice(0, 4));
   if (Number.isInteger(currentYear)) {
     years.add(currentYear);
   }
-  if (selectedYear !== undefined && Number.isInteger(selectedYear)) {
+  if (selectedYear !== undefined && Number.isInteger(selectedYear)
+    && !isFutureYear(selectedYear, today)) {
     years.add(selectedYear);
   }
   return [...years].sort((left, right) => left - right);
@@ -643,9 +674,11 @@ export function getYearlyYearOptions(
 
 const YEAR_KEY_PATTERN = /^\d{4}$/;
 
-// A well-formed year query wins, even when no transaction represents it, so a
-// shared link can show an empty year. Otherwise the current year wins when it
-// is represented, then the newest represented year, then the current year.
+// A well-formed year query at or before the current year wins, even when no
+// transaction represents it, so a shared link can show an empty year. A future
+// query is unavailable. Otherwise the current year wins when it is represented,
+// then the newest represented year at or before the current year, then the
+// current year.
 export function resolveSelectedYear(
   value: unknown,
   transactions: CategorySpendingTransaction[],
@@ -653,13 +686,14 @@ export function resolveSelectedYear(
 ): number {
   if (typeof value === 'string' && YEAR_KEY_PATTERN.test(value)) {
     const year = Number(value);
-    if (Number.isInteger(year)) {
+    if (Number.isInteger(year) && !isFutureYear(year, today)) {
       return year;
     }
   }
 
   const currentYear = Number(today.slice(0, 4));
-  const represented = getRepresentedYears(transactions);
+  const represented = getRepresentedYears(transactions)
+    .filter((year) => !isFutureYear(year, today));
   if (represented.includes(currentYear)) {
     return currentYear;
   }
@@ -703,24 +737,26 @@ function compareYearlyRows(left: YearlyCategoryRow, right: YearlyCategoryRow): n
   return left.key < right.key ? -1 : left.key > right.key ? 1 : 0;
 }
 
-// One selected year as category rows and twelve month cells. Hidden categories
-// are excluded before any row or cell is formed, and every displayed value is
-// an exact decimal string. The row maximum is the largest month amount, used
-// only for the row-relative heatmap.
+// One selected year as category rows and the months elapsed by today. Hidden
+// categories are excluded before any row or cell is formed, and every displayed
+// value is an exact decimal string. Cells cover shown months only; row and
+// matrix totals cover the whole year, including hidden future months. The row
+// maximum is the largest shown month amount, used only for the heatmap.
 export function createYearlyCategoryMatrixData(
   transactions: CategorySpendingTransaction[],
   year: number,
+  today: string,
 ): YearlyCategoryMatrixData {
-  const months = getCalendarYearMonths(year);
-  const monthKeys = new Set(months.map(({ key }) => key));
+  const months = getElapsedCalendarYearMonths(year, today);
+  const yearPrefix = `${String(year).padStart(4, '0')}-`;
   const groups = new Map<string, { name: string; amountsByMonth: Map<string, string[]> }>();
 
   for (const transaction of excludeHiddenCategoryTransactions(transactions)) {
-    const monthKey = transaction.bookingDate.slice(0, 7);
-    if (!monthKeys.has(monthKey)) {
+    if (!transaction.bookingDate.startsWith(yearPrefix)) {
       continue;
     }
 
+    const monthKey = transaction.bookingDate.slice(0, 7);
     const key = transaction.category === null ? 'uncategorised' : `category:${transaction.category.id}`;
     let group = groups.get(key);
     if (group === undefined) {
@@ -740,7 +776,7 @@ export function createYearlyCategoryMatrixData(
     .map(([key, group]) => {
       const cells = months.map(({ key: monthKey }) =>
         sumAbsoluteAmountStrings(group.amountsByMonth.get(monthKey) ?? []));
-      const total = sumAbsoluteAmountStrings(cells);
+      const total = sumAbsoluteAmountStrings([...group.amountsByMonth.values()].flat());
       const maximum = cells.reduce(
         (largest, amount) => (compareDecimalStrings(amount, largest) > 0 ? amount : largest),
         '0',
@@ -777,8 +813,9 @@ export function getYearlyCellTintPercent(amount: string, rowMaximum: string): nu
 }
 
 // The years the year control offers: every year represented by an included
-// returned transaction, the current year, and the supplied month's year when it
-// is well formed. Hidden-category transactions do not represent a year.
+// returned transaction up to the current year, the current year, and the
+// supplied month's year when it is well formed and not future. Hidden-category
+// transactions do not represent a year.
 export function getAvailableYears(
   transactions: CategorySpendingTransaction[],
   today: string,
@@ -792,27 +829,29 @@ export function getAvailableYears(
 
   for (const { bookingDate } of excludeHiddenCategoryTransactions(transactions)) {
     const year = Number(bookingDate.slice(0, 4));
-    if (Number.isInteger(year)) {
+    if (Number.isInteger(year) && !isFutureYear(year, today)) {
       years.add(year);
     }
   }
 
-  if (selectedMonth !== undefined && isMonthKey(selectedMonth)) {
+  if (selectedMonth !== undefined && isMonthKey(selectedMonth)
+    && !isFutureMonthKey(selectedMonth, today)) {
     years.add(Number(selectedMonth.slice(0, 4)));
   }
 
   return [...years].sort((left, right) => right - left);
 }
 
-// The selected month is the query value when it is a well-formed `YYYY-MM`.
-// Otherwise the current month wins when the returned transactions include it,
-// then the newest represented month, then the current month.
+// The selected month is the query value when it is a well-formed `YYYY-MM` that
+// is not in the future. Otherwise the current month wins when the returned
+// transactions include it, then the newest represented elapsed month, then the
+// current month.
 export function resolveSelectedMonth(
   value: unknown,
   transactions: CategorySpendingTransaction[],
   today: string,
 ): string {
-  if (typeof value === 'string' && isMonthKey(value)) {
+  if (typeof value === 'string' && isMonthKey(value) && !isFutureMonthKey(value, today)) {
     return value;
   }
 
@@ -824,7 +863,7 @@ export function resolveSelectedMonth(
 
   const representedMonths = visible
     .map(({ bookingDate }) => bookingDate.slice(0, 7))
-    .filter(isMonthKey)
+    .filter((month) => isMonthKey(month) && !isFutureMonthKey(month, today))
     .sort();
   return representedMonths[representedMonths.length - 1] ?? currentMonth;
 }

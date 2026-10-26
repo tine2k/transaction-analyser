@@ -16,6 +16,7 @@ import Monthly from '../../app/pages/monthly.vue';
 
 const today = getLocalDateString(new Date());
 const currentMonth = today.slice(0, 7);
+const currentMonthNumber = Number(today.slice(5, 7));
 const currentYear = Number(today.slice(0, 4));
 const defaultPerson = { id: '1', name: 'Default' };
 const anna = { id: '2', name: 'Anna' };
@@ -93,8 +94,43 @@ describe('the Monthly screen', () => {
     expect(currentPill?.attributes('aria-pressed')).toBe('true');
   });
 
+  it('offers only elapsed months and no future year', async () => {
+    const futureYear = currentYear + 1;
+    mocks.useFetch.mockReturnValue(response([
+      currentMonthTransaction('-10.00', { id: '1', name: 'Groceries' }),
+      transaction(`${futureYear}-01-01`, '-99.00', { id: '2', name: 'Future' }),
+    ]));
+
+    const wrapper = await mountSuspended(Monthly);
+    const pills = wrapper.findAll('[data-testid="month-pill"]');
+    const keys = pills.map((pill) => pill.attributes('data-month-key'));
+
+    expect(keys).toEqual(
+      Array.from({ length: currentMonthNumber }, (_, index) =>
+        `${currentYear}-${String(index + 1).padStart(2, '0')}`),
+    );
+    expect((wrapper.get('[data-testid="year-select"]').element as HTMLSelectElement).value)
+      .toBe(String(currentYear));
+    expect(wrapper.findAll('[data-testid="year-select"] option').map((option) => option.attributes('value')))
+      .not.toContain(String(futureYear));
+  });
+
+  it('falls back from a future month link without offering that month', async () => {
+    const futureMonth = `${currentYear + 1}-01`;
+    mocks.useFetch.mockReturnValue(response([
+      currentMonthTransaction('-10.00', { id: '1', name: 'Groceries' }),
+    ]));
+
+    const wrapper = await mountSuspended(Monthly, { route: `/monthly?month=${futureMonth}` });
+
+    expect(wrapper.find(`[data-testid="month-pill"][data-month-key="${futureMonth}"]`).exists()).toBe(false);
+    expect(wrapper.get(`[data-testid="month-pill"][data-month-key="${currentMonth}"]`)
+      .attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[data-testid="row-amount"]').text()).toBe(formatEuroAmount('10.00'));
+  });
+
   it('reads the selected month from the URL and keeps the year control in step', async () => {
-    const month = `${currentYear - 1}-03`;
+    const month = `${currentYear - 1}-12`;
     const replace = vi.fn();
     mocks.useFetch.mockReturnValue(response([
       transaction(`${month}-05`, '-10.00', { id: '7', name: 'Groceries' }),
@@ -116,20 +152,21 @@ describe('the Monthly screen', () => {
 
     expect(replace).toHaveBeenCalledWith({
       path: '/monthly',
-      query: { month: `${currentYear}-03` },
+      query: { month: currentMonth },
     });
     expect(mocks.useFetch).toHaveBeenCalledTimes(1);
   });
 
   it('changes month through the pills and preserves the person in the query', async () => {
-    const nextMonth = currentMonth === `${currentYear}-01` ? `${currentYear}-02` : `${currentYear}-01`;
+    const selectedMonth = `${currentYear - 1}-01`;
+    const nextMonth = `${currentYear - 1}-02`;
     const replace = vi.fn();
     mocks.useFetch.mockReturnValue(response([
-      currentMonthTransaction('-10.00', { id: '7', name: 'Groceries' }, '01', anna),
+      transaction(`${selectedMonth}-01`, '-10.00', { id: '7', name: 'Groceries' }, anna),
       transaction(`${nextMonth}-01`, '-20.00', { id: '8', name: 'Rent' }, anna),
     ]));
 
-    const wrapper = await mountSuspended(Monthly, { route: '/monthly?person=2' });
+    const wrapper = await mountSuspended(Monthly, { route: `/monthly?month=${selectedMonth}&person=2` });
     vi.spyOn(wrapper.vm.$router, 'replace').mockImplementation(replace);
 
     await wrapper.get(`[data-testid="month-pill"][data-month-key="${nextMonth}"]`).trigger('click');
@@ -269,7 +306,7 @@ describe('the Monthly screen', () => {
 
     expect(wrapper.get('[data-testid="month-picker"]').attributes('data-testid')).toBe('month-picker');
     const pills = wrapper.findAll('[data-testid="month-pill"]');
-    expect(pills).toHaveLength(12);
+    expect(pills).toHaveLength(currentMonthNumber);
     expect(pills.filter((pill) => pill.attributes('aria-pressed') === 'true')).toHaveLength(1);
     expect(wrapper.get('[data-testid="year-select"]').element.closest('label')?.textContent).toContain('Year');
 
@@ -297,7 +334,7 @@ describe('the Monthly screen', () => {
     expect(empty.get('[data-testid="transaction-count-value"]').text()).toBe('0');
     expect(empty.find('[data-testid="category-bar"]').exists()).toBe(false);
     expect(empty.get('[data-testid="no-category-data"]').text()).toContain(`No category data for`);
-    expect(empty.findAll('[data-testid="month-pill"]')).toHaveLength(12);
+    expect(empty.findAll('[data-testid="month-pill"]')).toHaveLength(currentMonthNumber);
   });
 
   it('rests every analysis surface on the sheet elevation', async () => {

@@ -63,6 +63,26 @@ async function interceptApi(page: Page, transactions: FixtureTransaction[]): Pro
   });
 }
 
+test('omits future months and years from period choices but keeps their rows under all periods', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-06-15T12:00:00Z'));
+
+  await interceptApi(page, [
+    transaction('1', '2026-06-10', { id: '1', name: 'Groceries', hidden: false }),
+    transaction('2', '2026-07-10', { id: '1', name: 'Groceries', hidden: false }),
+    transaction('3', '2027-01-10', { id: '1', name: 'Groceries', hidden: false }),
+  ]);
+
+  await page.goto('/', { waitUntil: 'networkidle' });
+
+  const periodFilter = page.getByTestId('period-filter');
+  await expect(periodFilter.locator('option')).toHaveCount(3);
+  await expect(periodFilter).not.toContainText('July 2026');
+  await expect(periodFilter).not.toContainText('2027');
+
+  await periodFilter.selectOption('all');
+  await expect(page.locator('tbody tr')).toHaveCount(3);
+});
+
 test('defaults to the current year and uncategorised when that year holds one', async ({ page }) => {
   await interceptApi(page, [
     transaction('1', `${currentYear}-02-10`, null),

@@ -16,7 +16,7 @@ import {
   filterTransactionsByPerson,
   formatEuroAmount,
   getAvailableYears,
-  getCalendarYearMonths,
+  getElapsedCalendarYearMonths,
   getCategoryBreakdown,
   getCategorySharePercent,
   getLocalDateString,
@@ -53,7 +53,7 @@ const yearOptions = computed(() => getAvailableYears(
   today,
   selectedMonth.value,
 ));
-const yearMonths = computed(() => getCalendarYearMonths(selectedYear.value));
+const yearMonths = computed(() => getElapsedCalendarYearMonths(selectedYear.value, today));
 const selectedMonthLabel = computed(() =>
   yearMonths.value.find(({ key }) => key === selectedMonth.value)?.label ?? selectedMonth.value,
 );
@@ -66,7 +66,8 @@ function selectMonth(month: string): void {
 
 function onYearChange(event: Event): void {
   const year = (event.target as HTMLSelectElement).value;
-  selectMonth(`${year}-${selectedMonth.value.slice(5, 7)}`);
+  const target = `${year}-${selectedMonth.value.slice(5, 7)}`;
+  selectMonth(target > today.slice(0, 7) ? today.slice(0, 7) : target);
 }
 
 // The person choices come from the returned transactions. The selection is

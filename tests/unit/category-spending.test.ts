@@ -15,6 +15,7 @@ import {
   getCalendarYearMonths,
   getCategoryBreakdown,
   getCategorySharePercent,
+  getElapsedCalendarYearMonths,
   getElapsedMonthsInYear,
   getLastCalendarMonths,
   getPersonChoices,
@@ -22,6 +23,8 @@ import {
   getYearlyCellTintPercent,
   getYearlyYearOptions,
   groupTransactionsByAvailableMonth,
+  isFutureMonthKey,
+  isFutureYear,
   isZeroAmountString,
   resolvePersonChoice,
   resolveSelectedMonth,
@@ -477,6 +480,31 @@ function transaction(
   };
 }
 
+describe('elapsed calendar periods', () => {
+  it('treats the current month as elapsed and the next month as future', () => {
+    expect(isFutureMonthKey('2026-09', '2026-10-15')).toBe(false);
+    expect(isFutureMonthKey('2026-10', '2026-10-15')).toBe(false);
+    expect(isFutureMonthKey('2026-11', '2026-10-15')).toBe(true);
+    expect(isFutureMonthKey('2027-01', '2026-10-15')).toBe(true);
+  });
+
+  it('treats the current year as elapsed and the next year as future', () => {
+    expect(isFutureYear(2025, '2026-10-15')).toBe(false);
+    expect(isFutureYear(2026, '2026-10-15')).toBe(false);
+    expect(isFutureYear(2027, '2026-10-15')).toBe(true);
+  });
+
+  it('returns only the elapsed months of a calendar year', () => {
+    expect(getElapsedCalendarYearMonths(2026, '2026-10-15').map(({ key }) => key))
+      .toEqual([
+        '2026-01', '2026-02', '2026-03', '2026-04', '2026-05',
+        '2026-06', '2026-07', '2026-08', '2026-09', '2026-10',
+      ]);
+    expect(getElapsedCalendarYearMonths(2025, '2026-10-15')).toHaveLength(12);
+    expect(getElapsedCalendarYearMonths(2027, '2026-10-15')).toEqual([]);
+  });
+});
+
 describe('calendar-year month selection', () => {
   it('builds twelve month options with exact bounds', () => {
     const months = getCalendarYearMonths(2024);
@@ -505,6 +533,19 @@ describe('calendar-year month selection', () => {
     expect(resolveSelectedMonth('2025-03', [], '2026-09-28')).toBe('2025-03');
     expect(resolveSelectedMonth('2025-3', [], '2026-09-28')).toBe('2026-09');
     expect(resolveSelectedMonth('2025-13', [], '2026-09-28')).toBe('2026-09');
+  });
+
+  it('treats a future month query as unavailable and falls back', () => {
+    const transactions = [
+      transaction('2026-07-02', '-1.00', { id: '1', name: 'Groceries' }),
+      transaction('2026-11-02', '-1.00', { id: '1', name: 'Groceries' }),
+    ];
+
+    expect(resolveSelectedMonth('2026-12', [], '2026-09-28')).toBe('2026-09');
+    expect(resolveSelectedMonth('2026-12', transactions, '2026-09-28')).toBe('2026-07');
+    expect(resolveSelectedMonth('2026-10', [
+      transaction('2026-09-02', '-1.00', { id: '1', name: 'Groceries' }),
+    ], '2026-09-28')).toBe('2026-09');
   });
 
   it('defaults to the current month when the transactions represent it', () => {
@@ -549,6 +590,17 @@ describe('calendar-year month selection', () => {
     expect(getAvailableYears(transactions, '2026-09-28', '2020-05')).toEqual([2026, 2024, 2020]);
   });
 
+  it('does not offer future years from transactions or the selected month', () => {
+    const transactions = [
+      transaction('2024-01-02', '-1.00', { id: '1', name: 'Old' }),
+      transaction('2027-05-02', '-1.00', { id: '1', name: 'Future' }),
+    ];
+
+    expect(getAvailableYears(transactions, '2026-09-28')).toEqual([2026, 2024]);
+    expect(getAvailableYears(transactions, '2026-09-28', '2020-05')).toEqual([2026, 2024, 2020]);
+    expect(getAvailableYears(transactions, '2026-09-28', '2027-05')).toEqual([2026, 2024]);
+  });
+
   it('filters transactions to exactly one calendar month', () => {
     const transactions = [
       transaction('2026-08-31', '-1.00', { id: '1', name: 'August' }),
@@ -573,9 +625,31 @@ describe('yearly year selection', () => {
     expect(getYearlyYearOptions(transactions, '2026-09-28', 2020)).toEqual([2020, 2024, 2026]);
   });
 
+  it('does not offer future years from transactions or a selected year', () => {
+    const transactions = [
+      transaction('2024-01-02', '-1.00', { id: '1', name: 'Old' }),
+      transaction('2027-05-02', '-1.00', { id: '1', name: 'Future' }),
+    ];
+
+    expect(getYearlyYearOptions(transactions, '2026-09-28')).toEqual([2024, 2026]);
+    expect(getYearlyYearOptions(transactions, '2026-09-28', 2020)).toEqual([2020, 2024, 2026]);
+    expect(getYearlyYearOptions(transactions, '2026-09-28', 2027)).toEqual([2024, 2026]);
+  });
+
   it('selects a well-formed query year even when no transaction represents it', () => {
     expect(resolveSelectedYear('2025', [], '2026-09-28')).toBe(2025);
     expect(resolveSelectedYear('2025-3', [], '2026-09-28')).toBe(2026);
+  });
+
+  it('treats a future query year as unavailable and ignores future represented years', () => {
+    const transactions = [
+      transaction('2024-01-02', '-1.00', { id: '1', name: 'Old' }),
+      transaction('2027-05-02', '-1.00', { id: '1', name: 'Future' }),
+    ];
+
+    expect(resolveSelectedYear('2027', transactions, '2026-09-28')).toBe(2024);
+    expect(resolveSelectedYear('2027', [], '2026-09-28')).toBe(2026);
+    expect(resolveSelectedYear('2027', transactions.slice(0, 1), '2026-09-28')).toBe(2024);
   });
 
   it('defaults to the current year when represented, then the newest represented year', () => {
@@ -607,18 +681,18 @@ describe('yearly year selection', () => {
 });
 
 describe('yearly category matrix', () => {
-  it('builds twelve month cells and a total from exact absolute sums', () => {
+  it('builds twelve month cells and a total for a past year', () => {
     const matrix = createYearlyCategoryMatrixData([
-      transaction('2026-01-02', '-12.50', { id: '1', name: 'Groceries' }),
-      transaction('2026-01-03', '4.00', { id: '1', name: 'Groceries' }),
-      transaction('2026-03-04', '-7.00', { id: '1', name: 'Groceries' }),
-      transaction('2026-02-05', '-100.00', { id: '2', name: 'Rent' }),
-      transaction('2025-12-06', '-50.00', { id: '1', name: 'Groceries' }),
-    ], 2026);
+      transaction('2025-01-02', '-12.50', { id: '1', name: 'Groceries' }),
+      transaction('2025-01-03', '4.00', { id: '1', name: 'Groceries' }),
+      transaction('2025-03-04', '-7.00', { id: '1', name: 'Groceries' }),
+      transaction('2025-02-05', '-100.00', { id: '2', name: 'Rent' }),
+      transaction('2024-12-06', '-50.00', { id: '1', name: 'Groceries' }),
+    ], 2025, '2026-10-15');
 
     expect(matrix.months.map(({ key }) => key)).toEqual([
-      '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
-      '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12',
+      '2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06',
+      '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12',
     ]);
     expect(matrix.rows.map(({ name, total }) => [name, total])).toEqual([
       ['Rent', '100.00'],
@@ -635,12 +709,43 @@ describe('yearly category matrix', () => {
     expect(matrix.total).toBe('123.50');
   });
 
+  it('shows only elapsed months while totals include hidden future months', () => {
+    const matrix = createYearlyCategoryMatrixData([
+      transaction('2026-01-02', '-16.50', { id: '1', name: 'Groceries' }),
+      transaction('2026-11-02', '-10.00', { id: '1', name: 'Groceries' }),
+      transaction('2026-02-05', '-100.00', { id: '2', name: 'Rent' }),
+      transaction('2026-12-06', '-5.00', { id: '3', name: 'Future only' }),
+    ], 2026, '2026-10-15');
+
+    expect(matrix.months.map(({ key }) => key)).toEqual([
+      '2026-01', '2026-02', '2026-03', '2026-04', '2026-05',
+      '2026-06', '2026-07', '2026-08', '2026-09', '2026-10',
+    ]);
+    expect(matrix.rows.map(({ name, total }) => [name, total])).toEqual([
+      ['Rent', '100.00'],
+      ['Groceries', '26.50'],
+      ['Future only', '5.00'],
+    ]);
+
+    const groceries = matrix.rows.find(({ name }) => name === 'Groceries');
+    expect(groceries?.cells).toEqual([
+      '16.50', '0', '0', '0', '0', '0', '0', '0', '0', '0',
+    ]);
+    expect(groceries?.maximum).toBe('16.50');
+
+    const futureOnly = matrix.rows.find(({ name }) => name === 'Future only');
+    expect(futureOnly?.cells).toEqual(Array.from({ length: 10 }, () => '0'));
+    expect(futureOnly?.total).toBe('5.00');
+    expect(futureOnly?.maximum).toBe('0');
+    expect(matrix.total).toBe('131.50');
+  });
+
   it('excludes hidden categories and includes uncategorised', () => {
     const matrix = createYearlyCategoryMatrixData([
-      transaction('2026-01-02', '-12.50', { id: '1', name: 'Groceries' }),
-      transaction('2026-01-03', '-999.00', { id: '2', name: 'Internal', hidden: true }),
-      transaction('2026-02-04', '-2.00', null),
-    ], 2026);
+      transaction('2025-01-02', '-12.50', { id: '1', name: 'Groceries' }),
+      transaction('2025-01-03', '-999.00', { id: '2', name: 'Internal', hidden: true }),
+      transaction('2025-02-04', '-2.00', null),
+    ], 2025, '2026-10-15');
 
     expect(matrix.rows.map(({ name, total }) => [name, total])).toEqual([
       ['Groceries', '12.50'],
@@ -651,11 +756,11 @@ describe('yearly category matrix', () => {
 
   it('orders rows by total descending, then name and identity, with uncategorised participating', () => {
     const matrix = createYearlyCategoryMatrixData([
-      transaction('2026-01-02', '-5.00', { id: '3', name: 'Zulu' }),
-      transaction('2026-01-03', '-5.00', { id: '2', name: 'alpha' }),
-      transaction('2026-01-04', '-10.00', null),
-      transaction('2026-01-05', '-5.00', { id: '4', name: 'Alpha' }),
-    ], 2026);
+      transaction('2025-01-02', '-5.00', { id: '3', name: 'Zulu' }),
+      transaction('2025-01-03', '-5.00', { id: '2', name: 'alpha' }),
+      transaction('2025-01-04', '-10.00', null),
+      transaction('2025-01-05', '-5.00', { id: '4', name: 'Alpha' }),
+    ], 2025, '2026-10-15');
 
     expect(matrix.rows.map(({ name }) => name)).toEqual([
       'Uncategorised', 'alpha', 'Alpha', 'Zulu',
@@ -664,8 +769,8 @@ describe('yearly category matrix', () => {
 
   it('keeps a zero-total category row', () => {
     const matrix = createYearlyCategoryMatrixData([
-      transaction('2026-01-02', '0.00', { id: '1', name: 'Zero-only' }),
-    ], 2026);
+      transaction('2025-01-02', '0.00', { id: '1', name: 'Zero-only' }),
+    ], 2025, '2026-10-15');
 
     expect(matrix.rows).toHaveLength(1);
     expect(matrix.rows[0]?.name).toBe('Zero-only');

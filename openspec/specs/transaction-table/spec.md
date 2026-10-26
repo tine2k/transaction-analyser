@@ -259,9 +259,9 @@ The system SHALL present a defined state when the endpoint returns no transactio
 
 ### Requirement: The table offers a read-only category-presence filter
 
-The system SHALL offer a person filter with choices for all people and each person represented in the returned transaction data. It SHALL offer a category filter with choices for all categories, uncategorised transactions, and each category represented in the selected person's returned transaction data. It SHALL offer a single period filter with choices for all periods, each calendar month represented by at least one of the selected person's returned transactions, and each calendar year represented by at least one of the selected person's returned transactions. The period choices SHALL be presented in two labelled groups: a `Years` group listing each represented calendar year newest first, and a `Months` group listing each represented calendar month newest first, with the months group after the years group. The all-periods choice SHALL appear before both groups. A month choice SHALL be labelled with its calendar month and year, and a year choice SHALL be labelled with its calendar year alone.
+The system SHALL offer a person filter with choices for all people and each person represented in the returned transaction data. It SHALL offer a category filter with choices for all categories, uncategorised transactions, and each category represented in the selected person's returned transaction data. It SHALL offer a single period filter with choices for all periods, each calendar month represented by at least one of the selected person's returned transactions that is not a future month, and each calendar year represented by at least one of the selected person's returned transactions that is not a future year. A future month SHALL have no month choice and a future year SHALL have no year choice. The period choices SHALL be presented in two labelled groups: a `Years` group listing each offered calendar year newest first, and a `Months` group listing each offered calendar month newest first, with the months group after the years group. The all-periods choice SHALL appear before both groups. A month choice SHALL be labelled with its calendar month and year, and a year choice SHALL be labelled with its calendar year alone.
 
-The person filter SHALL default to all people. The period filter SHALL default to the browser's current calendar year when the selected person's returned transactions include it, otherwise to the newest calendar year represented in the selected person's transactions, and to all periods when the selected person has no returned transaction. The category filter SHALL default to uncategorised when no category is specified and at least one of the selected person's returned transactions in the effective default period has no category; otherwise it SHALL default to all categories. The effective default period is the period named by a supplied query value that the period choices offer, otherwise the period selected by the period default above.
+The person filter SHALL default to all people. The period filter SHALL default to the browser's current calendar year when the selected person's returned transactions include it, otherwise to the newest calendar year offered by the period choices, and to all periods when the period choices offer no year. The category filter SHALL default to uncategorised when no category is specified and at least one of the selected person's returned transactions in the effective default period has no category; otherwise it SHALL default to all categories. The effective default period is the period named by a supplied query value that the period choices offer, otherwise the period selected by the period default above.
 
 A supplied person SHALL initialize the person control when the choices offer it; an absent, unknown, or unoffered person SHALL select all people. A supplied category and period filter SHALL initialize their controls and matching items when the choices offer them. The selected filters SHALL be represented in the index route's query so a filtered list can be linked to directly: a person as `person=<id>`, a calendar month as `month=YYYY-MM`, and a calendar year as `year=YYYY`. The period filter SHALL match a transaction whose booking date falls in the selected calendar month or calendar year. When a person and a category and/or period are selected and the search is empty, a transaction SHALL be shown only if it matches the person and the other selected filters. A non-empty search SHALL override the category and period filters as the search requirements define, and SHALL NOT override the person filter.
 
@@ -274,8 +274,8 @@ Changing any filter SHALL change which returned items are shown without changing
 
 #### Scenario: The newest represented year is the fallback period
 
-- **WHEN** transaction data has loaded, the selected person's returned transactions do not include the browser's current calendar year, the route has no period filter, and the search is empty
-- **THEN** the period filter selects the newest calendar year represented in that person's returned transactions
+- **WHEN** transaction data has loaded, the selected person's returned transactions do not include the browser's current calendar year, a future year is represented, the route has no period filter, and the search is empty
+- **THEN** the period filter selects the newest offered calendar year at or before the current year, and the future year is not offered
 
 #### Scenario: No transactions fall back to all periods
 
@@ -381,6 +381,31 @@ Changing any filter SHALL change which returned items are shown without changing
 
 - **WHEN** the index route is opened with a category and a year in its query and the search is empty
 - **THEN** the period control reflects that year and the list shows only items in that year matching the category within the selected person
+
+#### Scenario: Future months have no period choice
+
+- **WHEN** the selected person has returned transactions in the current month and in a later month of the current year
+- **THEN** the months group offers the current month and does not offer the later month
+
+#### Scenario: Future years have no period choice
+
+- **WHEN** the selected person has returned transactions in a future calendar year
+- **THEN** the years group does not offer that year, the months group offers none of its months, and its transactions remain visible only when the selected view includes them
+
+#### Scenario: A future period link falls back
+
+- **WHEN** the query carries a month or year after the current month or year and the search is empty
+- **THEN** that value is unoffered, so the period filter falls back to the period default or to all periods as an unknown period does
+
+#### Scenario: Future-dated rows remain in an all-periods view
+
+- **WHEN** all periods is selected and the selected person has a transaction dated after the current month
+- **THEN** that transaction remains eligible to be shown
+
+#### Scenario: Future-dated rows remain in search results
+
+- **WHEN** a non-empty search matches a transaction dated after the current month
+- **THEN** that transaction is shown while the search is applied
 
 #### Scenario: An unknown period value falls back to all periods
 

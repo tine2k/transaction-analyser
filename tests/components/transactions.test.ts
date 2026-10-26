@@ -569,6 +569,96 @@ describe('transaction list filters', () => {
       ]);
   });
 
+  it('omits future months and years from the period choices', async () => {
+    const data: TestTransaction[] = [
+      {
+        id: 'now', bookingDate: '2026-06-01', valueDate: '2026-06-01', amount: '-1.00',
+        purpose: 'Current June', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+      {
+        id: 'later', bookingDate: '2026-07-01', valueDate: '2026-07-01', amount: '-2.00',
+        purpose: 'Future July', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+      {
+        id: 'next', bookingDate: '2027-01-01', valueDate: '2027-01-01', amount: '-3.00',
+        purpose: 'Future year', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+    ];
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+
+    const wrapper = await mountTransactions();
+    const select = wrapper.get('[data-testid="period-filter"]');
+
+    expect(select.findAll('option').map((option) => option.attributes('value')))
+      .toEqual(['all', '2026', '2026-06']);
+    expect(select.findAll('option').map((option) => option.attributes('value')))
+      .not.toContain('2026-07');
+    expect(select.findAll('option').map((option) => option.attributes('value')))
+      .not.toContain('2027');
+  });
+
+  it('falls back from a future period link like an unknown period', async () => {
+    const data: TestTransaction[] = [
+      {
+        id: 'now', bookingDate: '2026-06-01', valueDate: '2026-06-01', amount: '-1.00',
+        purpose: 'Current June', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+      {
+        id: 'later', bookingDate: '2026-07-01', valueDate: '2026-07-01', amount: '-2.00',
+        purpose: 'Future July', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+    ];
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+
+    const wrapper = await mountTransactions({ route: '/?month=2026-07' });
+
+    expect((wrapper.get('[data-testid="period-filter"]').element as HTMLSelectElement).value)
+      .toBe('2026');
+    expect(wrapper.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['now', 'later']);
+  });
+
+  it('keeps future-dated rows visible under all periods and search', async () => {
+    const data: TestTransaction[] = [
+      {
+        id: 'now', bookingDate: '2026-06-01', valueDate: '2026-06-01', amount: '-1.00',
+        purpose: 'Current June', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+      {
+        id: 'later', bookingDate: '2026-07-01', valueDate: '2026-07-01', amount: '-2.00',
+        purpose: 'Future July', counterpartyName: 'Shop', counterpartyAccount: null,
+        categoryAssignment: 'automatic',
+        category: { id: '1', name: 'Groceries', hidden: false },
+      },
+    ];
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(data) : categoriesResponse());
+
+    const allPeriods = await mountTransactions();
+    await allPeriods.get('[data-testid="period-filter"]').setValue('all');
+    await flushPromises();
+    expect(allPeriods.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['now', 'later']);
+
+    const searched = await mountTransactions({ route: '/?q=Future%20July' });
+    expect(searched.findAll('tbody tr').map((row) => row.attributes('data-transaction-id')))
+      .toEqual(['later']);
+  });
+
   it('filters to a selected calendar year and excludes other years', async () => {
     const mixed: TestTransaction[] = [
       {

@@ -86,8 +86,9 @@ describe('yearly page', () => {
       'category:2', 'category:1', 'uncategorised',
     ]);
     expect(rows.map((row) => row.get('th').text())).toEqual(['Rent', 'Groceries', 'Uncategorised']);
-    expect(rows.every((row) => row.findAll('[data-testid="yearly-month-cell"]').length === 12)).toBe(true);
-    expect(wrapper.findAll('[data-testid="yearly-month-cell"]')).toHaveLength(36);
+    expect(rows.every((row) => row.findAll('[data-testid="yearly-month-cell"]').length === currentMonth))
+      .toBe(true);
+    expect(wrapper.findAll('[data-testid="yearly-month-cell"]')).toHaveLength(3 * currentMonth);
     expect(wrapper.text()).not.toContain('Internal');
 
     expect(wrapper.get('[data-testid="total-moved-value"]').text()).toBe(formatEuroAmount('125.50'));
@@ -143,7 +144,7 @@ describe('yearly page', () => {
     expect(populatedRow.get('[data-testid="yearly-total-cell"]').text()).toBe(formatEuroAmount('10.00'));
   });
 
-  it('marks not-yet-elapsed months with a dash and keeps real future data', async () => {
+  it('falls back from a future year link and does not offer that year', async () => {
     const futureYear = currentYear + 1;
     mocks.useFetch.mockReturnValue(response([
       transaction(futureYear, 3, '-10.00', category('1', 'Groceries')),
@@ -151,12 +152,47 @@ describe('yearly page', () => {
 
     const wrapper = await mountSuspended(Yearly, { route: `/yearly?year=${futureYear}` });
 
-    const cells = wrapper.get('[data-testid="yearly-row"]').findAll('[data-testid="yearly-month-cell"]');
-    expect(cells[2]?.text()).toBe(formatEuroAmount('10.00'));
-    expect(cells[0]?.text()).toBe('–');
-    expect(cells[11]?.text()).toBe('–');
-    expect(wrapper.get('[data-testid="average-value"]').text()).toBe('–');
-    expect(wrapper.find('[data-testid="average-divisor"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="year-pill"]').map((pill) => pill.text()))
+      .toEqual([String(currentYear)]);
+    expect(wrapper.get(`[data-testid="year-pill"][data-year="${currentYear}"]`).attributes('aria-pressed'))
+      .toBe('true');
+    expect(wrapper.findAll('[data-testid="yearly-month-cell"]')).toHaveLength(0);
+    expect(wrapper.get('[data-testid="total-moved-value"]').text()).toBe(formatEuroAmount('0'));
+    expect(wrapper.text()).toContain(`No category data for ${currentYear}.`);
+  });
+
+  it('hides future month columns while keeping their amounts in totals', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 15, 12, 0, 0));
+
+    try {
+      mocks.useFetch.mockReturnValue(response([
+        transaction(2026, 1, '-16.50', category('1', 'Groceries')),
+        transaction(2026, 11, '-10.00', category('1', 'Groceries')),
+        transaction(2026, 2, '-100.00', category('2', 'Rent')),
+        transaction(2026, 12, '-5.00', category('3', 'Future only')),
+      ]));
+
+      const wrapper = await mountSuspended(Yearly, { route: '/yearly?year=2026' });
+
+      expect(wrapper.findAll('[data-testid="yearly-month-cell"]')).toHaveLength(3 * 10);
+      expect(wrapper.findAll('[data-testid="yearly-month-cell"]').map((cell) => cell.text()))
+        .not.toContain(formatEuroAmount('10.00'));
+
+      const groceries = wrapper.get('[data-testid="yearly-row"][data-category-key="category:1"]');
+      expect(groceries.findAll('[data-testid="yearly-month-cell"]')[0]?.text())
+        .toBe(formatEuroAmount('16.50'));
+      expect(groceries.get('[data-testid="yearly-total-cell"]').text()).toBe(formatEuroAmount('26.50'));
+
+      const futureOnly = wrapper.get('[data-testid="yearly-row"][data-category-key="category:3"]');
+      expect(futureOnly.findAll('[data-testid="yearly-month-cell"]').map((cell) => cell.text()))
+        .toEqual(Array.from({ length: 10 }, () => ''));
+      expect(futureOnly.get('[data-testid="yearly-total-cell"]').text()).toBe(formatEuroAmount('5.00'));
+
+      expect(wrapper.get('[data-testid="total-moved-value"]').text()).toBe(formatEuroAmount('131.50'));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('links populated month and total cells and leaves blank cells inert', async () => {

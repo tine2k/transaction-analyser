@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { contrastRatio } from './contrast';
 
 // The Monthly screen replaced the Analytics screen. The old path redirects, and
 // the selected month lives in the query so a month can be linked to directly.
@@ -44,6 +45,18 @@ const transactions = [
   },
 ];
 
+const manyCategories = Array.from({ length: 10 }, (_, index) => ({
+  id: `many-${index}`,
+  bookingDate: '2025-03-05',
+  valueDate: '2025-03-05',
+  amount: `-${10 - index}.00`,
+  purpose: `March shop ${index}`,
+  counterpartyName: 'Shop',
+  counterpartyAccount: null,
+  person: anna,
+  category: { id: String(index + 1), name: `Category ${index + 1}`, hidden: false, expenseType: null },
+}));
+
 async function interceptTransactions(page: Page): Promise<void> {
   await page.route('**/api/transactions', async (route) => {
     await route.fulfill({ json: transactions });
@@ -80,4 +93,56 @@ test('a month link selects that month, and changing month or year keeps the pers
   await expect(page.locator('[data-testid="month-pill"][data-month-key="2024-04"]'))
     .toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('category-row')).toContainText('Travel');
+});
+
+test('the Other segment and legend use the same visible neutral', async ({ page }) => {
+  await page.route('**/api/transactions', async (route) => {
+    await route.fulfill({ json: manyCategories });
+  });
+  await page.goto('/monthly?month=2025-03', { waitUntil: 'networkidle' });
+
+  await expect(page.getByTestId('bar-legend-item').last()).toContainText('Other 2');
+
+  const colors = await page.evaluate(() => {
+    const segment = document.querySelector(
+      '[data-testid="bar-segment"][data-category-key="other"]',
+    ) as HTMLElement;
+    const legendSwatch = document.querySelector(
+      '[data-testid="bar-legend-item"]:last-child span[aria-hidden="true"]',
+    ) as HTMLElement;
+    const panel = document.querySelector('[data-testid="monthly-bar-panel"]') as HTMLElement;
+    const categorySegments = Array.from(
+      document.querySelectorAll('[data-testid="bar-segment"]:not([data-category-key="other"])'),
+    ).map((element) => window.getComputedStyle(element).backgroundColor);
+
+    return {
+      segment: window.getComputedStyle(segment).backgroundColor,
+      legend: window.getComputedStyle(legendSwatch).backgroundColor,
+      surface: window.getComputedStyle(panel).backgroundColor,
+      categorySegments,
+    };
+  });
+
+  expect(colors.segment).toBe(colors.legend);
+  expect(colors.categorySegments).not.toContain(colors.segment);
+  expect(contrastRatio(colors.segment, colors.surface)).toBeGreaterThanOrEqual(3);
+});
+
+test('every category share bar meets the 3:1 contrast floor against its track', async ({ page }) => {
+  await page.route('**/api/transactions', async (route) => {
+    await route.fulfill({ json: manyCategories });
+  });
+  await page.goto('/monthly?month=2025-03', { waitUntil: 'networkidle' });
+
+  const bars = await page.evaluate(() => Array.from(
+    document.querySelectorAll('[data-testid="share-bar"]'),
+  ).map((element) => ({
+    fill: window.getComputedStyle(element).backgroundColor,
+    track: window.getComputedStyle(element.parentElement as HTMLElement).backgroundColor,
+  })));
+
+  expect(bars).not.toHaveLength(0);
+  for (const bar of bars) {
+    expect(contrastRatio(bar.fill, bar.track)).toBeGreaterThanOrEqual(3);
+  }
 });

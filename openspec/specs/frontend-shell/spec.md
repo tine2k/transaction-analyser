@@ -305,6 +305,20 @@ The system SHALL define the application's palette once as theme tokens with expl
 - **WHEN** a populated Yearly month cell is rendered with a magnitude tint
 - **THEN** the tint uses the brand role at varying strength, the exact amount remains ink, and no other content uses colour to encode magnitude
 
+### Requirement: Category marks meet a contrast floor
+
+The system SHALL draw every category indicator — category pill, dot, bar segment, legend swatch, or share bar — from the single application category palette. A category indicator SHALL have at least 3:1 contrast against the surface it is drawn on. Category pill text SHALL have at least 4.5:1 contrast against the pill's ground.
+
+#### Scenario: A category indicator has non-text contrast
+
+- **WHEN** a category dot, bar segment, legend swatch, or share bar is rendered
+- **THEN** its colour has at least 3:1 contrast against the surface behind it
+
+#### Scenario: A category pill's text is legible
+
+- **WHEN** a category pill carrying a palette colour is rendered
+- **THEN** its text has at least 4.5:1 contrast against the pill's ground
+
 ### Requirement: Type is set in three roles
 
 The system SHALL set the application masthead and page titles in a display weight of the sans-serif family, interface and tabular content in that sans-serif family, and machine-generated strings shown to the user — category patterns, counterparty accounts, and import timestamps — in a monospaced face. The display role SHALL use a heavier weight and tighter spacing than interface text. The faces SHALL be served from the application's own origin. Amounts and counts SHALL be set with tabular figures.

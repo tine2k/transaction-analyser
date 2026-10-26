@@ -324,7 +324,7 @@ function transactionLocation(categoryKey: string) {
               :data-category-key="segment.key"
               :style="{
                 flexGrow: sharePercent(segment.amount),
-                backgroundColor: segment.key === 'other' ? 'var(--color-rule-strong)' : categoryColor(segment.key),
+                backgroundColor: segment.key === 'other' ? 'var(--color-neutral-strong)' : categoryColor(segment.key),
               }"
             />
           </div>
@@ -344,7 +344,7 @@ function transactionLocation(categoryKey: string) {
             <span
               aria-hidden="true"
               class="h-3 w-3 shrink-0 rounded"
-              :style="{ backgroundColor: segment.key === 'other' ? 'var(--color-rule-strong)' : categoryColor(segment.key) }"
+              :style="{ backgroundColor: segment.key === 'other' ? 'var(--color-neutral-strong)' : categoryColor(segment.key) }"
             />
             <span class="break-words">{{ segment.name }}</span>
             <b class="shrink-0 text-ink tabular-nums">{{ formatEuroAmount(segment.amount) }}</b>
@@ -409,7 +409,7 @@ function transactionLocation(categoryKey: string) {
                     </NuxtLink>
                   </th>
                   <td class="px-3 py-3 sm:px-5">
-                    <div class="h-2.5 rounded-full bg-rule">
+                    <div class="h-2.5 rounded-full bg-surface ring-1 ring-rule">
                       <div
                         class="h-2.5 rounded-full"
                         data-testid="share-bar"

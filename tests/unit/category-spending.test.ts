@@ -140,7 +140,54 @@ describe('stable category colors', () => {
     expect(new Set(colorsInOrder.values()).size).toBe(keys.length);
     expect([...colorsInOrder.values()]).toEqual(CATEGORY_COLOR_PALETTE.slice(0, keys.length));
   });
+
+  it('keeps every palette color at or above 3:1 against white', () => {
+    expect(CATEGORY_COLOR_PALETTE).toHaveLength(9);
+    expect(new Set(CATEGORY_COLOR_PALETTE).size).toBe(CATEGORY_COLOR_PALETTE.length);
+
+    for (const color of CATEGORY_COLOR_PALETTE) {
+      expect(contrastRatio(color, '#ffffff'), color).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('keeps every category pill text at or above 4.5:1 on its tinted ground', () => {
+    for (const color of CATEGORY_COLOR_PALETTE) {
+      const ground = mixSrgb(color, '#ffffff', 0.16);
+      const text = mixSrgb(color, '#201e3e', 0.5);
+      expect(contrastRatio(text, ground), color).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });
+
+function mixSrgb(foreground: string, background: string, foregroundWeight: number): string {
+  const channels = (color: string) => [1, 3, 5].map(
+    (start) => Number.parseInt(color.slice(start, start + 2), 16),
+  );
+  const foregroundChannels = channels(foreground);
+  const backgroundChannels = channels(background);
+  return `#${foregroundChannels.map((channel, index) => Math.round(
+    channel * foregroundWeight + backgroundChannels[index]! * (1 - foregroundWeight),
+  ).toString(16).padStart(2, '0')).join('')}`;
+}
+
+function relativeLuminance(color: string): number {
+  const channels = [1, 3, 5].map((start) => {
+    const value = Number.parseInt(color.slice(start, start + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const red = channels[0]!;
+  const green = channels[1]!;
+  const blue = channels[2]!;
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
 
 describe('available-month transaction buckets', () => {
   it('creates a configurable window of months from the current partial month backwards', () => {

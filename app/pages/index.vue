@@ -564,7 +564,7 @@ function categoryPillStyle(category: Category | null): Record<string, string> {
   return {
     backgroundColor: `color-mix(in srgb, ${color} 16%, white)`,
     borderColor: `color-mix(in srgb, ${color} 32%, white)`,
-    color: `color-mix(in srgb, ${color} 72%, var(--color-ink))`,
+    color: `color-mix(in srgb, ${color} 50%, var(--color-ink))`,
   };
 }
 

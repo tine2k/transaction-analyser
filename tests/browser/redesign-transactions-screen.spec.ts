@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { contrastRatio } from './contrast';
 
 // The redesigned Transactions screen: the brand bar, the title-summary-sheet
 // order, the category pills, the amount-last columns, and the responsive
@@ -569,6 +570,7 @@ test.describe('redesigned transactions screen', () => {
     expect(pills.categorisedBackground).not.toBe(pills.uncategorisedBackground);
     expect(pills.categorisedBackground).not.toBe('rgba(0, 0, 0, 0)');
     expect(pills.categorisedColor).not.toBe('');
+    expect(contrastRatio(pills.categorisedColor, pills.categorisedBackground)).toBeGreaterThanOrEqual(4.5);
     expect(Number.parseFloat(pills.categorisedRadius)).toBeGreaterThanOrEqual(9999);
     expect(pills.uncategorisedBackground).toBe('rgb(255, 255, 255)');
     expect(pills.uncategorisedText).toBe('Uncategorised');

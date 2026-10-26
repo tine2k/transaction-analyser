@@ -1,7 +1,7 @@
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   formatEuroAmount,
   formatMonthRange,
@@ -55,9 +55,69 @@ function summaryValues(wrapper: Awaited<ReturnType<typeof mountSuspended>>) {
   return wrapper.findAll('[data-testid="monthly-average-summary-value"]').map((item) => item.text());
 }
 
+function phoneMatchMedia() {
+  return vi.fn(() => ({
+    matches: true,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+}
+
 describe('monthly category average page', () => {
   beforeEach(() => {
     mocks.useFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('presents cards below the sm breakpoint with the exact values as text', async () => {
+    vi.stubGlobal('matchMedia', phoneMatchMedia());
+    mocks.useFetch.mockReturnValue(response(sampleTransactions()));
+
+    const wrapper = await mountSuspended(MonthlyAverage);
+
+    expect(wrapper.find('[data-testid="monthly-average-table"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="category-average"]').exists()).toBe(false);
+    const cards = wrapper.findAll('[data-testid="category-average-card"]');
+    expect(cards).toHaveLength(2);
+
+    const groceries = cards.find((card) => card.attributes('data-category-key') === 'category:1');
+    expect(groceries).toBeDefined();
+    expect(groceries!.text()).toContain('Groceries');
+    expect(groceries!.text()).toContain('Last 12 months');
+    expect(groceries!.get('[data-testid="category-window-total"]').text()).toBe(formatEuroAmount('24.00'));
+    expect(groceries!.get('[data-testid="category-average-amount"]').text()).toBe(formatEuroAmount('2.00'));
+    expect(groceries!.findAll('[data-testid="trend-bar"]')).toHaveLength(12);
+    expect(groceries!.get('[data-testid="category-trend"]').attributes('aria-hidden')).toBe('true');
+    expect(groceries!.get('[data-testid="average-bar-cell"]').attributes('aria-hidden')).toBe('true');
+    expect(wrapper.get('[data-testid="monthly-average-sort-statement"]').text())
+      .toBe('Sorted by average amount, descending');
+  });
+
+  it('states and applies the phone sort beside the cards', async () => {
+    vi.stubGlobal('matchMedia', phoneMatchMedia());
+    mocks.useFetch.mockReturnValue(response([
+      { bookingDate: currentMonth.startDate, amount: '-120.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Zebra', hidden: false, expenseType: null } },
+      { bookingDate: currentMonth.startDate, amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '4', name: 'Alpha', hidden: false, expenseType: null } },
+    ]));
+
+    const wrapper = await mountSuspended(MonthlyAverage);
+    const cardNames = () => wrapper.findAll('[data-testid="category-average-card"]')
+      .map((card) => card.get('h2').text());
+
+    expect(cardNames()).toEqual(['Zebra', 'Alpha']);
+
+    await wrapper.get('[data-testid="monthly-average-sort-column"]').setValue('category');
+    expect(wrapper.get('[data-testid="monthly-average-sort-statement"]').text())
+      .toBe('Sorted by category, descending');
+    expect(cardNames()).toEqual(['Zebra', 'Alpha']);
+
+    await wrapper.get('[data-testid="monthly-average-sort-direction"]').setValue('asc');
+    expect(wrapper.get('[data-testid="monthly-average-sort-statement"]').text())
+      .toBe('Sorted by category, ascending');
+    expect(cardNames()).toEqual(['Alpha', 'Zebra']);
   });
 
   it('loads transactions once and shows the default twelve-month comparison table', async () => {

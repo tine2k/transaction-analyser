@@ -45,6 +45,22 @@ const transactions = [
   },
 ];
 
+const longCategoryName = 'A deliberately long category name for narrow screens';
+
+const phoneTransactions = [
+  {
+    id: 'phone-1',
+    bookingDate: '2025-03-05',
+    valueDate: '2025-03-05',
+    amount: '-12345678.90',
+    purpose: 'A large March expense',
+    counterpartyName: 'Shop',
+    counterpartyAccount: null,
+    person: anna,
+    category: { id: '7', name: longCategoryName, hidden: false, expenseType: null },
+  },
+];
+
 const manyCategories = Array.from({ length: 10 }, (_, index) => ({
   id: `many-${index}`,
   bookingDate: '2025-03-05',
@@ -107,6 +123,54 @@ test('a month link selects that month, and changing month or year keeps the pers
   await expect(page.locator('[data-testid="month-pill"][data-month-key="2024-04"]'))
     .toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('category-row')).toContainText('Travel');
+});
+
+test('a phone puts Amount beside the pinned Category and restores the desktop order', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/transactions', async (route) => {
+    await route.fulfill({ json: phoneTransactions });
+  });
+  await page.goto('/monthly?month=2025-03', { waitUntil: 'networkidle' });
+
+  const table = page.getByTestId('monthly-category-table');
+  const headers = await table.locator('thead th').allTextContents();
+  expect(headers.map((header) => header.trim()))
+    .toEqual(['Category', 'Amount', 'Share of top category', 'Transactions']);
+
+  const region = page.getByTestId('monthly-category-scroll');
+  const categoryCell = page.getByTestId('category-row').first().locator('th');
+  await expect(page.getByTestId('category-row')).toContainText(longCategoryName);
+
+  const regionBox = await region.boundingBox();
+  const categoryBox = await categoryCell.boundingBox();
+  const amountBox = await page.getByTestId('row-amount').first().boundingBox();
+  expect(regionBox).not.toBeNull();
+  expect(categoryBox).not.toBeNull();
+  expect(amountBox).not.toBeNull();
+  expect(amountBox!.x).toBeGreaterThanOrEqual(categoryBox!.x + categoryBox!.width - 1);
+  expect(amountBox!.x + amountBox!.width).toBeLessThanOrEqual(regionBox!.x + regionBox!.width + 1);
+
+  await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
+    .toBe(true);
+  await region.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+  });
+  await expect.poll(async () => {
+    const currentRegion = await region.boundingBox();
+    const currentCategory = await categoryCell.boundingBox();
+    return currentRegion === null || currentCategory === null
+      ? Number.POSITIVE_INFINITY
+      : Math.abs(currentCategory.x - currentRegion.x);
+  }).toBeLessThanOrEqual(2);
+
+  const link = page.getByTestId('category-transaction-link').first();
+  await expect(link).toHaveAttribute('href', /month=2025-03/);
+  await expect(link).toHaveAttribute('href', /category=7/);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect.poll(async () => (await table.locator('thead th').allTextContents())
+    .map((header) => header.trim()))
+    .toEqual(['Category', 'Share of top category', 'Transactions', 'Amount']);
 });
 
 test('the Other segment and legend use the same visible neutral', async ({ page }) => {

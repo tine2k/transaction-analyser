@@ -46,6 +46,74 @@ const { data: runs, error, pending, refresh } = useFetch<ImportRun[]>('/api/impo
   default: () => [],
 });
 
+// One presentation is rendered at a time. Below the `sm` breakpoint a run shows
+// its priority values and an in-row detail; from `sm` up the ten-column table is
+// kept. The flag follows the transactions screen's pattern and falls back to the
+// table when matchMedia is unavailable.
+const PHONE_MEDIA_QUERY = '(max-width: 639.98px)';
+
+function phoneMediaQuery(): MediaQueryList | null {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(PHONE_MEDIA_QUERY)
+    : null;
+}
+
+const phoneQuery = phoneMediaQuery();
+const phoneViewport = ref(phoneQuery?.matches ?? isPhoneWidth());
+
+function isPhoneWidth(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth > 0 && window.innerWidth < 640;
+}
+
+function syncPhoneViewport(event?: MediaQueryListEvent): void {
+  phoneViewport.value = event?.matches ?? phoneQuery?.matches ?? isPhoneWidth();
+}
+
+function onPhoneResize(): void {
+  syncPhoneViewport();
+}
+
+const expandedRunId = ref<string | null>(null);
+
+// A refresh can remove a run; drop the detail state with it rather than keeping
+// an expanded id that no row carries.
+watch(runs, (currentRuns) => {
+  if (
+    expandedRunId.value !== null
+    && !(currentRuns ?? []).some((run) => run.id === expandedRunId.value)
+  ) {
+    expandedRunId.value = null;
+  }
+});
+
+function runDetailId(run: ImportRun): string {
+  return `import-run-detail-${run.id}`;
+}
+
+function isRunExpanded(run: ImportRun): boolean {
+  return expandedRunId.value === run.id;
+}
+
+function toggleRunDetails(run: ImportRun): void {
+  expandedRunId.value = isRunExpanded(run) ? null : run.id;
+}
+
+function runDetailLabel(run: ImportRun): string {
+  const action = isRunExpanded(run) ? 'Hide' : 'Show';
+  return `${action} details for the run started ${displayImportTime(run.startedAt)} from ${sourceLabel(run.source)}`;
+}
+
+onMounted(() => {
+  syncPhoneViewport();
+  phoneQuery?.addEventListener('change', syncPhoneViewport);
+  window.addEventListener('resize', onPhoneResize);
+});
+
+onBeforeUnmount(() => {
+  phoneQuery?.removeEventListener('change', syncPhoneViewport);
+  window.removeEventListener('resize', onPhoneResize);
+});
+
 const syncing = ref(false);
 const syncMessage = ref<string | null>(null);
 const recategorising = ref(false);
@@ -229,14 +297,27 @@ function sourceLabel(source: string): string {
       role="region"
       aria-label="Import log"
       tabindex="0"
-      class="mt-6 max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      class="table-scroll mt-6 max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
       data-testid="imports-scroll"
     >
-      <table class="w-max min-w-full border-collapse text-left text-sm" data-testid="imports-table">
+      <table
+        class="border-collapse text-left"
+        :class="phoneViewport ? 'w-full table-fixed text-xs' : 'w-max min-w-full text-sm'"
+        data-testid="imports-table"
+      >
         <caption class="sr-only">
           The most recent import runs with their source, person, outcome, and row counts
         </caption>
-        <thead>
+        <thead v-if="phoneViewport">
+          <tr class="border-b border-rule-strong">
+            <th scope="col" class="w-[4.5rem] px-2 py-2 text-left font-semibold text-ink">Started</th>
+            <th scope="col" class="w-14 px-2 py-2 text-left font-semibold text-ink">Source</th>
+            <th scope="col" class="w-14 px-2 py-2 text-left font-semibold text-ink">Outcome</th>
+            <th scope="col" class="w-10 px-2 py-2 text-right font-semibold text-ink">Written</th>
+            <th scope="col" class="w-12 px-2 py-2"><span class="sr-only">Details</span></th>
+          </tr>
+        </thead>
+        <thead v-else>
           <tr class="border-b border-rule-strong">
             <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Started</th>
             <th scope="col" class="whitespace-nowrap px-3 py-2 font-semibold text-ink">Source</th>
@@ -255,59 +336,141 @@ function sourceLabel(source: string): string {
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="run in runs"
-            :key="run.id"
-            class="border-b border-rule"
-            data-testid="import-run"
-          >
-            <th scope="row" class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">
-              {{ displayImportTime(run.startedAt) }}
-            </th>
-            <td class="whitespace-nowrap px-3 py-2 text-ink">{{ sourceLabel(run.source) }}</td>
-            <td class="whitespace-nowrap px-3 py-2 text-ink" data-testid="import-run-person">
-              {{ run.person?.name ?? 'Not recorded' }}
-            </td>
-            <td class="whitespace-nowrap px-3 py-2 text-ink" data-testid="import-run-mode">
-              {{ run.nonWriting ? 'Non-writing' : 'Writing' }}
-            </td>
-            <td
-              class="whitespace-nowrap px-3 py-2"
-              :class="run.outcome === 'failed' ? 'text-failure' : 'text-ink'"
-              data-testid="import-run-outcome"
+          <template v-for="run in runs" :key="run.id">
+            <tr
+              v-if="phoneViewport"
+              class="border-b border-rule"
+              data-testid="import-run"
             >
-              {{ importOutcomeLabel(run.outcome) }}
-            </td>
-            <td
-              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
-              data-testid="import-run-read"
+              <th scope="row" class="max-w-20 whitespace-normal break-words px-2 py-2 align-top font-mono font-medium text-ink">
+                {{ displayImportTime(run.startedAt) }}
+              </th>
+              <td class="max-w-16 whitespace-normal break-words px-2 py-2 align-top text-ink">
+                {{ sourceLabel(run.source) }}
+              </td>
+              <td
+                class="whitespace-nowrap px-2 py-2 align-top"
+                :class="run.outcome === 'failed' ? 'text-failure' : 'text-ink'"
+                data-testid="import-run-outcome"
+              >
+                {{ importOutcomeLabel(run.outcome) }}
+              </td>
+              <td
+                class="whitespace-nowrap px-2 py-2 text-right align-top font-medium tabular-nums text-ink"
+                data-testid="import-run-written"
+              >
+                {{ run.rowsWritten }}
+              </td>
+              <td class="whitespace-nowrap px-2 py-2 align-top">
+                <button
+                  type="button"
+                  class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sheet border border-rule-strong bg-surface px-2 text-xs font-bold text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  data-testid="import-run-disclosure"
+                  :aria-expanded="isRunExpanded(run)"
+                  :aria-controls="runDetailId(run)"
+                  :aria-label="runDetailLabel(run)"
+                  @click="toggleRunDetails(run)"
+                >
+                  <span aria-hidden="true">{{ isRunExpanded(run) ? 'Hide' : 'Details' }}</span>
+                </button>
+              </td>
+            </tr>
+            <tr
+              v-if="phoneViewport && isRunExpanded(run)"
+              :id="runDetailId(run)"
+              class="border-b border-rule bg-paper/50"
+              data-testid="import-run-detail"
             >
-              {{ run.rowsRead }}
-            </td>
-            <td
-              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
-              data-testid="import-run-already-stored"
+              <td colspan="5" class="px-2 py-2">
+                <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs text-muted">
+                  <dt class="font-bold">Person</dt>
+                  <dd class="min-w-0 break-words text-right text-ink" data-testid="import-run-person">
+                    {{ run.person?.name ?? 'Not recorded' }}
+                  </dd>
+                  <dt class="font-bold">Mode</dt>
+                  <dd class="text-right text-ink" data-testid="import-run-mode">
+                    {{ run.nonWriting ? 'Non-writing' : 'Writing' }}
+                  </dd>
+                  <dt class="font-bold">Read</dt>
+                  <dd class="text-right tabular-nums text-ink" data-testid="import-run-read">
+                    {{ run.rowsRead }}
+                  </dd>
+                  <dt class="font-bold">Already stored</dt>
+                  <dd class="text-right tabular-nums text-ink" data-testid="import-run-already-stored">
+                    {{ run.rowsAlreadyStored }}
+                  </dd>
+                  <dt class="font-bold">Categorised</dt>
+                  <dd class="text-right tabular-nums text-ink" data-testid="import-run-categorised">
+                    {{ run.rowsCategorised }}
+                  </dd>
+                  <dt class="font-bold">Reason</dt>
+                  <dd
+                    class="min-w-0 break-words text-right"
+                    :class="run.error !== null ? 'text-failure' : 'text-muted'"
+                    data-testid="import-run-error"
+                  >
+                    <template v-if="run.error !== null">{{ run.error }}</template>
+                    <template v-else>
+                      <span aria-hidden="true">—</span>
+                      <span class="sr-only">No failure reason</span>
+                    </template>
+                  </dd>
+                </dl>
+              </td>
+            </tr>
+            <tr
+              v-if="!phoneViewport"
+              class="border-b border-rule"
+              data-testid="import-run"
             >
-              {{ run.rowsAlreadyStored }}
-            </td>
-            <td
-              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
-              data-testid="import-run-written"
-            >
-              {{ run.rowsWritten }}
-            </td>
-            <td
-              class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
-              data-testid="import-run-categorised"
-            >
-              {{ run.rowsCategorised }}
-            </td>
-            <td
-              class="px-3 py-2"
-              :class="run.error !== null ? 'text-failure' : 'text-muted'"
-              data-testid="import-run-error"
-            >{{ run.error ?? '' }}</td>
-          </tr>
+              <th scope="row" class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">
+                {{ displayImportTime(run.startedAt) }}
+              </th>
+              <td class="whitespace-nowrap px-3 py-2 text-ink">{{ sourceLabel(run.source) }}</td>
+              <td class="whitespace-nowrap px-3 py-2 text-ink" data-testid="import-run-person">
+                {{ run.person?.name ?? 'Not recorded' }}
+              </td>
+              <td class="whitespace-nowrap px-3 py-2 text-ink" data-testid="import-run-mode">
+                {{ run.nonWriting ? 'Non-writing' : 'Writing' }}
+              </td>
+              <td
+                class="whitespace-nowrap px-3 py-2"
+                :class="run.outcome === 'failed' ? 'text-failure' : 'text-ink'"
+                data-testid="import-run-outcome"
+              >
+                {{ importOutcomeLabel(run.outcome) }}
+              </td>
+              <td
+                class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
+                data-testid="import-run-read"
+              >
+                {{ run.rowsRead }}
+              </td>
+              <td
+                class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
+                data-testid="import-run-already-stored"
+              >
+                {{ run.rowsAlreadyStored }}
+              </td>
+              <td
+                class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
+                data-testid="import-run-written"
+              >
+                {{ run.rowsWritten }}
+              </td>
+              <td
+                class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"
+                data-testid="import-run-categorised"
+              >
+                {{ run.rowsCategorised }}
+              </td>
+              <td
+                class="px-3 py-2"
+                :class="run.error !== null ? 'text-failure' : 'text-muted'"
+                data-testid="import-run-error"
+              >{{ run.error ?? '' }}</td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>

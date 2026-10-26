@@ -1,7 +1,7 @@
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ useFetch: vi.fn(), fetch: vi.fn() }));
 
@@ -108,6 +108,54 @@ describe('imports page', () => {
   beforeEach(() => {
     mocks.useFetch.mockReset();
     mocks.fetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows priority values and expands the remaining fields on a phone', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })));
+    const state = response(runs);
+    mocks.useFetch.mockReturnValue(state);
+
+    const wrapper = await mountSuspended(Imports);
+
+    expect(wrapper.findAll('thead th')).toHaveLength(5);
+    const rows = wrapper.findAll('[data-testid="import-run"]');
+    expect(rows).toHaveLength(3);
+    expect(wrapper.find('[data-testid="import-run-mode"]').exists()).toBe(false);
+    expect(rows[0]?.text()).toContain('2026-10-06 03:00:00 UTC');
+    expect(rows[0]?.get('[data-testid="import-run-written"]').text()).toBe('3');
+
+    const disclosure = rows[0]!.get('[data-testid="import-run-disclosure"]');
+    expect(disclosure.attributes('aria-expanded')).toBe('false');
+    expect(disclosure.attributes('aria-label')).toContain('Show details');
+    expect(disclosure.attributes('aria-label')).toContain('Scheduled sync');
+
+    await disclosure.trigger('click');
+
+    expect(disclosure.attributes('aria-expanded')).toBe('true');
+    expect(wrapper.findAll('[data-testid="import-run-detail"]')).toHaveLength(1);
+    const detail = wrapper.get('[data-testid="import-run-detail"]');
+    expect(detail.get('[data-testid="import-run-person"]').text()).toBe('Default');
+    expect(detail.get('[data-testid="import-run-mode"]').text()).toBe('Writing');
+    expect(detail.get('[data-testid="import-run-read"]').text()).toBe('12');
+    expect(detail.get('[data-testid="import-run-already-stored"]').text()).toBe('9');
+    expect(detail.get('[data-testid="import-run-categorised"]').text()).toBe('2');
+
+    await disclosure.trigger('click');
+    expect(disclosure.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('[data-testid="import-run-detail"]').exists()).toBe(false);
+
+    await disclosure.trigger('click');
+    state.data.value = [runs[1]!];
+    await flushPromises();
+    expect(wrapper.find('[data-testid="import-run-detail"]').exists()).toBe(false);
   });
 
   it('shows one row per returned run with its source, mode, outcome, and counts', async () => {

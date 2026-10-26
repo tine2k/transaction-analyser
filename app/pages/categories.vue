@@ -18,6 +18,7 @@
 // and openspec/changes/add-category-date-windows/specs/category-management-screen/spec.md
 // and openspec/changes/add-category-expense-type/specs/category-management-screen/spec.md
 import { IconCheck, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-vue';
+import { observeTableOverflow, type TableOverflow } from '../utils/table-overflow';
 
 type CategoryWindow = { from: string; to: string };
 type CategoryExpenseType = 'recurring' | 'one-time';
@@ -46,6 +47,21 @@ const sortedCategories = computed(() =>
     return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
   }),
 );
+
+const tableShell = ref<HTMLElement | null>(null);
+const tableRegion = ref<HTMLElement | null>(null);
+let tableOverflow: TableOverflow | null = null;
+
+// The category table only exists after the response arrives, so attach the
+// overflow tracker when both template refs are present and detach when either
+// goes away.
+watch([tableShell, tableRegion], ([shell, region]) => {
+  tableOverflow?.disconnect();
+  tableOverflow = null;
+  if (shell !== null && region !== null) {
+    tableOverflow = observeTableOverflow(shell, region);
+  }
+}, { flush: 'post' });
 
 const formElement = ref<HTMLFormElement | null>(null);
 const name = ref('');
@@ -245,6 +261,8 @@ onBeforeUnmount(() => {
   if (windowPreviewTimer !== null) {
     clearTimeout(windowPreviewTimer);
   }
+  tableOverflow?.disconnect();
+  tableOverflow = null;
 });
 
 // The expense type the form sends: the stored labels, or null for the unset choice,
@@ -545,65 +563,70 @@ async function remove(category: Category): Promise<void> {
       <p id="categories-scroll-help" class="mb-2 text-xs text-muted sm:hidden">
         Scroll horizontally to view all category columns and actions.
       </p>
-      <div
-        role="region"
-        aria-label="Category table"
-        aria-describedby="categories-scroll-help"
-        tabindex="0"
-        data-testid="categories-scroll"
-        class="max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-      >
-      <table class="w-max border-collapse text-left text-sm">
-        <thead>
-          <tr class="border-b border-rule-strong">
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Name</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Expression count</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Window count</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Analysis</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Type</th>
-            <th scope="col" class="px-3 py-2 align-middle font-semibold text-ink">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="category in sortedCategories"
-            :key="category.id"
-            class="border-b border-rule"
-          >
-            <td class="px-3 py-2 align-middle text-ink">{{ category.name }}</td>
-            <td class="px-3 py-2 align-middle text-ink">{{ category.patterns.length }}</td>
-            <td class="px-3 py-2 align-middle text-ink" data-testid="category-window-count">
-              {{ category.windows.length }}
-            </td>
-            <td class="px-3 py-2 align-middle text-ink" data-testid="category-hidden-state">
-              {{ category.hidden ? 'Hidden' : 'Visible' }}
-            </td>
-            <td class="px-3 py-2 align-middle text-ink" data-testid="category-expense-type">
-              {{ expenseTypeLabel(category.expenseType) }}
-            </td>
-            <td class="px-3 py-2 align-middle">
-              <div class="flex gap-2">
-                <button
-                  type="button"
-                  class="inline-flex min-h-11 items-center justify-center gap-2 rounded-sheet border border-rule-strong bg-surface px-3 text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                  @click="startEdit(category)"
-                >
-                  <AppIcon :icon="IconPencil" />
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex min-h-11 items-center justify-center gap-2 rounded-sheet border border-failure/60 bg-surface px-3 text-xs font-medium text-failure hover:border-failure focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-failure"
-                  @click="remove(category)"
-                >
-                  <AppIcon :icon="IconTrash" />
-                  Delete
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div ref="tableShell" class="table-scroll-shell">
+        <div
+          ref="tableRegion"
+          role="region"
+          aria-label="Category table"
+          aria-describedby="categories-scroll-help"
+          tabindex="0"
+          data-testid="categories-scroll"
+          class="table-scroll max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+        <table class="w-max border-collapse text-left text-sm">
+          <thead>
+            <tr class="border-b border-rule-strong">
+              <th scope="col" class="table-pin-left w-28 max-w-28 px-2 py-2 align-middle font-semibold text-ink sm:w-auto sm:max-w-none sm:px-3">Name</th>
+              <th scope="col" class="px-2 py-2 align-middle font-semibold text-ink sm:px-3">Expression count</th>
+              <th scope="col" class="px-2 py-2 align-middle font-semibold text-ink sm:px-3">Window count</th>
+              <th scope="col" class="px-2 py-2 align-middle font-semibold text-ink sm:px-3">Analysis</th>
+              <th scope="col" class="px-2 py-2 align-middle font-semibold text-ink sm:px-3">Type</th>
+              <th scope="col" class="table-pin-right px-2 py-2 align-middle font-semibold text-ink sm:px-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="category in sortedCategories"
+              :key="category.id"
+              class="border-b border-rule"
+            >
+              <td class="table-pin-left w-28 max-w-28 whitespace-normal break-words px-2 py-2 align-middle text-ink sm:w-auto sm:max-w-none sm:whitespace-nowrap sm:px-3">{{ category.name }}</td>
+              <td class="px-2 py-2 align-middle text-ink sm:px-3">{{ category.patterns.length }}</td>
+              <td class="px-2 py-2 align-middle text-ink sm:px-3" data-testid="category-window-count">
+                {{ category.windows.length }}
+              </td>
+              <td class="px-2 py-2 align-middle text-ink sm:px-3" data-testid="category-hidden-state">
+                {{ category.hidden ? 'Hidden' : 'Visible' }}
+              </td>
+              <td class="px-2 py-2 align-middle text-ink sm:px-3" data-testid="category-expense-type">
+                {{ expenseTypeLabel(category.expenseType) }}
+              </td>
+              <td class="table-pin-right px-2 py-2 align-middle sm:px-3">
+                <div class="flex gap-1 sm:gap-2">
+                  <button
+                    type="button"
+                    :aria-label="`Edit ${category.name}`"
+                    class="inline-flex min-h-11 min-w-11 size-11 items-center justify-center rounded-sheet border border-rule-strong bg-surface text-xs font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-auto sm:gap-2 sm:px-3"
+                    @click="startEdit(category)"
+                  >
+                    <AppIcon :icon="IconPencil" />
+                    <span class="hidden sm:inline">Edit</span>
+                  </button>
+                  <button
+                    type="button"
+                    :aria-label="`Delete ${category.name}`"
+                    class="inline-flex min-h-11 min-w-11 size-11 items-center justify-center rounded-sheet border border-failure/60 bg-surface text-xs font-medium text-failure hover:border-failure focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-failure sm:w-auto sm:gap-2 sm:px-3"
+                    @click="remove(category)"
+                  >
+                    <AppIcon :icon="IconTrash" />
+                    <span class="hidden sm:inline">Delete</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
       </div>
     </div>
   </div>

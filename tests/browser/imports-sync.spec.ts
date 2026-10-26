@@ -35,6 +35,56 @@ const uiRun = {
   error: null,
 };
 
+test('a phone shows priority columns and expands a run in place', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let syncRequests = 0;
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/easybank/sync') {
+      syncRequests += 1;
+    }
+  });
+  await page.route('**/api/imports', async (route) => {
+    await route.fulfill({ json: [scheduledRun, uiRun] });
+  });
+
+  await page.goto('/imports');
+  await expect(page.getByTestId('import-run')).toHaveCount(2);
+  await expect(page.locator('thead th')).toHaveCount(5);
+  await expect(page.getByTestId('import-run-mode')).toHaveCount(0);
+
+  const first = page.getByTestId('import-run').first();
+  await expect(first).toContainText('Scheduled sync');
+  await expect(first).toContainText('2026-10-06 03:00:00 UTC');
+  await expect(first.getByTestId('import-run-written')).toHaveText('0');
+  await expect(first.getByTestId('import-run-outcome')).toHaveText('Success');
+
+  const disclosure = first.getByTestId('import-run-disclosure');
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+  await expect(disclosure).toHaveAttribute('aria-controls', 'import-run-detail-1');
+  const disclosureBox = await disclosure.boundingBox();
+  expect(disclosureBox).not.toBeNull();
+  expect(disclosureBox!.height).toBeGreaterThanOrEqual(44);
+
+  await disclosure.click();
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+  const detail = page.getByTestId('import-run-detail');
+  await expect(detail).toHaveCount(1);
+  await expect(detail.getByTestId('import-run-person')).toHaveText('Not recorded');
+  await expect(detail.getByTestId('import-run-mode')).toHaveText('Non-writing');
+  await expect(detail.getByTestId('import-run-read')).toHaveText('2');
+  await expect(detail.getByTestId('import-run-already-stored')).toHaveText('2');
+  await expect(detail.getByTestId('import-run-categorised')).toHaveText('0');
+  expect(syncRequests).toBe(0);
+
+  await disclosure.click();
+  await expect(page.getByTestId('import-run-detail')).toHaveCount(0);
+
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(page.locator('thead th')).toHaveCount(10);
+  await expect(page.getByTestId('import-run-disclosure')).toHaveCount(0);
+  await expect(page.getByTestId('import-run-mode').first()).toHaveText('Non-writing');
+});
+
 test('the sync control starts a run and refreshes the log', async ({ page }) => {
   let logRequests = 0;
   let syncMethod: string | null = null;

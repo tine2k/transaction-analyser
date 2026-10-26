@@ -98,7 +98,7 @@ const routes = [
   { path: '/people', surface: 'people-scroll' },
   { path: '/monthly', surface: 'monthly-summary-card' },
   { path: '/yearly', surface: 'yearly-summary-card' },
-  { path: '/monthly-average', surface: 'monthly-average-table' },
+  { path: '/monthly-average', surface: 'monthly-average-table', phoneSurface: 'category-average-card' },
   { path: '/imports', surface: 'imports-scroll' },
 ] as const;
 
@@ -111,7 +111,9 @@ async function expectCardOnEveryRoute(page: Page, viewport: 'desktop' | 'phone')
     const ground = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
     expect(ground, `${route.path} should use the lavender ground`).toBe('rgb(233, 231, 245)');
 
-    const surface = page.getByTestId(route.surface).first();
+    const atPhoneWidth = (page.viewportSize()?.width ?? 1280) <= 390;
+    const surfaceId = atPhoneWidth && 'phoneSurface' in route ? route.phoneSurface : route.surface;
+    const surface = page.getByTestId(surfaceId).first();
     await expect(surface, `${route.path} should show its surface`).toBeVisible();
 
     const card = await surface.evaluate((element) => {

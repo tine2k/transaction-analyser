@@ -34,11 +34,50 @@ const router = useRouter();
 const route = router.currentRoute;
 const today = getLocalDateString(new Date());
 
+// One presentation is rendered at a time: cards below the `sm` breakpoint,
+// the semantic table from `sm` up. The fallback is the table when matchMedia is
+// unavailable, matching the transactions screen's card/table pattern.
+const PHONE_MEDIA_QUERY = '(max-width: 639.98px)';
+
+function phoneMediaQuery(): MediaQueryList | null {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(PHONE_MEDIA_QUERY)
+    : null;
+}
+
+const phoneQuery = phoneMediaQuery();
+const phoneViewport = ref(phoneQuery?.matches ?? isPhoneWidth());
+
+function isPhoneWidth(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth > 0 && window.innerWidth < 640;
+}
+
+function syncPhoneViewport(event?: MediaQueryListEvent): void {
+  phoneViewport.value = event?.matches ?? phoneQuery?.matches ?? isPhoneWidth();
+}
+
+function onPhoneResize(): void {
+  syncPhoneViewport();
+}
+
+onMounted(() => {
+  syncPhoneViewport();
+  phoneQuery?.addEventListener('change', syncPhoneViewport);
+  window.addEventListener('resize', onPhoneResize);
+});
+
+onBeforeUnmount(() => {
+  phoneQuery?.removeEventListener('change', syncPhoneViewport);
+  window.removeEventListener('resize', onPhoneResize);
+});
+
 const monthCount = ref('12');
 const appliedMonthCount = ref(12);
 const sortColumn = ref<'amount' | 'category'>('amount');
 const sortDirection = ref<'asc' | 'desc'>('desc');
 const expenseType = ref<ExpenseTypeChoice>('all');
+const sortColumnLabel = computed(() => sortColumn.value === 'amount' ? 'average amount' : 'category');
+const sortDirectionLabel = computed(() => sortDirection.value === 'asc' ? 'ascending' : 'descending');
 
 const windowMonths = computed(() => [...getLastCalendarMonths(today, appliedMonthCount.value)].reverse());
 const monthRangeLabel = computed(() => formatMonthRange(windowMonths.value));
@@ -294,6 +333,14 @@ function sortArrow(column: 'amount' | 'category'): string {
             </select>
           </label>
         </div>
+        <p
+          v-if="phoneViewport"
+          class="mt-3 text-xs font-bold text-muted"
+          data-testid="monthly-average-sort-statement"
+          aria-live="polite"
+        >
+          Sorted by {{ sortColumnLabel }}, {{ sortDirectionLabel }}
+        </p>
       </div>
 
       <p id="monthly-average-summary-note" class="sr-only">
@@ -320,7 +367,77 @@ function sortArrow(column: 'amount' | 'category'): string {
         </section>
       </div>
 
-      <div v-if="sortedAverages.length > 0" class="mt-4" data-testid="monthly-average-table-section">
+      <template v-if="sortedAverages.length > 0">
+        <div
+          v-if="phoneViewport"
+          class="mt-4 flex flex-col gap-3"
+          data-testid="monthly-average-cards"
+        >
+          <article
+            v-for="row in sortedAverages"
+            :key="row.key"
+            class="rounded-panel border border-card-border bg-surface p-4 shadow-sheet"
+            data-testid="category-average-card"
+            :data-category-key="row.key"
+          >
+            <div class="flex min-w-0 items-center gap-2">
+              <span
+                aria-hidden="true"
+                class="h-2.5 w-2.5 shrink-0 rounded-full"
+                data-testid="category-color"
+                :style="{ backgroundColor: categoryColor(row.key) }"
+              />
+              <h2 class="min-w-0 break-words text-[15px] font-bold text-ink">{{ row.name }}</h2>
+            </div>
+
+            <p class="mt-2 text-xs font-bold text-muted">{{ lastMonthsLabel }}</p>
+            <div
+              class="mt-1 flex h-[30px] items-end"
+              :class="trendGapClass"
+              aria-hidden="true"
+              data-testid="category-trend"
+            >
+              <div
+                v-for="(cell, index) in row.cells"
+                :key="averageData.months[index]?.key ?? index"
+                class="min-w-0 flex-1 rounded-t-[3px]"
+                data-testid="trend-bar"
+                :style="{
+                  height: `${trendHeight(cell, row.maximum)}px`,
+                  backgroundColor: categoryColor(row.key),
+                }"
+              />
+            </div>
+
+            <div
+              class="mt-2 h-2.5 rounded-full bg-surface ring-1 ring-rule"
+              aria-hidden="true"
+              data-testid="average-bar-cell"
+            >
+              <div
+                class="h-2.5 rounded-full"
+                data-testid="average-bar"
+                :style="{
+                  width: `${averageBarPercent(row.average)}%`,
+                  backgroundColor: categoryColor(row.key),
+                }"
+              />
+            </div>
+
+            <dl class="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-t border-rule pt-2 text-xs text-muted">
+              <dt class="font-bold">{{ appliedMonthCount }}-month total</dt>
+              <dd class="text-right font-bold tabular-nums text-ink" data-testid="category-window-total">
+                {{ formatEuroAmount(row.total) }}
+              </dd>
+              <dt class="font-bold">Avg / month</dt>
+              <dd class="text-right font-bold tabular-nums text-ink" data-testid="category-average-amount">
+                {{ formatEuroAmount(row.average) }}
+              </dd>
+            </dl>
+          </article>
+        </div>
+
+        <div v-else class="mt-4" data-testid="monthly-average-table-section">
         <p
           id="monthly-average-table-scroll-help"
           class="mb-2 text-xs text-muted lg:hidden"
@@ -426,7 +543,8 @@ function sortArrow(column: 'amount' | 'category'): string {
             </tbody>
           </table>
         </div>
-      </div>
+        </div>
+      </template>
 
       <p v-else class="mt-4 text-sm text-muted" data-testid="no-data">
         No category data for these months.

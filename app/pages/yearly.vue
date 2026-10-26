@@ -27,6 +27,7 @@ import {
   type ExpenseTypeChoice,
   type YearlyCategoryRow,
 } from '../utils/category-spending';
+import { observeTableOverflow, type TableOverflow } from '../utils/table-overflow';
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
 const router = useRouter();
@@ -35,6 +36,25 @@ const today = getLocalDateString(new Date());
 const hideUncategorised = ref(false);
 const expenseType = ref<ExpenseTypeChoice>('all');
 const selectedYear = ref(Number(today.slice(0, 4)));
+
+const tableShell = ref<HTMLElement | null>(null);
+const tableRegion = ref<HTMLElement | null>(null);
+let tableOverflow: TableOverflow | null = null;
+
+// The table exists only after the response arrives, so attach the overflow
+// tracker when both template refs are present and detach when either goes away.
+watch([tableShell, tableRegion], ([shell, region]) => {
+  tableOverflow?.disconnect();
+  tableOverflow = null;
+  if (shell !== null && region !== null) {
+    tableOverflow = observeTableOverflow(shell, region);
+  }
+}, { flush: 'post' });
+
+onBeforeUnmount(() => {
+  tableOverflow?.disconnect();
+  tableOverflow = null;
+});
 
 // The selected year is URL-backed. A supplied year wins even when it is empty;
 // otherwise the current year wins when it is represented, then the newest
@@ -315,91 +335,95 @@ function totalLocation(categoryKey: string) {
         <p id="yearly-matrix-scroll-help" class="mb-2 text-xs text-muted lg:hidden">
           Scroll horizontally to view every month.
         </p>
-        <div
-          role="region"
-          aria-label="Yearly category matrix"
-          aria-describedby="yearly-matrix-scroll-help"
-          tabindex="0"
-          class="max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          data-testid="yearly-matrix-scroll"
-        >
-          <table
-            class="w-full min-w-[1100px] border-collapse text-left text-sm"
-            data-testid="yearly-matrix"
+        <div ref="tableShell" class="table-scroll-shell">
+          <div
+            ref="tableRegion"
+            role="region"
+            aria-label="Yearly category matrix"
+            aria-describedby="yearly-matrix-scroll-help"
+            tabindex="0"
+            class="table-scroll max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            data-testid="yearly-matrix-scroll"
           >
-            <caption class="sr-only">
-              Absolute transaction totals by category for {{ selectedYear }}
-            </caption>
-            <thead>
-              <tr class="text-xs uppercase tracking-[0.06em] text-muted">
-                <th scope="col" class="px-3 py-3 align-middle font-bold sm:px-5">Category</th>
-                <th
-                  v-for="month in matrix.months"
-                  :key="month.key"
-                  scope="col"
-                  class="px-2 py-3 text-right align-middle font-bold"
-                >
-                  {{ month.label.slice(0, 3) }}
-                </th>
-                <th scope="col" class="px-3 py-3 text-right align-middle font-bold sm:px-5">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="row in matrix.rows"
-                :key="row.key"
-                class="border-t border-rule"
-                data-testid="yearly-row"
-                :data-category-key="row.key"
-              >
-                <th scope="row" class="whitespace-nowrap px-3 py-2 align-middle font-semibold sm:px-5">
-                  <span class="inline-flex min-w-0 items-center gap-2">
-                    <span
-                      aria-hidden="true"
-                      class="h-2.5 w-2.5 shrink-0 rounded-full"
-                      data-testid="category-color"
-                      :style="{ backgroundColor: categoryColor(row.key) }"
-                    />
-                    <span class="break-words">{{ row.name }}</span>
-                  </span>
-                </th>
-                <td
-                  v-for="(month, index) in matrix.months"
-                  :key="month.key"
-                  class="p-0 text-right align-middle tabular-nums text-ink"
-                  :class="cellClass(cellAmount(row, index), row.maximum)"
-                  :style="cellTintStyle(cellAmount(row, index), row.maximum)"
-                  data-testid="yearly-month-cell"
-                  :data-month-key="month.key"
-                >
-                  <NuxtLink
-                    v-if="!isZeroAmountString(cellAmount(row, index))"
-                    :to="monthLocation(month.key, row.key)"
-                    class="flex min-h-11 items-center justify-end px-2 transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
-                    data-testid="yearly-month-link"
+            <table
+              class="w-full min-w-[760px] border-collapse text-left text-xs sm:min-w-[1100px] sm:text-sm"
+              data-testid="yearly-matrix"
+            >
+              <caption class="sr-only">
+                Absolute transaction totals by category for {{ selectedYear }}
+              </caption>
+              <thead>
+                <tr class="text-xs uppercase tracking-[0.06em] text-muted">
+                  <th scope="col" class="table-pin-left w-28 px-2 py-3 text-left align-middle font-bold sm:w-auto sm:px-5">Category</th>
+                  <th
+                    v-for="month in matrix.months"
+                    :key="month.key"
+                    scope="col"
+                    class="px-1 py-2 text-right align-middle font-bold sm:px-2.5 sm:py-3"
                   >
-                    {{ cellText(cellAmount(row, index), index) }}
-                  </NuxtLink>
-                  <span v-else class="flex min-h-11 items-center justify-end px-2">
-                    {{ cellText(cellAmount(row, index), index) }}
-                  </span>
-                </td>
-                <td
-                  class="whitespace-nowrap px-3 align-middle text-right font-bold tabular-nums text-ink sm:px-5"
-                  data-testid="yearly-total-cell"
+                    <span aria-hidden="true">{{ month.label.slice(0, 3) }}</span>
+                    <span class="sr-only">{{ month.label }}</span>
+                  </th>
+                  <th scope="col" class="w-16 px-2 py-3 text-right align-middle font-bold sm:w-auto sm:px-5">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in matrix.rows"
+                  :key="row.key"
+                  class="border-t border-rule"
+                  data-testid="yearly-row"
+                  :data-category-key="row.key"
                 >
-                  <NuxtLink
-                    v-if="!isZeroAmountString(row.total)"
-                    :to="totalLocation(row.key)"
-                    class="flex min-h-11 items-center justify-end px-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                    data-testid="yearly-total-link"
+                  <th scope="row" class="table-pin-left w-28 whitespace-normal break-words px-2 py-2 align-middle font-semibold sm:w-auto sm:whitespace-nowrap sm:px-5">
+                    <span class="inline-flex min-w-0 items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        class="h-2.5 w-2.5 shrink-0 rounded-full"
+                        data-testid="category-color"
+                        :style="{ backgroundColor: categoryColor(row.key) }"
+                      />
+                      <span class="break-words">{{ row.name }}</span>
+                    </span>
+                  </th>
+                  <td
+                    v-for="(month, index) in matrix.months"
+                    :key="month.key"
+                    class="p-0 text-right align-middle tabular-nums text-ink"
+                    :class="cellClass(cellAmount(row, index), row.maximum)"
+                    :style="cellTintStyle(cellAmount(row, index), row.maximum)"
+                    data-testid="yearly-month-cell"
+                    :data-month-key="month.key"
                   >
-                    {{ formatEuroAmount(row.total) }}
-                  </NuxtLink>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                    <NuxtLink
+                      v-if="!isZeroAmountString(cellAmount(row, index))"
+                      :to="monthLocation(month.key, row.key)"
+                      class="flex min-h-11 items-center justify-end px-2 transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
+                      data-testid="yearly-month-link"
+                    >
+                      {{ cellText(cellAmount(row, index), index) }}
+                    </NuxtLink>
+                    <span v-else class="flex min-h-11 items-center justify-end px-2">
+                      {{ cellText(cellAmount(row, index), index) }}
+                    </span>
+                  </td>
+                  <td
+                    class="w-16 whitespace-nowrap px-2 text-right align-middle font-bold tabular-nums text-ink sm:w-auto sm:px-5"
+                    data-testid="yearly-total-cell"
+                  >
+                    <NuxtLink
+                      v-if="!isZeroAmountString(row.total)"
+                      :to="totalLocation(row.key)"
+                      class="flex min-h-11 items-center justify-end px-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                      data-testid="yearly-total-link"
+                    >
+                      {{ formatEuroAmount(row.total) }}
+                    </NuxtLink>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

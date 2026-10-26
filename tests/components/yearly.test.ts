@@ -101,7 +101,11 @@ describe('yearly page', () => {
     expect(region.attributes('aria-label')).toBe('Yearly category matrix');
     expect(region.attributes('tabindex')).toBe('0');
     expect(region.classes()).toContain('overflow-x-auto');
-    expect(wrapper.get('[data-testid="yearly-matrix"]').classes()).toContain('min-w-[1100px]');
+    const matrix = wrapper.get('[data-testid="yearly-matrix"]');
+    expect(matrix.classes()).toContain('min-w-[760px]');
+    expect(matrix.classes()).toContain('sm:min-w-[1100px]');
+    expect(matrix.get('thead th').classes()).toContain('table-pin-left');
+    expect(matrix.findAll('thead th .sr-only')).toHaveLength(12);
   });
 
   it('centers every matrix cell and link content vertically', async () => {

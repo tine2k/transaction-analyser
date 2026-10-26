@@ -277,6 +277,54 @@ test('the yearly screen explains an empty year', async ({ page }) => {
   await expect(page.getByText('No category data for 2025.')).toBeVisible();
 });
 
+for (const width of [320, 390]) {
+  test(`a ${width}px phone pins Category and keeps every month reachable`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await interceptTransactions(page);
+    await page.goto('/yearly?year=2025', { waitUntil: 'networkidle' });
+
+    const table = page.getByTestId('yearly-matrix');
+    const headers = table.locator('thead th');
+    await expect(headers).toHaveCount(14);
+    expect(await table.locator('thead th .sr-only').allTextContents()).toEqual([
+      'January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025',
+      'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025',
+    ]);
+    expect(await table.locator('thead th span[aria-hidden="true"]').allTextContents()).toEqual([
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ]);
+
+    const region = page.getByTestId('yearly-matrix-scroll');
+    await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
+      .toBe(true);
+    await region.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+
+    const firstRow = page.getByTestId('yearly-row').first();
+    const categoryCell = firstRow.locator('th');
+    await expect.poll(async () => {
+      const regionBox = await region.boundingBox();
+      const categoryBox = await categoryCell.boundingBox();
+      return regionBox === null || categoryBox === null
+        ? Number.POSITIVE_INFINITY
+        : Math.abs(categoryBox.x - regionBox.x);
+    }).toBeLessThanOrEqual(2);
+
+    await expect(firstRow.locator('[data-month-key="2025-12"]')).toBeVisible();
+    await expect(firstRow.getByTestId('yearly-total-cell')).toBeVisible();
+
+    const groceries = page.getByTestId('yearly-row').filter({ hasText: 'Groceries' });
+    const january = groceries.locator('[data-month-key="2025-01"]');
+    await expect(january.getByTestId('yearly-month-link')).toHaveAttribute('href', /month=2025-01/);
+    await expect(january.getByTestId('yearly-month-link')).toHaveAttribute('href', /category=1/);
+    expect(await january.getAttribute('style')).toContain('--yearly-tint');
+
+    expect(await page.evaluate(() => window.scrollX)).toBe(0);
+  });
+}
+
 test('the yearly matrix scrolls within its own region on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await interceptTransactions(page);

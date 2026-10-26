@@ -32,6 +32,137 @@ async function interceptApi(page: Page): Promise<void> {
   });
 }
 
+const phoneCategories = [
+  {
+    id: '1',
+    name: 'Groceries',
+    patterns: ['food'],
+    hidden: false,
+    windows: [],
+    expenseType: 'recurring',
+  },
+  {
+    id: '2',
+    name: 'A deliberately long category name for narrow screens',
+    patterns: ['long', 'name'],
+    hidden: false,
+    windows: [{ from: '2026-01-01', to: '2026-01-31' }],
+    expenseType: null,
+  },
+];
+
+async function interceptPhoneCategories(page: Page): Promise<void> {
+  await page.route('**/api/**', async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const method = route.request().method();
+
+    if (pathname === '/api/categories' && method === 'GET') {
+      await route.fulfill({ json: phoneCategories });
+      return;
+    }
+
+    if (pathname.startsWith('/api/categories/') && method === 'POST') {
+      await route.fulfill({ json: { count: 0 } });
+      return;
+    }
+
+    if (pathname.startsWith('/api/categories/') && method === 'DELETE') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    await route.fulfill({ json: { count: 0 } });
+  });
+}
+
+for (const width of [320, 390]) {
+  test(`a ${width}px phone pins the category name and actions`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await interceptPhoneCategories(page);
+    await page.goto('/categories', { waitUntil: 'networkidle' });
+
+    const region = page.getByRole('region', { name: 'Category table' });
+    await expect(region).toBeVisible();
+    await expect(page.locator('thead th')).toHaveCount(6);
+    await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
+      .toBe(true);
+
+    const row = page.locator('tbody tr').filter({ hasText: 'Groceries' });
+    const nameCell = row.locator('td').first();
+    const actionsCell = row.locator('td').last();
+    const longRow = page.locator('tbody tr').filter({ hasText: 'A deliberately long category name for narrow screens' });
+    await expect(longRow).toBeVisible();
+
+    await expect.poll(async () => {
+      const regionBox = await region.boundingBox();
+      const nameBox = await nameCell.boundingBox();
+      return regionBox === null || nameBox === null
+        ? Number.POSITIVE_INFINITY
+        : Math.abs(nameBox.x - regionBox.x);
+    }).toBeLessThanOrEqual(2);
+    await expect.poll(async () => {
+      const regionBox = await region.boundingBox();
+      const actionsBox = await actionsCell.boundingBox();
+      return regionBox === null || actionsBox === null
+        ? Number.POSITIVE_INFINITY
+        : Math.abs((actionsBox.x + actionsBox.width) - (regionBox.x + regionBox.width));
+    }).toBeLessThanOrEqual(3);
+
+    const longNameBox = await longRow.locator('td').first().boundingBox();
+    expect(longNameBox).not.toBeNull();
+    expect(longNameBox!.width).toBeLessThanOrEqual(120);
+
+    await region.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect.poll(async () => {
+      const regionBox = await region.boundingBox();
+      const nameBox = await nameCell.boundingBox();
+      return regionBox === null || nameBox === null
+        ? Number.POSITIVE_INFINITY
+        : Math.abs(nameBox.x - regionBox.x);
+    }).toBeLessThanOrEqual(2);
+    await expect.poll(async () => {
+      const regionBox = await region.boundingBox();
+      const actionsBox = await actionsCell.boundingBox();
+      return regionBox === null || actionsBox === null
+        ? Number.POSITIVE_INFINITY
+        : Math.abs((actionsBox.x + actionsBox.width) - (regionBox.x + regionBox.width));
+    }).toBeLessThanOrEqual(3);
+
+    const edit = row.getByRole('button', { name: 'Edit Groceries' });
+    const remove = row.getByRole('button', { name: 'Delete Groceries' });
+    for (const control of [edit, remove]) {
+      await expect(control).toBeVisible();
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+    }
+
+    let dialogMessage = '';
+    let deleteRequests = 0;
+    page.once('dialog', async (dialog) => {
+      dialogMessage = dialog.message();
+      await dialog.dismiss();
+    });
+    page.on('request', (request) => {
+      if (request.method() === 'DELETE') {
+        deleteRequests += 1;
+      }
+    });
+    await remove.click();
+    await expect.poll(() => dialogMessage).toContain('Groceries');
+    expect(deleteRequests).toBe(0);
+
+    await edit.click();
+    await expect(page.getByRole('heading', { name: 'Edit category' })).toBeVisible();
+    await expect(page.locator('form label input').first()).toHaveValue('Groceries');
+
+    expect(await page.evaluate(() => window.scrollX)).toBe(0);
+  });
+}
+
 test('the category table takes only the space it needs and rules its rows', async ({ page }) => {
   await interceptApi(page);
   await page.goto('/categories', { waitUntil: 'networkidle' });

@@ -54,6 +54,36 @@ async function interceptTransactions(page: Page): Promise<void> {
   });
 }
 
+test('a phone shows one card per category with exact values and a sort statement', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await interceptTransactions(page);
+  await page.goto('/monthly-average', { waitUntil: 'networkidle' });
+
+  await expect(page.getByTestId('monthly-average-table')).toHaveCount(0);
+  const cards = page.getByTestId('category-average-card');
+  await expect(cards).toHaveCount(3);
+  await expect(page.getByTestId('monthly-average-sort-statement'))
+    .toHaveText('Sorted by average amount, descending');
+
+  const groceries = cards.filter({ hasText: 'Groceries' });
+  await expect(groceries.getByTestId('category-window-total')).toHaveText('€ 100.00');
+  await expect(groceries.getByTestId('category-average-amount')).toHaveText('€ 8.33');
+  await expect(groceries.getByTestId('trend-bar')).toHaveCount(12);
+  await expect(groceries.getByTestId('category-trend')).toHaveAttribute('aria-hidden', 'true');
+  await expect(groceries.getByTestId('average-bar-cell')).toHaveAttribute('aria-hidden', 'true');
+
+  await page.getByTestId('monthly-average-sort-direction').selectOption('asc');
+  await expect(page.getByTestId('monthly-average-sort-statement'))
+    .toHaveText('Sorted by average amount, ascending');
+  await expect(cards.first()).toContainText('Uncategorised');
+
+  expect(await page.evaluate(() => window.scrollX)).toBe(0);
+
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(page.getByTestId('category-average-card')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Monthly average category table' })).toBeVisible();
+});
+
 test('the trend and share bars are solid category colours above 3:1', async ({ page }) => {
   await interceptTransactions(page);
   await page.goto('/monthly-average', { waitUntil: 'networkidle' });

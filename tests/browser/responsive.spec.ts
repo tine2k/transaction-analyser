@@ -190,8 +190,39 @@ for (const viewport of viewports) {
 
           const region = page.getByRole('region', { name: 'Category table' });
           await expect(region).toBeVisible();
+          await expect(page.locator('thead th')).toHaveCount(6);
           await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
             .toBe(true);
+
+          const firstRow = page.locator('tbody tr').first();
+          const nameCell = firstRow.locator('td').first();
+          const actionsCell = firstRow.locator('td').last();
+          await region.evaluate((element) => {
+            element.scrollLeft = element.scrollWidth;
+          });
+          await expect.poll(async () => {
+            const regionBox = await region.boundingBox();
+            const nameBox = await nameCell.boundingBox();
+            return regionBox === null || nameBox === null
+              ? Number.POSITIVE_INFINITY
+              : Math.abs(nameBox.x - regionBox.x);
+          }).toBeLessThanOrEqual(2);
+          await expect.poll(async () => {
+            const regionBox = await region.boundingBox();
+            const actionsBox = await actionsCell.boundingBox();
+            return regionBox === null || actionsBox === null
+              ? Number.POSITIVE_INFINITY
+              : Math.abs((actionsBox.x + actionsBox.width) - (regionBox.x + regionBox.width));
+          }).toBeLessThanOrEqual(3);
+
+          for (const action of ['Edit', 'Delete']) {
+            const control = firstRow.getByRole('button', { name: new RegExp(`^${action} `) });
+            const box = await control.boundingBox();
+            expect(box).not.toBeNull();
+            expect(box!.width).toBeGreaterThanOrEqual(44);
+            expect(box!.height).toBeGreaterThanOrEqual(44);
+          }
+          await expect(page.getByText('A deliberately long category name for narrow screens', { exact: true })).toBeVisible();
           await expectNoPageOverflow(page);
         }
 
@@ -212,6 +243,28 @@ for (const viewport of viewports) {
           await expect(region).toBeVisible();
           await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
             .toBe(true);
+
+          const table = page.getByTestId('yearly-matrix');
+          await expect(table.locator('thead th')).toHaveCount(14);
+          expect(await table.locator('thead th .sr-only').allTextContents()).toEqual([
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December',
+          ].map((month) => `${month} ${new Date().getFullYear()}`));
+
+          await region.evaluate((element) => {
+            element.scrollLeft = element.scrollWidth;
+          });
+          const firstRow = page.getByTestId('yearly-row').first();
+          await expect(firstRow.locator('[data-month-key^="' + new Date().getFullYear() + '-12"]')).toBeVisible();
+          await expect(firstRow.getByTestId('yearly-total-cell')).toBeVisible();
+          await expect.poll(async () => {
+            const regionBox = await region.boundingBox();
+            const categoryBox = await firstRow.locator('th').boundingBox();
+            return regionBox === null || categoryBox === null
+              ? Number.POSITIVE_INFINITY
+              : Math.abs(categoryBox.x - regionBox.x);
+          }).toBeLessThanOrEqual(2);
+
           await expectNoPageOverflow(page);
         }
 
@@ -224,8 +277,24 @@ for (const viewport of viewports) {
           if (viewport.width <= 390) {
             const region = page.getByRole('region', { name: 'Monthly category table' });
             await expect(region).toBeVisible();
-            await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
-              .toBe(true);
+
+            const headers = await page.getByTestId('monthly-category-table').locator('thead th').allTextContents();
+            expect(headers.map((header) => header.trim()))
+              .toEqual(['Category', 'Amount', 'Share of top category', 'Transactions']);
+
+            const regionBox = await region.boundingBox();
+            const categoryBox = await page.getByTestId('category-row').first().locator('th').boundingBox();
+            const amountBox = await page.getByTestId('category-row').first().getByTestId('row-amount').boundingBox();
+            expect(regionBox).not.toBeNull();
+            expect(categoryBox).not.toBeNull();
+            expect(amountBox).not.toBeNull();
+            expect(amountBox!.x).toBeGreaterThanOrEqual(categoryBox!.x + categoryBox!.width - 1);
+            expect(amountBox!.x + amountBox!.width).toBeLessThanOrEqual(regionBox!.x + regionBox!.width + 1);
+
+            if (viewport.width === 320) {
+              await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
+                .toBe(true);
+            }
             await expectNoPageOverflow(page);
           }
         }
@@ -234,26 +303,48 @@ for (const viewport of viewports) {
           await expect(page.getByTestId('monthly-average-subtitle')).toContainText('12 months');
           await expect(page.getByTestId('monthly-average-filter-panel')).toBeVisible();
           await expect(page.getByTestId('monthly-average-summary-card')).toHaveCount(3);
-          await expect(page.getByTestId('category-average')).toHaveCount(9);
-          await expect(page.getByTestId('category-average').first().getByTestId('trend-bar')).toHaveCount(12);
 
-          const region = page.getByRole('region', { name: 'Monthly average category table' });
-          await expect(region).toBeVisible();
-
-          if (viewport.width <= 768) {
-            await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
-              .toBe(true);
+          if (viewport.width <= 390) {
+            await expect(page.getByTestId('monthly-average-table')).toHaveCount(0);
+            await expect(page.getByTestId('category-average')).toHaveCount(0);
+            await expect(page.getByTestId('category-average-card')).toHaveCount(9);
+            await expect(page.getByTestId('monthly-average-sort-statement')).toBeVisible();
+            const firstCard = page.getByTestId('category-average-card').first();
+            await expect(firstCard.getByTestId('trend-bar')).toHaveCount(12);
+            await expect(firstCard.getByTestId('category-window-total')).toBeVisible();
+            await expect(firstCard.getByTestId('category-average-amount')).toBeVisible();
           } else {
-            await expect.poll(() => region.evaluate((element) => element.scrollWidth <= element.clientWidth))
-              .toBe(true);
+            await expect(page.getByTestId('category-average-card')).toHaveCount(0);
+            await expect(page.getByTestId('category-average')).toHaveCount(9);
+            await expect(page.getByTestId('category-average').first().getByTestId('trend-bar')).toHaveCount(12);
+
+            const region = page.getByRole('region', { name: 'Monthly average category table' });
+            await expect(region).toBeVisible();
+
+            if (viewport.width === 768) {
+              await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
+                .toBe(true);
+            } else {
+              await expect.poll(() => region.evaluate((element) => element.scrollWidth <= element.clientWidth))
+                .toBe(true);
+            }
           }
           await expectNoPageOverflow(page);
         }
 
         if (route.path === '/imports') {
           await expect(page.getByTestId('import-run')).toHaveCount(1);
-          await expect(page.getByTestId('import-run-mode')).toHaveText('Non-writing');
           await expect(page.getByTestId('import-run-outcome')).toHaveText('Success');
+
+          if (viewport.width <= 390) {
+            await expect(page.locator('thead th')).toHaveCount(5);
+            await expect(page.getByTestId('import-run-mode')).toHaveCount(0);
+            await expect(page.getByTestId('import-run-disclosure')).toBeVisible();
+          } else {
+            await expect(page.locator('thead th')).toHaveCount(10);
+            await expect(page.getByTestId('import-run-disclosure')).toHaveCount(0);
+            await expect(page.getByTestId('import-run-mode')).toHaveText('Non-writing');
+          }
         }
       });
     }
@@ -291,3 +382,31 @@ for (const viewport of viewports) {
     }
   });
 }
+
+test.describe('phone table scroll affordance', () => {
+  test.use({ viewport: { width: 320, height: 640 } });
+
+  test('the Monthly shell marks the edge with more content and contains the gesture', async ({ page }) => {
+    await interceptApi(page);
+    await page.goto('/monthly', { waitUntil: 'networkidle' });
+
+    const region = page.getByTestId('monthly-category-scroll');
+    const shell = region.locator('..');
+    await expect(shell).toHaveAttribute('data-overflow-start', 'false');
+    await expect(shell).toHaveAttribute('data-overflow-end', 'true');
+
+    await region.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect(shell).toHaveAttribute('data-overflow-start', 'true');
+    await expect(shell).toHaveAttribute('data-overflow-end', 'false');
+
+    await region.evaluate((element) => {
+      element.scrollLeft = 0;
+    });
+    await expect(shell).toHaveAttribute('data-overflow-start', 'false');
+    await expect(shell).toHaveAttribute('data-overflow-end', 'true');
+
+    await expectNoPageOverflow(page);
+  });
+});

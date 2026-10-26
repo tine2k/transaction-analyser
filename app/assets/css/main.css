@@ -98,6 +98,67 @@
   );
 }
 
+/* A wide table keeps its own horizontal scroll region. The shell draws a
+   gradient-and-shadow edge while more columns remain on that side; the state is
+   written by app/utils/table-overflow.ts. The pinned cells sit above the
+   affordance so the gradient never dims the column that stays in view. */
+.table-scroll {
+  overscroll-behavior-x: contain;
+}
+
+.table-scroll-shell {
+  position: relative;
+}
+
+.table-scroll-shell::before,
+.table-scroll-shell::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  z-index: 2;
+  width: 18px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.table-scroll-shell::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(32, 30, 62, 0.16), transparent);
+}
+
+.table-scroll-shell::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(32, 30, 62, 0.16), transparent);
+}
+
+.table-scroll-shell[data-overflow-start='true']::before,
+.table-scroll-shell[data-overflow-end='true']::after {
+  opacity: 1;
+}
+
+/* A table cell that stays in view while the middle columns scroll. The seam is
+   drawn with a shadow because border-collapse would detach a border from the
+   cell as it sticks. The opaque ground keeps the moving columns from showing
+   through. z-index 3 keeps the pinned cell above the shell's edge affordance. */
+.table-pin-left,
+.table-pin-right {
+  position: sticky;
+  z-index: 3;
+  background-color: var(--color-surface);
+}
+
+.table-pin-left {
+  left: 0;
+  box-shadow: 1px 0 0 var(--color-rule);
+}
+
+.table-pin-right {
+  right: 0;
+  box-shadow: -1px 0 0 var(--color-rule);
+}
+
 /* Intentional wide-table overflow is handled by each table's own scroll region. */
 html,
 body {

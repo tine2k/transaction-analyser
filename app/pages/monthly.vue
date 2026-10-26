@@ -28,6 +28,7 @@ import {
   type CategorySpendingTransaction,
   type ExpenseTypeChoice,
 } from '../utils/category-spending';
+import { observeTableOverflow, type TableOverflow } from '../utils/table-overflow';
 
 const { data: transactions, error, pending } = useFetch<CategorySpendingTransaction[]>('/api/transactions');
 const router = useRouter();
@@ -36,6 +37,60 @@ const today = getLocalDateString(new Date());
 const hideUncategorised = ref(false);
 const expenseType = ref<ExpenseTypeChoice>('all');
 const selectedMonth = ref(today.slice(0, 7));
+
+// One table is rendered at a time. Below the `sm` breakpoint Amount follows
+// Category so the key number is read first; from `sm` up the original column
+// order returns. The flag follows the transactions screen's pattern and falls
+// back to the desktop order when matchMedia is unavailable.
+const PHONE_MEDIA_QUERY = '(max-width: 639.98px)';
+
+function phoneMediaQuery(): MediaQueryList | null {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(PHONE_MEDIA_QUERY)
+    : null;
+}
+
+const phoneQuery = phoneMediaQuery();
+const phoneViewport = ref(phoneQuery?.matches ?? isPhoneWidth());
+
+function isPhoneWidth(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth > 0 && window.innerWidth < 640;
+}
+
+function syncPhoneViewport(event?: MediaQueryListEvent): void {
+  phoneViewport.value = event?.matches ?? phoneQuery?.matches ?? isPhoneWidth();
+}
+
+function onPhoneResize(): void {
+  syncPhoneViewport();
+}
+
+const tableShell = ref<HTMLElement | null>(null);
+const tableRegion = ref<HTMLElement | null>(null);
+let tableOverflow: TableOverflow | null = null;
+
+// The table exists only after the response arrives, so attach the overflow
+// tracker when both template refs are present and detach when either goes away.
+watch([tableShell, tableRegion], ([shell, region]) => {
+  tableOverflow?.disconnect();
+  tableOverflow = null;
+  if (shell !== null && region !== null) {
+    tableOverflow = observeTableOverflow(shell, region);
+  }
+}, { flush: 'post' });
+
+onMounted(() => {
+  syncPhoneViewport();
+  phoneQuery?.addEventListener('change', syncPhoneViewport);
+  window.addEventListener('resize', onPhoneResize);
+});
+
+onBeforeUnmount(() => {
+  phoneQuery?.removeEventListener('change', syncPhoneViewport);
+  window.removeEventListener('resize', onPhoneResize);
+  tableOverflow?.disconnect();
+  tableOverflow = null;
+});
 
 // The selected month is URL-backed. A supplied month wins; otherwise the
 // current month wins when the returned transactions represent it, then the
@@ -367,74 +422,81 @@ function transactionLocation(categoryKey: string) {
           <p id="monthly-table-scroll-help" class="mb-2 text-xs text-muted lg:hidden">
             Scroll horizontally to view every column.
           </p>
-          <div
-            role="region"
-            aria-label="Monthly category table"
-            aria-describedby="monthly-table-scroll-help"
-            tabindex="0"
-            class="max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-            data-testid="monthly-category-scroll"
-          >
-            <table
-              class="w-full min-w-[720px] border-collapse text-left text-sm"
-              data-testid="monthly-category-table"
+          <div ref="tableShell" class="table-scroll-shell">
+            <div
+              ref="tableRegion"
+              role="region"
+              aria-label="Monthly category table"
+              aria-describedby="monthly-table-scroll-help"
+              tabindex="0"
+              class="table-scroll max-w-full overflow-x-auto rounded-panel border border-card-border bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              data-testid="monthly-category-scroll"
             >
-              <caption class="sr-only">
-                Absolute transaction totals by category for {{ selectedMonthLabel }}
-              </caption>
-              <thead>
-                <tr class="text-xs uppercase tracking-[0.06em] text-muted">
-                  <th scope="col" class="px-3 py-3 font-bold sm:px-5">Category</th>
-                  <th scope="col" class="w-[38%] px-3 py-3 font-bold sm:px-5">Share of top category</th>
-                  <th scope="col" class="px-3 py-3 text-right font-bold sm:px-5">Transactions</th>
-                  <th scope="col" class="px-3 py-3 text-right font-bold sm:px-5">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="entry in breakdown.entries"
-                  :key="entry.key"
-                  class="border-t border-rule"
-                  data-testid="category-row"
-                  :data-category-key="entry.key"
-                >
-                  <th scope="row" class="whitespace-nowrap px-3 py-3 font-semibold sm:px-5">
-                    <NuxtLink
-                      :to="transactionLocation(entry.key)"
-                      :aria-label="`View ${entry.name} transactions for ${selectedMonthLabel}`"
-                      class="inline-flex min-h-11 items-center gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                      data-testid="category-transaction-link"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="h-2.5 w-2.5 shrink-0 rounded-full"
-                        data-testid="category-color"
-                        :style="{ backgroundColor: categoryColor(entry.key) }"
-                      />
-                      <span class="break-words">{{ entry.name }}</span>
-                    </NuxtLink>
-                  </th>
-                  <td class="px-3 py-3 sm:px-5">
-                    <div class="h-2.5 rounded-full bg-surface ring-1 ring-rule">
-                      <div
-                        class="h-2.5 rounded-full"
-                        data-testid="share-bar"
-                        :style="{
-                          width: `${sharePercent(entry.amount)}%`,
-                          backgroundColor: categoryColor(entry.key),
-                        }"
-                      />
-                    </div>
-                  </td>
-                  <td class="whitespace-nowrap px-3 py-3 text-right text-muted tabular-nums sm:px-5" data-testid="row-transactions">
-                    {{ entry.transactions }}
-                  </td>
-                  <td class="whitespace-nowrap px-3 py-3 text-right font-bold text-ink tabular-nums sm:px-5" data-testid="row-amount">
-                    {{ formatEuroAmount(entry.amount) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+              <table
+                class="w-full min-w-[340px] border-collapse text-left text-xs sm:min-w-[720px] sm:text-sm"
+                data-testid="monthly-category-table"
+              >
+                <caption class="sr-only">
+                  Absolute transaction totals by category for {{ selectedMonthLabel }}
+                </caption>
+                <thead>
+                  <tr class="text-xs uppercase tracking-[0.06em] text-muted">
+                    <th scope="col" class="table-pin-left w-28 px-2 py-3 text-left font-bold sm:w-auto sm:px-5">Category</th>
+                    <th v-if="phoneViewport" scope="col" class="w-20 px-2 py-3 text-right font-bold sm:w-auto sm:px-5">Amount</th>
+                    <th scope="col" class="w-24 px-2 py-3 font-bold sm:w-[38%] sm:px-5">Share of top category</th>
+                    <th scope="col" class="w-14 px-2 py-3 text-right font-bold sm:w-auto sm:px-5">Transactions</th>
+                    <th v-if="!phoneViewport" scope="col" class="w-auto px-2 py-3 text-right font-bold sm:px-5">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="entry in breakdown.entries"
+                    :key="entry.key"
+                    class="border-t border-rule"
+                    data-testid="category-row"
+                    :data-category-key="entry.key"
+                  >
+                    <th scope="row" class="table-pin-left w-28 whitespace-normal break-words px-2 py-2 font-semibold sm:w-auto sm:whitespace-nowrap sm:px-5 sm:py-3">
+                      <NuxtLink
+                        :to="transactionLocation(entry.key)"
+                        :aria-label="`View ${entry.name} transactions for ${selectedMonthLabel}`"
+                        class="inline-flex min-h-11 items-center gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                        data-testid="category-transaction-link"
+                      >
+                        <span
+                          aria-hidden="true"
+                          class="h-2.5 w-2.5 shrink-0 rounded-full"
+                          data-testid="category-color"
+                          :style="{ backgroundColor: categoryColor(entry.key) }"
+                        />
+                        <span class="break-words">{{ entry.name }}</span>
+                      </NuxtLink>
+                    </th>
+                    <td v-if="phoneViewport" class="w-20 whitespace-nowrap px-2 py-2 text-right font-bold text-ink tabular-nums sm:w-auto sm:px-5 sm:py-3" data-testid="row-amount">
+                      {{ formatEuroAmount(entry.amount) }}
+                    </td>
+                    <td class="w-24 px-2 py-2 sm:w-[38%] sm:px-5 sm:py-3">
+                      <div class="h-2.5 rounded-full bg-surface ring-1 ring-rule">
+                        <div
+                          class="h-2.5 rounded-full"
+                          data-testid="share-bar"
+                          :style="{
+                            width: `${sharePercent(entry.amount)}%`,
+                            backgroundColor: categoryColor(entry.key),
+                          }"
+                        />
+                      </div>
+                    </td>
+                    <td class="w-14 whitespace-nowrap px-2 py-2 text-right text-muted tabular-nums sm:w-auto sm:px-5 sm:py-3" data-testid="row-transactions">
+                      {{ entry.transactions }}
+                    </td>
+                    <td v-if="!phoneViewport" class="whitespace-nowrap px-2 py-3 text-right font-bold text-ink tabular-nums sm:px-5" data-testid="row-amount">
+                      {{ formatEuroAmount(entry.amount) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </template>

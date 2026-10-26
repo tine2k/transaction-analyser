@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Averages</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0;font-family:"Plus Jakarta Sans",system-ui,sans-serif;background:#F5F4FB;color:#1B1840}
+a{color:#fff;text-decoration:none}a:hover{opacity:.85}
+</style>
+</helmet>
+<div style="min-height:1500px;background:#F5F4FB">
+<header style="background:radial-gradient(45% 160% at 90% -30%,rgba(34,150,200,.55),transparent 65%),radial-gradient(40% 150% at 50% 140%,rgba(18,140,150,.4),transparent 70%),linear-gradient(105deg,#0F1B5C 0%,#1E2A9A 40%,#2F3FC2 70%,#1D6FA8 100%);padding:0 40px">
+<div style="max-width:1280px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px 32px;padding:14px 0">
+<div style="display:flex;align-items:center;gap:10px;font-weight:800;font-size:21px;color:#fff;letter-spacing:-.02em"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><defs><mask id="pm"><rect width="32" height="32" fill="#fff"></rect><path d="M16 16L16.00 -6.00" stroke="#000" stroke-width="1.8"></path><path d="M16 16L27.00 35.05" stroke="#000" stroke-width="1.8"></path><path d="M16 16L-2.02 28.62" stroke="#000" stroke-width="1.8"></path><path d="M16 16L-2.02 3.38" stroke="#000" stroke-width="1.8"></path></mask></defs><g><path mask="url(#pm)" d="M16 16L16.00 2.00A14 14 0 0 1 23.00 28.12Z" fill="#FF8A3D"></path></g><g><path mask="url(#pm)" d="M16 16L23.00 28.12A14 14 0 0 1 4.53 24.03Z" fill="#9B7BFF"></path></g><g><path mask="url(#pm)" d="M16 16L4.53 24.03A14 14 0 0 1 4.53 7.97Z" fill="#2DD4BF"></path></g><g transform="translate(-0.74 -1.42)"><path mask="url(#pm)" d="M16 16L4.53 7.97A14 14 0 0 1 16.00 2.00Z" fill="#FF5FA8"></path></g></svg>Expenses</div>
+<nav style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="7">
+<a href="{{n.href}}" style="padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;background:{{n.bg}};color:{{n.fg}}">{{n.label}}</a>
+</sc-for>
+</nav>
+</div>
+</header>
+<main style="max-width:1280px;margin:0 auto;padding:32px 40px 64px;display:flex;flex-direction:column;gap:24px;box-sizing:border-box">
+<div>
+<h1 style="margin:0;font-size:34px;font-weight:800;letter-spacing:-.02em">Averages</h1>
+<p style="margin:6px 0 0;color:#524E7D;font-size:15px">Monthly average per category · Nov 2025 – Oct 2026</p>
+</div>
+<section style="background:#fff;border-radius:20px;padding:20px 24px;box-shadow:0 1px 3px rgba(40,30,120,.08);display:flex;flex-wrap:wrap;gap:16px 24px">
+<div style="display:flex;flex-direction:column;gap:6px"><label for="pe" style="font-size:12px;font-weight:700;color:#524E7D">Person</label>
+<select id="pe" value="{{person}}" onChange="{{onPerson}}" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid #BDB8E0;background:#fff;font-size:14px;color:#1B1840;min-width:170px"><sc-for list="{{persons}}" as="o" hint-placeholder-count="4"><option value="{{o.v}}">{{o.l}}</option></sc-for></select></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="ty" style="font-size:12px;font-weight:700;color:#524E7D">Type</label>
+<select id="ty" value="{{type}}" onChange="{{onType}}" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid #BDB8E0;background:#fff;font-size:14px;color:#1B1840;min-width:170px"><sc-for list="{{types}}" as="o" hint-placeholder-count="4"><option value="{{o.v}}">{{o.l}}</option></sc-for></select></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="so" style="font-size:12px;font-weight:700;color:#524E7D">Sort by</label>
+<select id="so" value="{{sort}}" onChange="{{onSort}}" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid #BDB8E0;background:#fff;font-size:14px;color:#1B1840;min-width:190px"><sc-for list="{{sorts}}" as="o" hint-placeholder-count="4"><option value="{{o.v}}">{{o.l}}</option></sc-for></select></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="di" style="font-size:12px;font-weight:700;color:#524E7D">Order</label>
+<select id="di" value="{{dir}}" onChange="{{onDir}}" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid #BDB8E0;background:#fff;font-size:14px;color:#1B1840;min-width:170px"><sc-for list="{{dirs}}" as="o" hint-placeholder-count="4"><option value="{{o.v}}">{{o.l}}</option></sc-for></select></div>
+</section>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">
+<sc-for list="{{stats}}" as="s" hint-placeholder-count="3">
+<div style="background:{{s.bg}};color:{{s.fg}};border-radius:20px;padding:22px 24px">
+<div style="font-size:13px;font-weight:600">{{s.label}}</div>
+<div style="font-size:30px;font-weight:800;margin-top:6px;letter-spacing:-.02em">{{s.value}}</div>
+</div>
+</sc-for>
+</div>
+<section style="background:#fff;border-radius:20px;padding:8px 24px 16px;box-shadow:0 1px 3px rgba(40,30,120,.08)">
+<div style="overflow:auto;max-height:760px">
+<table style="width:100%;min-width:860px;border-collapse:collapse;font-size:14px">
+<thead><tr style="text-align:left;color:#524E7D;font-size:12px;text-transform:uppercase;letter-spacing:.06em;background:#fff;position:sticky;top:0">
+<th style="padding:16px 8px">Category {{catArrow}}</th><th style="padding:16px 8px">Last 12 months</th><th style="padding:16px 8px;width:26%">Average</th><th style="padding:16px 8px;text-align:right">12-month total</th><th style="padding:16px 8px;text-align:right">Avg / month {{avgArrow}}</th>
+</tr></thead>
+<tbody>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="12">
+<tr style="border-top:1px solid #ECEAF8">
+<td style="padding:10px 8px;font-weight:600;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:{{r.c}};margin-right:10px"></span>{{r.name}}</td>
+<td style="padding:10px 8px"><div style="display:flex;align-items:flex-end;gap:2px;height:30px"><sc-for list="{{r.spark}}" as="b" hint-placeholder-count="12"><div style="width:7px;border-radius:3px 3px 0 0;background:{{r.c}};opacity:.85;height:{{b.h}}px"></div></sc-for></div></td>
+<td style="padding:10px 8px"><div style="height:10px;border-radius:6px;background:#EEEBFA"><div style="height:10px;border-radius:6px;background:{{r.c}};width:{{r.w}}%"></div></div></td>
+<td style="padding:10px 8px;text-align:right;color:#524E7D">{{r.t}}</td>
+<td style="padding:10px 8px;text-align:right;font-weight:800">{{r.a}}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":1500}}'>
+class Component extends DCLogic {
+state={person:'all',type:'all',sort:'avg',dir:'desc'};
+renderVals() {
+const labels=['Transactions','Monthly','Yearly','Averages','Categories','Import','Settings'];const hrefs=['Main.dc.html','Monthly.dc.html','Yearly.dc.html','Averages.dc.html','#','#','#'];
+const nav=labels.map((l,i)=>({label:l,href:hrefs[i],bg:i===3?'#fff':'rgba(255,255,255,.16)',fg:i===3?'#2F3FC2':'#fff'}));
+const names=['Groceries','Rent','Dining out','Transport','Utilities','Internet','Phone','Insurance','Health','Pharmacy','Fitness','Clothing','Electronics','Home goods','Furniture','Travel','Hotels','Fuel','Parking','Subscriptions','Streaming','Books','Education','Gifts','Charity','Entertainment','Hobbies','Pets','Childcare','Taxes','Bank fees','Coffee','Takeaway','Car maintenance','Personal care'];
+const pal=['#6D3CF2','#FF8A3D','#12A594','#E0409A','#2F7BFF','#E5B100','#8A3FFC','#1E9E4A'];
+const rnd=(i,m)=>{const x=Math.sin(i*12.9898+m*78.233)*43758.5453;return x-Math.floor(x);};
+const eur=n=>'€'+Math.round(n).toLocaleString('en-US');
+const people=['Alex','Sam','Jo'],rec=[1,4,5,6,7,10,19,20,28,29];
+const st=this.state,S=o=>()=>this.setState(o);
+const mk=(arr,key,list)=>list.map(([v,l])=>({label:l,pick:S({[key]:v}),bg:st[key]===v?'#2F3FC2':'#EEEBFA',fg:st[key]===v?'#fff':'#1B1840'}));
+const val=(i,m,p,t)=>{const base=(560/(1+i*0.5)+6)*(0.7+rnd(i,m+3)*0.6);const w=people.map((_,k)=>0.2+rnd(i,k+20));const ws=w.reduce((a,b)=>a+b,0);
+const pf=p==='all'?1:w[people.indexOf(p)]/ws;const r=rec.includes(i)?0.95:0.1+rnd(i,40)*0.2;const tf=t==='all'?1:t==='rec'?r:1-r;return base*pf*tf;};
+const calc=(p,t)=>names.map((n,i)=>{const s=[];for(let m=0;m<12;m++)s.push(val(i,m,p,t));return {n,i,s,tot:s.reduce((a,b)=>a+b,0)};});
+let L=calc(st.person,st.type);
+const dir=st.dir==='asc'?1:-1;
+L.sort((a,b)=>st.sort==='avg'?(a.tot-b.tot)*dir:a.n.localeCompare(b.n)*dir);
+const mx=Math.max(...L.map(x=>x.tot));
+const rows=L.map(x=>{const sm=Math.max(...x.s);return {name:x.n,c:pal[x.i%8],w:Math.round(x.tot/mx*100),t:eur(x.tot),a:eur(x.tot/12),spark:x.s.map(v=>({h:Math.max(3,Math.round(v/sm*28))}))};});
+const sum=(p,t)=>calc(p,t).reduce((a,x)=>a+x.tot,0)/12;
+const stats=[{label:'Average per month · current filter',value:eur(L.reduce((a,x)=>a+x.tot,0)/12),bg:'#2F3FC2',fg:'#fff'},{label:'Recurring / month',value:eur(sum(st.person,'rec')),bg:'#12A594',fg:'#00201C'},{label:'One-time / month',value:eur(sum(st.person,'one')),bg:'#FF8A3D',fg:'#2A1200'}];
+return {nav,rows,stats,
+person:st.person,type:st.type,sort:st.sort,dir:st.dir,
+persons:[{v:'all',l:'Everyone'}].concat(people.map(p=>({v:p,l:p}))),
+types:[{v:'all',l:'All types'},{v:'one',l:'One-time'},{v:'rec',l:'Recurring'}],
+sorts:[{v:'name',l:'Category'},{v:'avg',l:'Average amount'}],
+dirs:[{v:'asc',l:'Ascending'},{v:'desc',l:'Descending'}],
+onPerson:e=>this.setState({person:e.target.value}),onType:e=>this.setState({type:e.target.value}),onSort:e=>this.setState({sort:e.target.value}),onDir:e=>this.setState({dir:e.target.value}),
+catArrow:st.sort==='name'?(st.dir==='asc'?'↑':'↓'):'',avgArrow:st.sort==='avg'?(st.dir==='asc'?'↑':'↓'):''};
+}
+}
+</script>
+</body>
+</html>

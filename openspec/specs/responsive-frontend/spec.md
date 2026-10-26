@@ -12,7 +12,7 @@ The system SHALL render the shared frame, its navigation, and each existing scre
 
 #### Scenario: The screens fit a narrow phone viewport
 
-- **WHEN** each of the seven routes is rendered at a 320 CSS-pixel viewport width
+- **WHEN** each of the eight routes is rendered at a 320 CSS-pixel viewport width
 - **THEN** the page itself has no horizontal overflow, the route content remains available, and the user can reach every control
 
 #### Scenario: The frame and content adapt across device sizes
@@ -27,7 +27,7 @@ The system SHALL render the shared frame, its navigation, and each existing scre
 
 ### Requirement: All application destinations remain reachable from mobile navigation
 
-The shared navigation SHALL keep links to all seven existing routes available on narrow and wide viewports. On narrow viewports it SHALL use a compact disclosure control rather than allowing the link row to overflow. The control SHALL expose its expanded state to assistive technology, support keyboard activation, and keep the current route distinguishable. Activating a destination SHALL navigate to the same route as the corresponding wide-screen link.
+The shared navigation SHALL keep links to the five menu destinations available on narrow and wide viewports. On narrow viewports it SHALL use a compact disclosure control rather than allowing the link row to overflow. The control SHALL expose its expanded state to assistive technology, support keyboard activation, and keep the current destination distinguishable. Activating a destination SHALL navigate to the same route as the corresponding wide-screen link. The category, people, and import screens SHALL remain reachable on a narrow viewport through the transactions screen's category-management link and the manage hub's entries.
 
 #### Scenario: The mobile navigation is initially collapsed
 
@@ -37,17 +37,22 @@ The shared navigation SHALL keep links to all seven existing routes available on
 #### Scenario: The mobile navigation opens and closes accessibly
 
 - **WHEN** the navigation control is activated by pointer or keyboard
-- **THEN** it exposes all seven route links, reports the expanded state, and can be activated again to collapse the links
+- **THEN** it exposes all five menu destinations, reports the expanded state, and can be activated again to collapse the links
 
 #### Scenario: A mobile route link reaches the selected screen
 
-- **WHEN** a user activates any route link in the expanded mobile navigation
+- **WHEN** a user activates any menu destination in the expanded mobile navigation
 - **THEN** the corresponding screen opens, its link is marked as current, and the navigation returns to its collapsed state
 
 #### Scenario: Wide-screen navigation remains directly available
 
 - **WHEN** a route is rendered at a wide viewport
-- **THEN** all seven route links are directly visible and the current route remains distinguishable
+- **THEN** all five menu destinations are directly visible and the current destination remains distinguishable
+
+#### Scenario: The remaining screens remain reachable on a phone
+
+- **WHEN** the category, people, or import screen is needed at a 320 CSS-pixel viewport width
+- **THEN** the transactions screen's category-management link or the manage hub's entry reaches it with no page-level horizontal overflow
 
 ### Requirement: Controls and forms reflow for mobile use
 

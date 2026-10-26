@@ -462,15 +462,13 @@ test.describe('redesigned transactions screen', () => {
     expect(headerBackground).toContain('linear-gradient');
 
     const links = page.locator('#screen-navigation a');
-    await expect(links).toHaveCount(7);
+    await expect(links).toHaveCount(5);
     await expect(links).toHaveText([
       'Transactions',
-      'Categories',
-      'People',
       'Monthly',
       'Yearly',
       'Monthly average',
-      'Imports',
+      'Manage',
     ]);
 
     const active = page.locator('#screen-navigation a[aria-current="page"]');
@@ -602,6 +600,42 @@ test.describe('redesigned transactions screen', () => {
     });
   });
 
+  test('links to category management beside the Category filter without changing it', async ({ page }) => {
+    await openWithAllCategories(page);
+
+    const link = page.getByTestId('manage-categories-link');
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute('href', '/categories');
+    await expect(page.getByTestId('category-filter')).toHaveValue('all');
+    await expect(page.getByTestId('category-filter').locator('option')).toHaveText([
+      'All categories (3)',
+      'Uncategorised (1)',
+      'Groceries',
+      'Transport',
+    ]);
+
+    await link.click();
+    await expect(page).toHaveURL(/\/categories$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+  });
+
+  test.describe('at 320 CSS pixels', () => {
+    test.use({ viewport: { width: 320, height: 640 } });
+
+    test('the category-management link is touch sized and reaches the category screen', async ({ page }) => {
+      await openWithAllCategories(page);
+
+      const link = page.getByTestId('manage-categories-link');
+      await expect(link).toBeVisible();
+      const height = await link.evaluate((element) => element.getBoundingClientRect().height);
+      expect(height).toBeGreaterThanOrEqual(44);
+
+      await link.click();
+      await expect(page).toHaveURL(/\/categories$/);
+      await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+    });
+  });
+
   for (const viewport of [
     { width: 320, height: 640 },
     { width: 768, height: 1024 },
@@ -620,9 +654,9 @@ test.describe('redesigned transactions screen', () => {
         await expect(toggle).toHaveAttribute('aria-expanded', 'true');
       }
 
-      await expect(page.locator('#screen-navigation a')).toHaveCount(7);
+      await expect(page.locator('#screen-navigation a')).toHaveCount(5);
       const navigationLinks = page.locator('#screen-navigation a:visible');
-      await expect(navigationLinks).toHaveCount(7);
+      await expect(navigationLinks).toHaveCount(5);
 
       await page.mouse.move(1, 1);
       await page.mouse.wheel(1000, 0);
@@ -649,7 +683,7 @@ test.describe('redesigned transactions screen', () => {
 
       if (viewport.width <= 390) {
         const shortControls = await page.locator(
-          'button:visible, select:visible:not([data-testid="row-category-select"]), input:not([type="checkbox"]):visible, #screen-navigation a:visible',
+          'button:visible, select:visible:not([data-testid="row-category-select"]), input:not([type="checkbox"]):visible, #screen-navigation a:visible, [data-testid="manage-categories-link"]:visible',
         ).evaluateAll((elements) => elements
           .filter((element) => element.getBoundingClientRect().height < 44)
           .map((element) => ({

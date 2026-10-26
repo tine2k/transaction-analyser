@@ -6,24 +6,24 @@ Defines the browser screen for managing the named owners of transactions: listin
 
 ## Requirements
 
-### Requirement: The people screen is reached at /people from the menu bar
+### Requirement: The people screen is reached at /people through the manage hub
 
-The system SHALL provide the people screen at `/people`, and the shared menu bar SHALL carry an in-application link to it on every route. The menu bar SHALL mark the link as current when the people screen is shown. Loading the screen SHALL request `GET /api/people` from the same origin and SHALL use that response as the only source of people and counts.
+The system SHALL provide the people screen at `/people`. The manage hub SHALL carry an entry to it, and the shared menu bar SHALL mark the Manage destination as the current one when the people screen is shown. Loading the screen SHALL request `GET /api/people` from the same origin and SHALL use that response as the only source of people and counts.
 
 #### Scenario: The route shows the people screen
 
 - **WHEN** the `/people` route is loaded
 - **THEN** the people screen is shown and the screen requests `GET /api/people` from the same origin
 
-#### Scenario: The menu bar links to the screen
+#### Scenario: The manage hub links to the screen
 
-- **WHEN** any route is shown
-- **THEN** the menu bar carries a link to `/people`, and following it reaches the people screen
+- **WHEN** the manage hub is shown
+- **THEN** its People entry reaches the people screen through in-application navigation on the same origin
 
-#### Scenario: The current screen is distinguished
+#### Scenario: The current section is distinguished
 
 - **WHEN** the people screen is shown
-- **THEN** its menu link is distinguishable as the current one
+- **THEN** the menu bar's Manage destination is distinguishable as the current one
 
 ### Requirement: The screen lists every person with their transaction count
 

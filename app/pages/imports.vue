@@ -25,6 +25,7 @@
 // and openspec/changes/match-counterparty-and-recategorise/specs/category-recategorisation/spec.md
 // and openspec/changes/add-pushover-test-button/specs/import-notification/spec.md
 import { IconRefresh, IconSend, IconSparkles } from '@tabler/icons-vue';
+import { displayImportTime, importOutcomeLabel } from '../utils/import-format';
 
 type ImportRun = {
   id: string;
@@ -131,15 +132,6 @@ async function testNotification(): Promise<void> {
   }
 }
 
-// The endpoint writes UTC instants in a fixed form, so the screen renders them
-// without a locale-dependent Date parse.
-function displayTime(value: string | null): string {
-  if (value === null) {
-    return '—';
-  }
-  return value.replace('T', ' ').replace('Z', ' UTC');
-}
-
 function sourceLabel(source: string): string {
   if (source === 'scheduled') {
     return 'Scheduled sync';
@@ -153,18 +145,6 @@ function sourceLabel(source: string): string {
   return source;
 }
 
-function outcomeLabel(run: ImportRun): string {
-  if (run.outcome === 'in_progress') {
-    return 'In progress';
-  }
-  if (run.outcome === 'success') {
-    return 'Success';
-  }
-  if (run.outcome === 'failed') {
-    return 'Failed';
-  }
-  return run.outcome;
-}
 </script>
 
 <template>
@@ -282,7 +262,7 @@ function outcomeLabel(run: ImportRun): string {
             data-testid="import-run"
           >
             <th scope="row" class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">
-              {{ displayTime(run.startedAt) }}
+              {{ displayImportTime(run.startedAt) }}
             </th>
             <td class="whitespace-nowrap px-3 py-2 text-ink">{{ sourceLabel(run.source) }}</td>
             <td class="whitespace-nowrap px-3 py-2 text-ink" data-testid="import-run-person">
@@ -296,7 +276,7 @@ function outcomeLabel(run: ImportRun): string {
               :class="run.outcome === 'failed' ? 'text-failure' : 'text-ink'"
               data-testid="import-run-outcome"
             >
-              {{ outcomeLabel(run) }}
+              {{ importOutcomeLabel(run.outcome) }}
             </td>
             <td
               class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink"

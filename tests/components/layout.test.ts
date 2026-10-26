@@ -26,25 +26,23 @@ describe('default layout navigation', () => {
     expect(logo.text()).toBe('');
     expect(wordmark.element.previousElementSibling).toBe(logo.element);
     expect(logo.element.closest('a')).toBeNull();
-    expect(header.findAll('a')).toHaveLength(7);
+    expect(header.findAll('a')).toHaveLength(5);
     expect(header.findAll('button')).toHaveLength(1);
     expect(header.text().match(/Expenses/g)).toHaveLength(1);
     await wrapper.unmount();
   });
 
-  it('links to each screen and marks the current screen', async () => {
+  it('links to the five destinations and marks the current screen', async () => {
     route.path = '/';
     const transactions = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
     const links = transactions.findAll('nav a');
 
     expect(links.map((link) => [link.text(), link.attributes('href')])).toEqual([
       ['Transactions', '/'],
-      ['Categories', '/categories'],
-      ['People', '/people'],
       ['Monthly', '/monthly'],
       ['Yearly', '/yearly'],
       ['Monthly average', '/monthly-average'],
-      ['Imports', '/imports'],
+      ['Manage', '/manage'],
     ]);
     expect(links.every((link) => link.findAll('svg').length === 0)).toBe(true);
     expect(links[0]?.attributes('aria-current')).toBe('page');
@@ -54,32 +52,46 @@ describe('default layout navigation', () => {
 
     route.path = '/monthly';
     const monthly = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(monthly.findAll('nav a')[3]?.attributes('aria-current')).toBe('page');
-    expect(monthly.findAll('nav a')[3]?.classes()).toContain('bg-surface');
+    expect(monthly.findAll('nav a')[1]?.attributes('aria-current')).toBe('page');
+    expect(monthly.findAll('nav a')[1]?.classes()).toContain('bg-surface');
     await monthly.unmount();
-
-    route.path = '/people';
-    const people = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(people.findAll('nav a')[2]?.text()).toBe('People');
-    expect(people.findAll('nav a')[2]?.attributes('aria-current')).toBe('page');
-    await people.unmount();
 
     route.path = '/yearly';
     const yearly = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(yearly.findAll('nav a')[4]?.text()).toBe('Yearly');
-    expect(yearly.findAll('nav a')[4]?.attributes('aria-current')).toBe('page');
+    expect(yearly.findAll('nav a')[2]?.text()).toBe('Yearly');
+    expect(yearly.findAll('nav a')[2]?.attributes('aria-current')).toBe('page');
     await yearly.unmount();
 
     route.path = '/monthly-average';
     const monthlyAverage = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(monthlyAverage.findAll('nav a')[5]?.text()).toBe('Monthly average');
-    expect(monthlyAverage.findAll('nav a')[5]?.attributes('aria-current')).toBe('page');
+    expect(monthlyAverage.findAll('nav a')[3]?.text()).toBe('Monthly average');
+    expect(monthlyAverage.findAll('nav a')[3]?.attributes('aria-current')).toBe('page');
     await monthlyAverage.unmount();
 
-    route.path = '/imports';
-    const imports = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
-    expect(imports.findAll('nav a')[6]?.text()).toBe('Imports');
-    expect(imports.findAll('nav a')[6]?.attributes('aria-current')).toBe('page');
+    route.path = '/manage';
+    const manage = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
+    expect(manage.findAll('nav a')[4]?.text()).toBe('Manage');
+    expect(manage.findAll('nav a')[4]?.attributes('aria-current')).toBe('page');
+    expect(manage.findAll('nav a')[4]?.classes()).toContain('bg-surface');
+    await manage.unmount();
+  });
+
+  it('marks Manage as the current section on the screens it contains', async () => {
+    for (const path of ['/categories', '/people', '/imports']) {
+      route.path = path;
+      const wrapper = await mountSuspended(DefaultLayout, { slots: { default: 'screen' } });
+      const links = wrapper.findAll('nav a');
+
+      expect(links).toHaveLength(5);
+      expect(links[4]?.text()).toBe('Manage');
+      expect(links[4]?.attributes('aria-current')).toBe('true');
+      expect(links[4]?.classes()).toContain('bg-surface');
+      expect(wrapper.find('nav a[href="/categories"]').exists()).toBe(false);
+      expect(wrapper.find('nav a[href="/people"]').exists()).toBe(false);
+      expect(wrapper.find('nav a[href="/imports"]').exists()).toBe(false);
+
+      await wrapper.unmount();
+    }
   });
 
   it('exposes and toggles the mobile navigation and closes it after choosing a destination', async () => {
@@ -91,13 +103,13 @@ describe('default layout navigation', () => {
     expect(toggle.attributes('aria-expanded')).toBe('false');
     expect(toggle.attributes('aria-label')).toBe('Open screen navigation');
     expect(toggle.findAll('svg[aria-hidden="true"]')).toHaveLength(1);
-    expect(wrapper.findAll('#screen-navigation a')).toHaveLength(7);
+    expect(wrapper.findAll('#screen-navigation a')).toHaveLength(5);
 
     await toggle.trigger('click');
     expect(toggle.attributes('aria-expanded')).toBe('true');
     expect(toggle.attributes('aria-label')).toBe('Close screen navigation');
 
-    await wrapper.get('#screen-navigation a[href="/categories"]').trigger('click');
+    await wrapper.get('#screen-navigation a[href="/manage"]').trigger('click');
     expect(toggle.attributes('aria-expanded')).toBe('false');
   });
 });

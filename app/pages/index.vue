@@ -1383,9 +1383,20 @@ onBeforeUnmount(() => {
               </optgroup>
             </select>
           </label>
-          <label class="col-span-2 grid min-w-0 gap-1.5 text-xs font-bold text-muted xl:col-span-1">
-            Category
+          <div class="col-span-2 grid min-w-0 gap-1.5 text-xs font-bold text-muted xl:col-span-1">
+            <div class="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <label for="category-filter">Category</label>
+              <NuxtLink
+                to="/categories"
+                :prefetch="false"
+                data-testid="manage-categories-link"
+                class="inline-flex min-h-11 items-center text-xs font-semibold text-brand underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-0"
+              >
+                Manage categories
+              </NuxtLink>
+            </div>
             <select
+              id="category-filter"
               v-model="categoryFilter"
               data-testid="category-filter"
               :disabled="searchActive"
@@ -1398,7 +1409,7 @@ onBeforeUnmount(() => {
                 {{ category.name }}
               </option>
             </select>
-          </label>
+          </div>
         </div>
       </div>
 

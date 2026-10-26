@@ -2,67 +2,36 @@
 
 ## Purpose
 
-Defines the browser screen for managing categories and the menu bar through which it is reached:
+Defines the browser screen for managing categories and the links through which it is reached:
 listing categories with their names and expressions, creating one, editing one, deleting one with
 confirmation, and reporting the outcome without inventing data or evaluating any expression in the
 browser.
 
 ## Requirements
 
-### Requirement: The layout carries a menu bar linking the screens
+### Requirement: The category screen is reached from the transactions screen and the manage hub
 
-The shared layout SHALL carry a menu bar, present on every route, holding a link to the
-transactions screen, a link to the category management screen, a link to the people management
-screen, a link to the category spending analytics screen, a link to the monthly totals screen, a link
-to the monthly average screen, and a link to the imports screen. Each link SHALL be an in-application
-navigation to that screen on the same origin. The menu bar SHALL distinguish the link for the screen
-currently shown from the other links. Adding the menu bar SHALL NOT remove the frame's other
-properties, which remain as `frontend-shell` defines.
+The system SHALL provide the category management screen at `/categories`. The transactions screen SHALL carry an in-application link to it beside the Category filter, and the manage hub SHALL carry an entry to it. The shared menu bar SHALL mark the Manage destination as the current one when the category screen is shown. The screen SHALL remain reachable by its own path.
 
-#### Scenario: The menu bar is on the transactions screen
+#### Scenario: The transactions screen links to the category screen
 
 - **WHEN** the transactions screen is shown
-- **THEN** a menu bar is present holding links to the transactions screen, the category management screen, the people management screen, the category spending analytics screen, the monthly totals screen, the monthly average screen, and the imports screen
+- **THEN** a link beside its Category filter reaches the category management screen through in-application navigation on the same origin
 
-#### Scenario: The menu bar is on the category management screen
+#### Scenario: The manage hub links to the category screen
+
+- **WHEN** the manage hub is shown
+- **THEN** its Categories entry reaches the category management screen through in-application navigation on the same origin
+
+#### Scenario: The current section is distinguished
 
 - **WHEN** the category management screen is shown
-- **THEN** the same menu bar is present
+- **THEN** the menu bar's Manage destination is distinguishable as the current one
 
-#### Scenario: The menu bar is on the people management screen
+#### Scenario: The direct route still opens the screen
 
-- **WHEN** the people management screen is shown
-- **THEN** the same menu bar is present, and its people link is marked as the current one
-
-#### Scenario: The menu bar is on the analytics screen
-
-- **WHEN** the category spending analytics screen is shown
-- **THEN** the same menu bar is present
-
-#### Scenario: The menu bar is on the monthly totals screen
-
-- **WHEN** the monthly totals screen is shown
-- **THEN** the same menu bar is present
-
-#### Scenario: The menu bar is on the monthly average screen
-
-- **WHEN** the monthly average screen is shown
-- **THEN** the same menu bar is present
-
-#### Scenario: The menu bar is on the imports screen
-
-- **WHEN** the imports screen is shown
-- **THEN** the same menu bar is present
-
-#### Scenario: The current screen is distinguished
-
-- **WHEN** a screen is shown
-- **THEN** the menu bar's link for that screen is distinguishable as the current one
-
-#### Scenario: Each link reaches its screen
-
-- **WHEN** any menu link is followed
-- **THEN** its screen is reached through in-application navigation on the same origin
+- **WHEN** the `/categories` route is loaded
+- **THEN** the category management screen is shown
 
 ### Requirement: The category screen lists every category with its name and expression
 

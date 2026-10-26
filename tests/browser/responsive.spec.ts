@@ -66,6 +66,7 @@ const routes = [
   { path: '/yearly', heading: 'Yearly' },
   { path: '/monthly-average', heading: 'Monthly average' },
   { path: '/imports', heading: 'Imports' },
+  { path: '/manage', heading: 'Manage' },
   { path: '/route-that-does-not-exist', heading: 'This page does not exist' },
 ];
 
@@ -117,7 +118,7 @@ async function expectNoPageOverflow(page: Page): Promise<void> {
 
 async function expectPhoneControlsToBeTouchSized(page: Page): Promise<void> {
   const shortControls = await page.locator(
-    'button:visible, select:visible, input:not([type="checkbox"]):visible, #screen-navigation a:visible',
+    'button:visible, select:visible, input:not([type="checkbox"]):visible, #screen-navigation a:visible, [data-testid="manage-categories-link"]:visible',
   ).evaluateAll((elements) => elements
     .filter((element) => {
       const target = element.matches('[data-testid="row-category-select"]')
@@ -246,20 +247,24 @@ for (const viewport of viewports) {
         await expect(toggle).toHaveAttribute('aria-expanded', 'false');
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        await expect(page.locator('#screen-navigation a')).toHaveCount(7);
+        await expect(page.locator('#screen-navigation a')).toHaveCount(5);
         await expectPhoneControlsToBeTouchSized(page);
-        await page.getByRole('link', { name: 'Categories' }).click();
+        await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Manage', exact: true }).click();
+        await expect(page).toHaveURL(/\/manage$/);
+        await expect(page.getByRole('heading', { name: 'Manage' })).toBeVisible();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        await expect(page.locator('#screen-navigation a[aria-current="page"]')).toHaveText('Manage');
+        await page.getByTestId('manage-link-categories').click();
         await expect(page).toHaveURL(/\/categories$/);
         await expect(page.getByRole('heading', { name: 'Categories' })).toBeVisible();
-        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-        await expect(page.locator('#screen-navigation a[aria-current="page"]')).toHaveText('Categories');
+        await expect(page.locator('#screen-navigation a[aria-current="true"]')).toHaveText('Manage');
       });
     } else {
       test('wide navigation keeps all destinations directly visible', async ({ page }) => {
         await interceptApi(page);
         await page.goto('/');
         const links = page.locator('#screen-navigation a');
-        await expect(links).toHaveCount(7);
+        await expect(links).toHaveCount(5);
         await expect(links.first()).toBeVisible();
         await expect(links.last()).toBeVisible();
       });

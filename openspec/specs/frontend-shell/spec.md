@@ -108,10 +108,7 @@ full-bleed brand-gradient ground.
 
 ### Requirement: Every route names itself in the browser tab
 
-The document title SHALL name the screen shown, then the application: `Transactions · Expenses` for
-`/`, `Categories · Expenses`, `People · Expenses`, `Monthly · Expenses`,
-`Yearly · Expenses`, `Monthly average · Expenses`, and `Imports · Expenses`. A page that
-names no screen SHALL show `Expenses` alone.
+The document title SHALL name the screen shown, then the application: `Transactions · Expenses` for `/`, `Categories · Expenses`, `People · Expenses`, `Monthly · Expenses`, `Yearly · Expenses`, `Monthly average · Expenses`, `Imports · Expenses`, and `Manage · Expenses` for `/manage`. A page that names no screen SHALL show `Expenses` alone.
 
 #### Scenario: The transactions route names itself
 
@@ -120,7 +117,7 @@ names no screen SHALL show `Expenses` alone.
 
 #### Scenario: Each named route names itself
 
-- **WHEN** `/categories`, `/people`, `/monthly`, `/yearly`, `/monthly-average`, or `/imports` is shown
+- **WHEN** `/categories`, `/people`, `/monthly`, `/yearly`, `/monthly-average`, `/imports`, or `/manage` is shown
 - **THEN** the document title is that screen's name followed by ` · Expenses`
 
 #### Scenario: A page without a screen name falls back to the application name
@@ -138,9 +135,9 @@ names no screen SHALL show `Expenses` alone.
 - **WHEN** any route's document title is read
 - **THEN** it contains `Expenses` exactly once
 
-### Requirement: The application serves the seven browser routes
+### Requirement: The application serves the eight browser routes
 
-The system SHALL provide browser routes at `/` for the transactions table, a category management route, `/people`, `/monthly` for the monthly category overview, `/yearly` for the yearly category-by-month matrix, `/monthly-average`, and `/imports` for the import log, each presenting the screen defined by its capability. The layout SHALL carry a menu bar through which all seven routes are reached. All routes SHALL be rendered by the browser rather than by the server.
+The system SHALL provide browser routes at `/` for the transactions table, `/categories` for category management, `/people`, `/monthly` for the monthly category overview, `/yearly` for the yearly category-by-month matrix, `/monthly-average`, `/imports` for the import log, and `/manage` for the management hub, each presenting the screen defined by its capability. All routes SHALL be rendered by the browser rather than by the server.
 
 #### Scenario: The index route presents the table
 
@@ -182,10 +179,20 @@ The system SHALL provide browser routes at `/` for the transactions table, a cat
 - **WHEN** the `/imports` route is requested
 - **THEN** a page is delivered that presents the import log
 
-#### Scenario: Each route is reached from the menu bar
+#### Scenario: The manage route presents the hub
 
-- **WHEN** the application is shown
-- **THEN** the menu bar links to the transactions route, the category management route, the people management route, the monthly route, the yearly route, the monthly average route, and the imports route, and following each link reaches that screen
+- **WHEN** the `/manage` route is requested
+- **THEN** a page is delivered that presents the management hub
+
+#### Scenario: Each menu destination reaches its screen
+
+- **WHEN** a menu destination is followed
+- **THEN** its screen is reached
+
+#### Scenario: The management screens are reached from the hub
+
+- **WHEN** the category, people, or imports entry in the manage hub is followed
+- **THEN** its screen is reached
 
 ### Requirement: The server delivers the application shell for every path
 
@@ -544,7 +551,7 @@ derive a value from transaction data for display.
 
 ### Requirement: The menu bar carries the application's identity and the current screen
 
-The shared menu bar SHALL present the application's logo mark immediately to the left of the application name `Expenses`, and one visibly labelled link for each of the seven routes. The mark SHALL be decorative: it SHALL NOT be a link or a control, SHALL NOT carry an accessible name of its own, and SHALL NOT change the name a screen reader reads for the application. The link for the current route SHALL be distinguishable without relying on colour alone. The bar SHALL NOT introduce a destination beyond the seven routes. On narrow viewports the bar SHALL keep a labelled disclosure control for the same links and SHALL keep the mark beside the name.
+The shared menu bar SHALL present the application's logo mark immediately to the left of the application name `Expenses`, and one visibly labelled link for each of the five bar destinations: Transactions, Monthly, Yearly, Monthly average, and Manage. The mark SHALL be decorative: it SHALL NOT be a link or a control, SHALL NOT carry an accessible name of its own, and SHALL NOT change the name a screen reader reads for the application. The current destination SHALL be distinguishable without relying on colour alone, with Manage standing in for the manage hub and the category, people, and import screens. The bar SHALL NOT introduce a destination beyond the five. On narrow viewports the bar SHALL keep a labelled disclosure control for the same five links and SHALL keep the mark beside the name.
 
 #### Scenario: The bar names the application
 
@@ -563,23 +570,23 @@ The shared menu bar SHALL present the application's logo mark immediately to the
 
 #### Scenario: Every route has a labelled link
 
-- **WHEN** the shared menu bar is rendered
-- **THEN** it shows one link each for Transactions, Categories, People, Monthly, Yearly, Monthly average, and Imports, and no other destination
+- **WHEN** the menu bar and the screens that reach the management screens are rendered
+- **THEN** the bar shows one labelled link each for Transactions, Monthly, Yearly, Monthly average, and Manage and no other destination, the transactions screen carries a labelled link to Categories, and the manage hub carries labelled links to People, Categories, and Imports
 
 #### Scenario: The current screen is distinguishable
 
-- **WHEN** a route is shown
-- **THEN** its menu link is marked as current and is visually distinct from the other links by more than its hue
+- **WHEN** any route is shown
+- **THEN** its bar destination is marked as current, with Manage standing in for `/manage`, `/categories`, `/people`, and `/imports`, and is visually distinct from the other links by more than its hue
 
 #### Scenario: The current screen follows navigation
 
-- **WHEN** the user follows a menu link to another screen
-- **THEN** the newly shown screen's link becomes the current one and the previous link loses that distinction
+- **WHEN** the user follows a bar destination or a manage-hub entry to another screen
+- **THEN** the newly shown screen's destination becomes the current one, with Manage standing in for the hub and its screens, and the previous destination loses that distinction
 
 #### Scenario: Narrow viewports keep the disclosure
 
 - **WHEN** the menu bar is rendered at a narrow viewport width
-- **THEN** the labelled disclosure control remains available, exposes the same seven links, and keeps its expanded state available to assistive technology
+- **THEN** the labelled disclosure control remains available, exposes the same five links, and keeps its expanded state available to assistive technology
 
 ### Requirement: The shared masthead uses the design's type and size scale
 

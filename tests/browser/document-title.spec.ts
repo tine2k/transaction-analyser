@@ -12,6 +12,7 @@ const screens = [
   { path: '/yearly', title: 'Yearly · Expenses' },
   { path: '/monthly-average', title: 'Monthly average · Expenses' },
   { path: '/imports', title: 'Imports · Expenses' },
+  { path: '/manage', title: 'Manage · Expenses' },
 ];
 
 async function interceptApi(page: Page): Promise<void> {
@@ -48,9 +49,9 @@ test('following a navigation link renames the tab without a reload', async ({ pa
     (window as unknown as { stillTheSameDocument: boolean }).stillTheSameDocument = true;
   });
 
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Imports' }).click();
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Monthly', exact: true }).click();
 
-  await expect(page).toHaveTitle('Imports · Expenses');
+  await expect(page).toHaveTitle('Monthly · Expenses');
   expect(await page.evaluate(() => (window as unknown as { stillTheSameDocument?: boolean }).stillTheSameDocument))
     .toBe(true);
 });

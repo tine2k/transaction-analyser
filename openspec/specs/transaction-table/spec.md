@@ -83,8 +83,6 @@ The system SHALL present each transaction's amount as the signed decimal value t
 - **WHEN** the endpoint returns an amount such as `0.01` or `-1234.56`
 - **THEN** the row shows exactly that value, with no rounding or floating-point approximation
 
-
-
 ### Requirement: An absent value is shown as an explicit gap
 
 The system SHALL distinguish an absent optional value from a present one. When a transaction's counterparty account is absent, the system SHALL show a visible gap in that column rather than an empty string or a borrowed value. When a transaction is uncategorised, the category column's assignment control SHALL present the absence explicitly — as the `Uncategorised` choice — rather than a category name, and SHALL NOT invent a category for the absence. The system SHALL NOT present an absent value as an empty string that could be mistaken for a value the transaction carries.
@@ -104,8 +102,6 @@ The system SHALL distinguish an absent optional value from a present one. When a
 - **WHEN** one returned transaction carries a category and another does not
 - **THEN** the first shows the category's name as its category control's value and the second shows the explicit absence, and the two cells are distinguishable
 
-
-
 ### Requirement: Dates are shown as the calendar dates they are
 
 The system SHALL present the booking date and the value date as the calendar dates the endpoint returned, each in its own column, without shifting the day for a time zone and without adding a time of day. The two dates SHALL remain distinguishable as separate columns even when they are equal.
@@ -119,8 +115,6 @@ The system SHALL present the booking date and the value date as the calendar dat
 
 - **WHEN** a returned transaction has a booking date of `2026-03-02` and a value date of `2026-03-01`
 - **THEN** the row shows each date in its own column, and the two remain distinguishable
-
-
 
 ### Requirement: Column headers sort the table
 
@@ -235,8 +229,6 @@ The system SHALL represent the active sort in the index route's query as a colum
 - **WHEN** the route query carries no sort
 - **THEN** the rows appear in the endpoint's order and no header reports an active sort
 
-
-
 ### Requirement: Rows keep the endpoint's order until a sort is selected
 
 When the route carries no recognized sort, the system SHALL render rows in the order the endpoint returned them and SHALL NOT apply an order of its own. The endpoint's order SHALL also break ties between rows that compare equal under an active sort, so the resulting order is deterministic.
@@ -251,8 +243,6 @@ When the route carries no recognized sort, the system SHALL render rows in the o
 - **WHEN** the table is rendered without a recognized sort
 - **THEN** the row sequence matches the endpoint's response and no client-side reordering occurs
 
-
-
 ### Requirement: The table distinguishes an empty list from a failed request
 
 The system SHALL present a defined state when the endpoint returns no transactions, stating that there are no transactions to show rather than rendering an empty table with no explanation, and it SHALL NOT invent a transaction to fill the table. The system SHALL present a distinct state when the request fails, stating that the transactions could not be loaded rather than showing an empty list that looks like "no data" or showing stale rows from a previous load. The system SHALL NOT present a failure as though the database held no transactions.
@@ -266,8 +256,6 @@ The system SHALL present a defined state when the endpoint returns no transactio
 
 - **WHEN** the request for transactions fails
 - **THEN** the page states that the transactions could not be loaded, and it does not read as an empty transaction list
-
-
 
 ### Requirement: The table offers a read-only category-presence filter
 
@@ -458,8 +446,6 @@ The system SHALL display a sum for the transaction rows currently shown after ap
 - **WHEN** the user changes a filter and the visible rows and their sum change
 - **THEN** the updated sum remains on the summary line beneath the page title beside the updated count
 
-
-
 ### Requirement: The displayed transaction count accompanies the sum
 
 The system SHALL display, on the summary line beneath the page title, the number of transaction rows currently shown together with the sum of those rows. The count SHALL cover the same rows as the sum, SHALL change when the visible rows change, and SHALL NOT describe the complete endpoint response while a filter is active. The count SHALL be labelled as a count of transactions, using singular wording for exactly one visible transaction and plural wording otherwise, and SHALL be zero when no row is visible. The count SHALL precede the sum in the summary's reading order and on the rendered line, and SHALL use the primary ink colour at the interface type size rather than page-title scale. The summary SHALL report no total beyond the count and the visible-row sum.
@@ -514,8 +500,6 @@ The system SHALL display, on the summary line beneath the page title, the number
 - **WHEN** the summary line is rendered
 - **THEN** it shows only the visible transaction count and the visible-row sum, and presents no income, spending, or other aggregate the read endpoint did not return
 
-
-
 ### Requirement: The filter options show transaction counts
 
 After transactions have loaded successfully, the filter options SHALL each display a count: the all-categories option SHALL show the number of transactions returned for the selected person, and the uncategorised-only option SHALL show the number of those transactions whose category is null. These counts SHALL be based on the selected person's transactions and SHALL remain unchanged when the selected category or period changes; they SHALL change when the selected person changes. A failed request SHALL NOT be presented as zero transactions.
@@ -549,8 +533,6 @@ After transactions have loaded successfully, the filter options SHALL each displ
 
 - **WHEN** the request for transactions fails
 - **THEN** the page shows the existing load-failure state and does not display counts that imply an empty result
-
-
 
 ### Requirement: The table offers an all-transactions search field
 
@@ -591,8 +573,6 @@ The system SHALL offer a labelled text field on the index route that searches th
 - **WHEN** the user applies or clears a search
 - **THEN** no additional data request is made and no stored transaction, person, or category is created, altered, or deleted
 
-
-
 ### Requirement: A non-empty search covers every returned transaction
 
 While an applied search holds non-whitespace text, the system SHALL consider every transaction returned by the read endpoint for the selected person and SHALL ignore the category and period filters for row selection. The category and period filter controls SHALL remain visible with their stored values, SHALL be unavailable for interaction, and SHALL be accompanied by a visible statement that category and period filtering is paused. The person filter SHALL remain visible and available for interaction, and its selected person SHALL continue to scope the search. Clearing the applied search SHALL restore the previously selected category and period filters and the rows they produced within the selected person. Editing the field without applying it SHALL leave the rows and the filter state unchanged.
@@ -632,8 +612,6 @@ While an applied search holds non-whitespace text, the system SHALL consider eve
 - **WHEN** the user applies a search while a sort is active
 - **THEN** the matching rows are ordered by that sort, and clearing the search keeps the sort active
 
-
-
 ### Requirement: The search is reflected in the index route's query
 
 The system SHALL represent the applied, trimmed search text in the index route's query as `q` and SHALL initialize the search field and its matching rows from that value. An absent or blank `q` SHALL mean no search. Applying or clearing a search SHALL update `q`; typing into the field SHALL NOT. Applying or clearing a search SHALL preserve the person, category, period, and sort query values.
@@ -667,8 +645,6 @@ The system SHALL represent the applied, trimmed search text in the index route's
 
 - **WHEN** the user applies or clears a search
 - **THEN** the person, category, period, and sort values in the route query are unchanged
-
-
 
 ### Requirement: Search results drive the summary, count, empty state, and selection
 
@@ -704,8 +680,6 @@ The visible sum and transaction count SHALL cover exactly the rows the applied s
 - **WHEN** a search is applied
 - **THEN** the all-categories and uncategorised option counts still describe the selected person's transactions rather than only the matches
 
-
-
 ### Requirement: The search is applied by an explicit search action
 
 The system SHALL provide a labelled search action beside the field. Activating the action SHALL apply the field's trimmed text, and pressing Enter in the field SHALL do the same. The visible rows, paused-filter state, summary, count, empty state, route query, and selection SHALL change only when a search is applied or cleared. Applying an empty or whitespace-only field SHALL clear the applied search.
@@ -734,8 +708,6 @@ The system SHALL provide a labelled search action beside the field. Activating t
 
 - **WHEN** the user applies a field that is empty or whitespace-only while a search is applied
 - **THEN** the applied search is cleared, `q` is removed, and the person, category, and period filters select the rows again
-
-
 
 ### Requirement: Rows are presented in progressive batches
 
@@ -779,8 +751,6 @@ The system SHALL append each batch after the rows already presented and SHALL NO
 
 - **WHEN** the active sort orders the rows by a column
 - **THEN** the completed table's row order is that order, and no row moved when a later batch arrived
-
-
 
 ### Requirement: Every matching row is presented when the batches complete
 
@@ -839,8 +809,6 @@ From the first batch onward, the displayed sum and transaction count SHALL descr
 - **WHEN** the remaining batches complete
 - **THEN** the displayed sum and transaction count are the values they already held after the first batch
 
-
-
 ### Requirement: The selection covers rows a later batch has not presented
 
 The select-all control SHALL select every row of the active view, including rows a later batch has not yet presented, and the bulk bar's count SHALL state the number of rows the selection holds.
@@ -854,8 +822,6 @@ The select-all control SHALL select every row of the active view, including rows
 
 - **WHEN** every row of a large view is selected while later batches are still pending
 - **THEN** the select-all control presents itself as selecting all shown rows rather than as partially selected
-
-
 
 ### Requirement: The category cell presents the category as a coloured pill
 
@@ -876,8 +842,6 @@ The system SHALL present each row's category as a pill-shaped labelled control c
 - **WHEN** a pill is rendered with a category colour
 - **THEN** the category name remains readable against the pill's ground and is not conveyed by colour alone
 
-
-
 ### Requirement: The category pill remains the assignment control
 
 The system SHALL keep the row's category control as the manual category assignment control defined by `manual-category-assignment`. It SHALL keep its choices, disabled state, and accessible name, SHALL NOT add a second assignment path, and SHALL keep the manual-assignment and update markers visible.
@@ -896,8 +860,6 @@ The system SHALL keep the row's category control as the manual category assignme
 
 - **WHEN** the category choices include a hidden category
 - **THEN** the pill's option list still marks that category as hidden
-
-
 
 ### Requirement: The table orders its columns for scanning
 
@@ -923,8 +885,6 @@ The system SHALL present the selection-control column first, followed in order b
 - **WHEN** the user activates a column header after the order change
 - **THEN** the table sorts by that header's column and does not sort by its position in the row
 
-
-
 ### Requirement: Transactions headings and summary use the mock's type scale
 
 The Transactions title SHALL be 34px, 800 weight, and −0.02em tracking at desktop widths, and 28px and 800 weight at mobile widths. The summary line beneath it SHALL be 15px at desktop widths and 14px at mobile widths, with the count and sum sharing that size.
@@ -943,8 +903,6 @@ The Transactions title SHALL be 34px, 800 weight, and −0.02em tracking at desk
 
 - **WHEN** the summary line is rendered
 - **THEN** it computes to 15px at desktop widths and 14px at mobile widths, and the count and sum use the same size
-
-
 
 ### Requirement: Transactions filter labels and controls use the mock's type scale
 
@@ -965,8 +923,6 @@ Filter labels SHALL be 12px and 700 weight. Search fields and selects SHALL be 1
 - **WHEN** the Search action or another primary action is rendered
 - **THEN** its text computes to 14px and 700 weight
 
-
-
 ### Requirement: Transactions page sections use the mock's gap
 
 The Transactions page SHALL separate its title block, filter sheet, filter note, and table region with a 24px gap at desktop widths and a 14px gap at mobile widths.
@@ -980,8 +936,6 @@ The Transactions page SHALL separate its title block, filter sheet, filter note,
 
 - **WHEN** the Transactions screen is rendered at a mobile width
 - **THEN** adjacent page sections are separated by 14px
-
-
 
 ### Requirement: Transactions sheets use the mock's rounded dimensions
 
@@ -1002,8 +956,6 @@ The Transactions filter and table sheets SHALL use a 20px corner radius at deskt
 - **WHEN** either sheet is rendered at a mobile width
 - **THEN** it computes to an 18px corner radius, and the filter sheet uses 14px padding
 
-
-
 ### Requirement: Transactions sheets rest elevated at every width
 
 At every viewport width the Transactions filter and table sheets SHALL carry the shadow `0 1px 3px rgba(40, 30, 120, 0.08)`. The fixed action bars SHALL keep a stronger upward shadow because they float above the table.
@@ -1017,8 +969,6 @@ At every viewport width the Transactions filter and table sheets SHALL carry the
 
 - **WHEN** a fixed action bar is shown on the Transactions screen
 - **THEN** it keeps its stronger upward shadow and is not changed to the sheet shadow
-
-
 
 ### Requirement: Transaction controls use the mock's height, padding, and corner radius
 
@@ -1039,8 +989,6 @@ Search fields, filter selects, and page action buttons on the Transactions scree
 - **WHEN** any of these Transactions controls is operated by touch
 - **THEN** its hit area is at least 44 CSS pixels high
 
-
-
 ### Requirement: The transaction table uses the mock's type scale
 
 The table SHALL set ordinary body text at 14px. Header cells SHALL set 12px, 700 weight, uppercase text with 0.06em tracking. Booking dates SHALL use 600 weight and amounts 700 weight.
@@ -1059,8 +1007,6 @@ The table SHALL set ordinary body text at 14px. Header cells SHALL set 12px, 700
 
 - **WHEN** a booking date and an amount are rendered
 - **THEN** the booking date computes to 600 weight and the amount to 700 weight
-
-
 
 ### Requirement: The transaction table uses the mock's cell metrics
 
@@ -1081,8 +1027,6 @@ Header cells SHALL use 8px horizontal padding. Ordinary body cells SHALL use 13p
 - **WHEN** the sortable header row is rendered
 - **THEN** the row is about 48px high and each header activation control has a hit area at least 44px high
 
-
-
 ### Requirement: The category pill uses the mock's type and padding
 
 The category pill SHALL set its label at 12px and 700 weight with 5px vertical and 12px horizontal padding, on the pill radius. The visible pill SHALL keep that compact size while the row keeps a hit area at least 44px high for the assignment control.
@@ -1097,8 +1041,6 @@ The category pill SHALL set its label at 12px and 700 weight with 5px vertical a
 - **WHEN** the category assignment control is operated by touch
 - **THEN** its hit area is at least 44 CSS pixels high even though the visible pill is compact
 
-
-
 ### Requirement: The empty state is centred and sized to the mock
 
 When the Transactions table has no rows to show, the empty-state message SHALL be centred within the table sheet at 14px with 40px vertical padding. The failure and loading states SHALL keep their current meaning and SHALL use the interface type scale.
@@ -1112,7 +1054,6 @@ When the Transactions table has no rows to show, the empty-state message SHALL b
 
 - **WHEN** the request is loading or has failed
 - **THEN** the loading or failure state remains distinct from the empty state and uses the interface type scale
-
 
 ### Requirement: The phone transaction list uses the mock's card presentation
 
@@ -1190,3 +1131,22 @@ At phone widths the Transactions filter sheet SHALL place the search field and S
 
 - **WHEN** the search field, a select, or the Search action is rendered at a phone width
 - **THEN** it is 48px high with a 12px corner radius
+
+### Requirement: The transactions screen links to category management
+
+The transactions screen SHALL carry an in-application link labelled `Manage categories` to the category management screen. The link SHALL sit with the Category filter and remain visible at phone and desktop widths. At phone widths its hit area SHALL be at least 44 CSS pixels high. The link SHALL NOT change the Category filter's choices, defaults, query values, or filtering, and the search, Person, Period, and Category controls SHALL keep the arrangement their requirements define.
+
+#### Scenario: The link reaches the category screen
+
+- **WHEN** the transactions screen is shown and the `Manage categories` link is followed
+- **THEN** the category management screen is reached through in-application navigation on the same origin
+
+#### Scenario: The link fits a phone width
+
+- **WHEN** the transactions screen is shown at a 320 CSS-pixel viewport width
+- **THEN** the link remains visible beside the Category filter with a hit area at least 44 CSS pixels high, and the page has no horizontal overflow
+
+#### Scenario: The link leaves filtering unchanged
+
+- **WHEN** the transactions screen is rendered with the link
+- **THEN** the Category filter's choices, default, query values, and filtering behavior are those defined by the category-presence filter requirement

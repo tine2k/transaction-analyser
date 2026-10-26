@@ -1,15 +1,31 @@
 <script setup lang="ts">
+// The Monthly average screen: one rolling window of calendar months, a
+// per-category comparison table with a row-relative monthly trend, exact
+// window totals, and three page-wide monthly figures. The page reads every
+// transaction once and derives every figure from that response. Person,
+// expense type, window, and sort are selections over the same data; hidden
+// categories are excluded everywhere.
+//
+// See openspec/changes/redesign-monthly-average-screen/specs/monthly-category-average/spec.md
+// and design.md D1-D10.
 import {
+  CATEGORY_COLOR_PALETTE,
+  averageDecimalString,
   compareDecimalStrings,
+  createCategoryColorMap,
+  createCategoryMonthlyAverageData,
   filterTransactionsByExpenseType,
   filterTransactionsByPerson,
   formatEuroAmount,
-  getCategoryMonthlyAverages,
+  formatMonthRange,
+  getCategorySharePercent,
+  getLastCalendarMonths,
   getLocalDateString,
   getPersonChoices,
+  getWindowAbsoluteTotal,
   resolvePersonChoice,
+  type CategoryMonthlyAverageRow,
   type CategorySpendingTransaction,
-  type CategoryMonthlyAverage,
   type ExpenseTypeChoice,
 } from '../utils/category-spending';
 
@@ -23,6 +39,16 @@ const appliedMonthCount = ref(12);
 const sortColumn = ref<'amount' | 'category'>('amount');
 const sortDirection = ref<'asc' | 'desc'>('desc');
 const expenseType = ref<ExpenseTypeChoice>('all');
+
+const windowMonths = computed(() => [...getLastCalendarMonths(today, appliedMonthCount.value)].reverse());
+const monthRangeLabel = computed(() => formatMonthRange(windowMonths.value));
+const appliedMonthsLabel = computed(() =>
+  `${appliedMonthCount.value} ${appliedMonthCount.value === 1 ? 'month' : 'months'}`);
+const lastMonthsLabel = computed(() =>
+  `Last ${appliedMonthCount.value} ${appliedMonthCount.value === 1 ? 'month' : 'months'}`);
+const subtitle = computed(() =>
+  `Average per category over the last ${appliedMonthsLabel.value} · ${monthRangeLabel.value}`);
+const trendGapClass = computed(() => appliedMonthCount.value > 12 ? 'gap-px' : 'gap-0.5');
 
 // The person choices come from the returned transactions. The selection is
 // URL-backed and independent of the window and the expense type; an absent or
@@ -63,7 +89,7 @@ function onMonthCountInput(event: Event): void {
 
 // The person and expense-type choices are selections over the already-fetched
 // transactions and are independent of the averaging window: changing any of them
-// recomputes the list from the same data, without another request.
+// recomputes the table from the same data, without another request.
 const personTransactions = computed(() =>
   filterTransactionsByPerson(transactions.value ?? [], selectedPerson.value),
 );
@@ -72,15 +98,17 @@ const selectedTransactions = computed(() =>
   filterTransactionsByExpenseType(personTransactions.value, expenseType.value),
 );
 
-const averages = computed(() => getCategoryMonthlyAverages(
+const averageData = computed(() => createCategoryMonthlyAverageData(
   selectedTransactions.value,
   today,
   appliedMonthCount.value,
 ));
 
+const averages = computed(() => averageData.value.rows);
+
 function compareCategoryOrder(
-  left: CategoryMonthlyAverage,
-  right: CategoryMonthlyAverage,
+  left: CategoryMonthlyAverageRow,
+  right: CategoryMonthlyAverageRow,
   direction: 1 | -1 = 1,
 ): number {
   if (left.key === 'uncategorised') {
@@ -102,7 +130,7 @@ function compareCategoryOrder(
 
 const sortedAverages = computed(() => [...averages.value].sort((left, right) => {
   if (sortColumn.value === 'amount') {
-    const byAmount = compareDecimalStrings(left.amount, right.amount);
+    const byAmount = compareDecimalStrings(left.average, right.average);
     if (byAmount !== 0) {
       return byAmount * (sortDirection.value === 'asc' ? 1 : -1);
     }
@@ -111,13 +139,84 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
 
   return compareCategoryOrder(left, right, sortDirection.value === 'asc' ? 1 : -1);
 }));
+
+const largestAverage = computed(() => averageData.value.rows.reduce(
+  (largest, row) => (compareDecimalStrings(row.average, largest) > 0 ? row.average : largest),
+  '0',
+));
+
+// The current-selection figure is the table's exact window total divided by the
+// applied months. The typed figures are person-scoped context: they ignore the
+// expense-type selection and cover only categories carrying that type.
+const currentSelectionAverage = computed(() =>
+  averageDecimalString(averageData.value.total, appliedMonthCount.value));
+const recurringAverage = computed(() => averageDecimalString(
+  getWindowAbsoluteTotal(
+    filterTransactionsByExpenseType(personTransactions.value, 'recurring'),
+    today,
+    appliedMonthCount.value,
+  ),
+  appliedMonthCount.value,
+));
+const oneTimeAverage = computed(() => averageDecimalString(
+  getWindowAbsoluteTotal(
+    filterTransactionsByExpenseType(personTransactions.value, 'one-time'),
+    today,
+    appliedMonthCount.value,
+  ),
+  appliedMonthCount.value,
+));
+
+const summaryFigures = computed(() => [
+  { key: 'current', label: 'Average per month', value: formatEuroAmount(currentSelectionAverage.value) },
+  { key: 'recurring', label: 'Recurring / month', value: formatEuroAmount(recurringAverage.value) },
+  { key: 'one-time', label: 'One-time / month', value: formatEuroAmount(oneTimeAverage.value) },
+]);
+
+// The colour map covers every returned category, not only the selected window,
+// so a category keeps its colour as the window, person, or filters change.
+const categoryColorMap = computed(() => createCategoryColorMap(
+  (transactions.value ?? []).map(({ category }) =>
+    category === null ? 'uncategorised' : `category:${category.id}`),
+));
+
+function categoryColor(key: string): string {
+  return categoryColorMap.value.get(key) ?? CATEGORY_COLOR_PALETTE[0];
+}
+
+function averageBarPercent(amount: string): number {
+  return getCategorySharePercent(amount, largestAverage.value);
+}
+
+function trendHeight(amount: string, maximum: string): number {
+  return Math.max(3, Math.round(getCategorySharePercent(amount, maximum) / 100 * 28));
+}
+
+const tableCaption = computed(() =>
+  `Average monthly absolute spend by category over the last ${appliedMonthsLabel.value}`);
+
+function sortAria(column: 'amount' | 'category'): 'ascending' | 'descending' | undefined {
+  if (sortColumn.value !== column) {
+    return undefined;
+  }
+  return sortDirection.value === 'asc' ? 'ascending' : 'descending';
+}
+
+function sortArrow(column: 'amount' | 'category'): string {
+  if (sortColumn.value !== column) {
+    return '';
+  }
+  return sortDirection.value === 'asc' ? '↑' : '↓';
+}
 </script>
 
 <template>
   <div>
-    <h1 class="font-display text-2xl font-extrabold text-ink sm:text-3xl">Monthly average</h1>
-    <p class="mt-2 max-w-2xl text-sm text-muted">
-      Average absolute transaction spend per category over a recent window of calendar months.
+    <h1 class="font-display text-[28px] font-extrabold tracking-[-0.02em] text-ink sm:text-[34px]">
+      Monthly average
+    </h1>
+    <p class="mt-1.5 text-sm text-muted sm:text-[15px]" data-testid="monthly-average-subtitle">
+      {{ subtitle }}
     </p>
 
     <p v-if="error" class="mt-4 text-muted">
@@ -125,119 +224,209 @@ const sortedAverages = computed(() => [...averages.value].sort((left, right) => 
     </p>
     <p v-else-if="pending" class="mt-4 text-muted">Loading monthly category averages…</p>
     <template v-else-if="transactions">
-      <label class="mt-4 inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
-        Months to average
-        <input
-          :value="monthCount"
-          type="number"
-          min="1"
-          step="1"
-          data-testid="month-count-input"
-          class="min-h-11 w-24 rounded-sheet border border-rule-strong px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          @input="onMonthCountInput"
-        >
-      </label>
+      <div
+        class="mt-4 rounded-panel bg-surface p-4 shadow-sheet sm:p-5"
+        data-testid="monthly-average-filter-panel"
+      >
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <label class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
+            Person
+            <select
+              :value="selectedPerson ?? 'all'"
+              data-testid="person-filter"
+              class="min-h-11 w-full min-w-0 rounded-control border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              @change="onPersonChange"
+            >
+              <option value="all">All people</option>
+              <option v-for="person in personChoices" :key="person.id" :value="person.id">
+                {{ person.name }}
+              </option>
+            </select>
+          </label>
 
-      <label class="mt-4 inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
-        Person
-        <select
-          :value="selectedPerson ?? 'all'"
-          data-testid="person-filter"
-          class="min-h-11 max-w-full rounded-sheet border border-rule-strong bg-surface px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          @change="onPersonChange"
-        >
-          <option value="all">All people</option>
-          <option v-for="person in personChoices" :key="person.id" :value="person.id">
-            {{ person.name }}
-          </option>
-        </select>
-      </label>
+          <label class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
+            Type
+            <select
+              v-model="expenseType"
+              data-testid="expense-type-filter"
+              class="min-h-11 w-full min-w-0 rounded-control border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            >
+              <option value="all">All types</option>
+              <option value="recurring">Recurring</option>
+              <option value="one-time">One-time</option>
+            </select>
+          </label>
 
-      <p class="mt-2 text-sm text-muted" data-testid="applied-window">
-        Averaging over the last {{ appliedMonthCount }} months.
-      </p>
+          <label class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
+            Months to average
+            <input
+              :value="monthCount"
+              type="number"
+              min="1"
+              step="1"
+              data-testid="month-count-input"
+              class="min-h-11 w-full min-w-0 rounded-control border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              @input="onMonthCountInput"
+            >
+          </label>
 
-      <fieldset class="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted" data-testid="expense-type-filter">
-        <legend class="sr-only">Expense type filter</legend>
-        <label class="inline-flex min-h-11 items-center gap-2">
-          <input
-            v-model="expenseType"
-            type="radio"
-            name="expense-type"
-            value="all"
-            data-testid="expense-type-all"
-            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          >
-          All
-        </label>
-        <label class="inline-flex min-h-11 items-center gap-2">
-          <input
-            v-model="expenseType"
-            type="radio"
-            name="expense-type"
-            value="recurring"
-            data-testid="expense-type-recurring"
-            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          >
-          Recurring
-        </label>
-        <label class="inline-flex min-h-11 items-center gap-2">
-          <input
-            v-model="expenseType"
-            type="radio"
-            name="expense-type"
-            value="one-time"
-            data-testid="expense-type-one-time"
-            class="size-5 min-h-11 border-rule-strong text-muted focus:ring-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          >
-          One-time
-        </label>
-      </fieldset>
+          <label class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
+            Sort by
+            <select
+              v-model="sortColumn"
+              data-testid="monthly-average-sort-column"
+              class="min-h-11 w-full min-w-0 rounded-control border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            >
+              <option value="amount">Average amount</option>
+              <option value="category">Category</option>
+            </select>
+          </label>
 
-      <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
-        <label class="inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
-          Sort by
-          <select
-            v-model="sortColumn"
-            data-testid="monthly-average-sort-column"
-            class="min-h-11 max-w-full rounded-sheet border border-rule-strong px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          >
-            <option value="amount">Average amount</option>
-            <option value="category">Category</option>
-          </select>
-        </label>
-        <label class="inline-flex min-h-11 flex-wrap items-center gap-2 text-sm text-muted">
-          Order
-          <select
-            v-model="sortDirection"
-            data-testid="monthly-average-sort-direction"
-            class="min-h-11 max-w-full rounded-sheet border border-rule-strong px-2 py-1 text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-        </label>
+          <label class="grid min-w-0 gap-1.5 text-xs font-bold text-muted">
+            Order
+            <select
+              v-model="sortDirection"
+              data-testid="monthly-average-sort-direction"
+              class="min-h-11 w-full min-w-0 rounded-control border border-rule-strong bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </label>
+        </div>
       </div>
 
-      <ul
-        v-if="sortedAverages.length > 0"
-        class="mt-6 max-w-xl divide-y divide-rule rounded-sheet border border-rule-strong bg-surface shadow-sheet"
-        aria-label="Category monthly averages"
-        data-testid="monthly-average-list"
+      <p id="monthly-average-summary-note" class="sr-only">
+        Recurring and one-time figures cover typed categories only.
+      </p>
+      <div
+        class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3"
+        aria-describedby="monthly-average-summary-note"
+        data-testid="monthly-average-summary"
       >
-        <li
-          v-for="average in sortedAverages"
-          :key="average.key"
-          class="flex flex-col items-start gap-1 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-          data-testid="category-average"
-          :data-category-key="average.key"
+        <section
+          v-for="figure in summaryFigures"
+          :key="figure.key"
+          class="min-w-0 rounded-panel bg-surface p-5 shadow-sheet sm:p-6"
+          data-testid="monthly-average-summary-card"
         >
-          <span class="min-w-0 max-w-full break-words text-muted">{{ average.name }}</span>
-          <span class="max-w-full break-words tabular-nums font-medium text-ink sm:shrink-0" data-testid="category-average-amount">
-            {{ formatEuroAmount(average.amount) }}
-          </span>
-        </li>
-      </ul>
+          <h2 class="text-sm font-semibold text-muted">{{ figure.label }}</h2>
+          <p
+            class="mt-1.5 text-3xl font-extrabold tracking-[-0.02em] text-ink tabular-nums"
+            data-testid="monthly-average-summary-value"
+          >
+            {{ figure.value }}
+          </p>
+        </section>
+      </div>
+
+      <div v-if="sortedAverages.length > 0" class="mt-4" data-testid="monthly-average-table-section">
+        <p
+          id="monthly-average-table-scroll-help"
+          class="mb-2 text-xs text-muted lg:hidden"
+          data-testid="monthly-average-table-scroll-help"
+        >
+          Scroll horizontally to view every column.
+        </p>
+        <div
+          role="region"
+          aria-label="Monthly average category table"
+          aria-describedby="monthly-average-table-scroll-help"
+          tabindex="0"
+          class="max-w-full overflow-x-auto rounded-panel bg-surface shadow-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          data-testid="monthly-average-table"
+        >
+          <table class="w-full min-w-[940px] border-collapse text-left text-sm">
+            <caption class="sr-only">
+              {{ tableCaption }}
+            </caption>
+            <thead>
+              <tr class="text-xs uppercase tracking-[0.06em] text-muted">
+                <th
+                  scope="col"
+                  class="px-3 py-3 font-bold sm:px-5"
+                  :aria-sort="sortAria('category')"
+                  data-testid="category-sort-header"
+                >
+                  Category<span v-if="sortArrow('category')" aria-hidden="true"> {{ sortArrow('category') }}</span>
+                </th>
+                <th scope="col" class="w-[150px] px-3 py-3 font-bold sm:px-5">{{ lastMonthsLabel }}</th>
+                <th scope="col" class="w-[24%] px-3 py-3 font-bold sm:px-5">Average</th>
+                <th scope="col" class="w-[130px] px-3 py-3 text-right font-bold sm:px-5">
+                  {{ appliedMonthCount }}-month total
+                </th>
+                <th
+                  scope="col"
+                  class="w-[120px] px-3 py-3 text-right font-bold sm:px-5"
+                  :aria-sort="sortAria('amount')"
+                  data-testid="amount-sort-header"
+                >
+                  Avg / month<span v-if="sortArrow('amount')" aria-hidden="true"> {{ sortArrow('amount') }}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in sortedAverages"
+                :key="row.key"
+                class="border-t border-rule"
+                data-testid="category-average"
+                :data-category-key="row.key"
+              >
+                <th scope="row" class="whitespace-nowrap px-3 py-3 font-semibold sm:px-5">
+                  <span class="inline-flex min-w-0 items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      class="h-2.5 w-2.5 shrink-0 rounded-full"
+                      data-testid="category-color"
+                      :style="{ backgroundColor: categoryColor(row.key) }"
+                    />
+                    <span class="break-words">{{ row.name }}</span>
+                  </span>
+                </th>
+                <td class="px-3 py-3" aria-hidden="true" data-testid="category-trend">
+                  <div class="flex h-[30px] items-end" :class="trendGapClass">
+                    <div
+                      v-for="(cell, index) in row.cells"
+                      :key="averageData.months[index]?.key ?? index"
+                      class="min-w-0 flex-1 rounded-t-[3px]"
+                      data-testid="trend-bar"
+                      :style="{
+                        height: `${trendHeight(cell, row.maximum)}px`,
+                        backgroundColor: categoryColor(row.key),
+                      }"
+                    />
+                  </div>
+                </td>
+                <td class="px-3 py-3" aria-hidden="true" data-testid="average-bar-cell">
+                  <div class="h-2.5 rounded-full bg-surface ring-1 ring-rule">
+                    <div
+                      class="h-2.5 rounded-full"
+                      data-testid="average-bar"
+                      :style="{
+                        width: `${averageBarPercent(row.average)}%`,
+                        backgroundColor: categoryColor(row.key),
+                      }"
+                    />
+                  </div>
+                </td>
+                <td
+                  class="whitespace-nowrap px-3 py-3 text-right text-muted tabular-nums sm:px-5"
+                  data-testid="category-window-total"
+                >
+                  {{ formatEuroAmount(row.total) }}
+                </td>
+                <td
+                  class="whitespace-nowrap px-3 py-3 text-right font-bold text-ink tabular-nums sm:px-5"
+                  data-testid="category-average-amount"
+                >
+                  {{ formatEuroAmount(row.average) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <p v-else class="mt-4 text-sm text-muted" data-testid="no-data">
         No category data for these months.

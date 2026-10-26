@@ -69,10 +69,19 @@ export type YearlyCategoryMatrixData = {
   total: string;
 };
 
-export type CategoryMonthlyAverage = {
+export type CategoryMonthlyAverageRow = {
   key: string;
   name: string;
-  amount: string;
+  cells: string[];
+  total: string;
+  average: string;
+  maximum: string;
+};
+
+export type CategoryMonthlyAverageData = {
+  months: CalendarMonth[];
+  rows: CategoryMonthlyAverageRow[];
+  total: string;
 };
 
 type DecimalParts = { coefficient: bigint; scale: number };
@@ -409,38 +418,110 @@ export function averageDecimalString(sum: string, count: number): string {
   return `${negativeResult ? '-' : ''}${integer}.${fraction}`;
 }
 
-export function getCategoryMonthlyAverages(
+export function formatMonthRange(months: CalendarMonth[]): string {
+  const first = months[0];
+  const last = months[months.length - 1];
+  if (first === undefined || last === undefined) {
+    return '';
+  }
+
+  const formatter = new Intl.DateTimeFormat('en', {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  const format = (month: CalendarMonth) => formatter.format(new Date(`${month.startDate}T00:00:00Z`));
+
+  return first.key === last.key ? format(first) : `${format(first)} – ${format(last)}`;
+}
+
+function findMonthIndex(bookingDate: string, months: CalendarMonth[]): number {
+  return months.findIndex(({ startDate, endDate }) =>
+    bookingDate >= startDate && bookingDate <= endDate);
+}
+
+// The exact absolute total of every included transaction inside the rolling
+// window. Hidden categories are excluded first, and the current month stops at
+// today, so future-dated rows in the current month do not contribute.
+export function getWindowAbsoluteTotal(
   transactions: CategorySpendingTransaction[],
   today: string,
   monthCount: number,
-): CategoryMonthlyAverage[] {
+): string {
+  if (!Number.isInteger(monthCount) || monthCount <= 0) {
+    throw new Error('month count must be a positive integer');
+  }
+
   const months = getLastCalendarMonths(today, monthCount);
-  const amountsByKey = new Map<string, { name: string; amounts: string[] }>();
+  return sumAbsoluteAmountStrings(
+    excludeHiddenCategoryTransactions(transactions)
+      .filter(({ bookingDate }) => findMonthIndex(bookingDate, months) !== -1)
+      .map(({ amount }) => amount),
+  );
+}
+
+// One row per represented category over the configured window. Months are
+// oldest first for the trend and the subtitle, while every cell, total, and
+// average stays an exact decimal string. The row maximum is used only to scale
+// the row-relative trend.
+export function createCategoryMonthlyAverageData(
+  transactions: CategorySpendingTransaction[],
+  today: string,
+  monthCount: number,
+): CategoryMonthlyAverageData {
+  if (!Number.isInteger(monthCount) || monthCount <= 0) {
+    throw new Error('month count must be a positive integer');
+  }
+
+  const months = [...getLastCalendarMonths(today, monthCount)].reverse();
+  const groups = new Map<string, { name: string; amountsByMonth: Map<number, string[]> }>();
 
   for (const transaction of excludeHiddenCategoryTransactions(transactions)) {
-    const inWindow = months.some(({ startDate, endDate }) =>
-      transaction.bookingDate >= startDate && transaction.bookingDate <= endDate,
-    );
-    if (!inWindow) {
+    const monthIndex = findMonthIndex(transaction.bookingDate, months);
+    if (monthIndex === -1) {
       continue;
     }
 
     const key = transaction.category === null ? 'uncategorised' : `category:${transaction.category.id}`;
-    let entry = amountsByKey.get(key);
-    if (entry === undefined) {
-      entry = { name: transaction.category?.name ?? 'Uncategorised', amounts: [] };
-      amountsByKey.set(key, entry);
+    let group = groups.get(key);
+    if (group === undefined) {
+      group = { name: transaction.category?.name ?? 'Uncategorised', amountsByMonth: new Map() };
+      groups.set(key, group);
     }
-    entry.amounts.push(transaction.amount);
+
+    const amounts = group.amountsByMonth.get(monthIndex);
+    if (amounts === undefined) {
+      group.amountsByMonth.set(monthIndex, [transaction.amount]);
+    } else {
+      amounts.push(transaction.amount);
+    }
   }
 
-  return [...amountsByKey.entries()]
-    .map(([key, { name, amounts }]) => ({
-      key,
-      name,
-      amount: averageDecimalString(sumAbsoluteAmountStrings(amounts), monthCount),
-    }))
+  const rows = [...groups.entries()]
+    .map(([key, group]) => {
+      const cells = months.map((_, index) =>
+        sumAbsoluteAmountStrings(group.amountsByMonth.get(index) ?? []));
+      const total = sumAbsoluteAmountStrings(cells);
+      const maximum = cells.reduce(
+        (largest, amount) => (compareDecimalStrings(amount, largest) > 0 ? amount : largest),
+        '0',
+      );
+      return {
+        key,
+        name: group.name,
+        cells,
+        total,
+        average: averageDecimalString(total, monthCount),
+        maximum,
+      };
+    })
     .sort(compareCategoryEntries);
+
+  return {
+    months,
+    rows,
+    total: sumAbsoluteAmountStrings(rows.map(({ total }) => total)),
+  };
 }
 
 export function groupTransactionsByAvailableMonth(

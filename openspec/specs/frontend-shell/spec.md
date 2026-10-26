@@ -489,8 +489,10 @@ selected month's total of those absolute amounts, the selected month's included 
 and the eight largest categories plus the remainder used by its stacked bar; the monthly category
 totals table's per-category sums of absolute transaction amounts grouped by booking month for every
 month represented by a transaction returned from the endpoint; and the monthly average page's
-per-category average of absolute transaction amounts over a configurable rolling window of recent
-booking months. The transaction page MAY use category presence to select which returned rows to
+per-category monthly absolute totals within its configurable rolling window of recent booking
+months, each category's exact window total and average, the page-wide average per month for the
+current person and expense-type selection, and the person-scoped recurring and one-time monthly
+averages. The transaction page MAY use category presence to select which returned rows to
 display, but SHALL NOT alter the returned data or evaluate any category's regular expression. The
 monthly category overview, monthly category totals table, and monthly average page MAY group and
 aggregate the transactions returned by their single read request as their capabilities define. The
@@ -517,7 +519,7 @@ derive a value from transaction data for display.
 #### Scenario: Only the filter counts are derived from transactions
 
 - **WHEN** the index route or the monthly route renders its transaction-derived values
-- **THEN** the index route displays only the total returned transaction count and count with a null category, the monthly route displays only the selected month's absolute total, included transaction count, per-category absolute totals, and top-eight grouping defined by its capability, the monthly totals route displays only the per-month category absolute totals defined by its capability for months represented in returned transactions, and the monthly average route displays only the per-category average absolute totals defined by its capability for the configured window
+- **THEN** the index route displays only the total returned transaction count and count with a null category, the monthly route displays only the selected month's absolute total, included transaction count, per-category absolute totals, and top-eight grouping defined by its capability, the monthly totals route displays only the per-month category absolute totals defined by its capability for months represented in returned transactions, and the monthly average route displays only the per-category monthly absolute totals, per-category window totals and averages, current-selection average per month, recurring average per month, and one-time average per month defined by its capability for the configured window
 
 #### Scenario: Filtering does not alter returned values or data
 

@@ -230,6 +230,26 @@ for (const viewport of viewports) {
           }
         }
 
+        if (route.path === '/monthly-average') {
+          await expect(page.getByTestId('monthly-average-subtitle')).toContainText('12 months');
+          await expect(page.getByTestId('monthly-average-filter-panel')).toBeVisible();
+          await expect(page.getByTestId('monthly-average-summary-card')).toHaveCount(3);
+          await expect(page.getByTestId('category-average')).toHaveCount(9);
+          await expect(page.getByTestId('category-average').first().getByTestId('trend-bar')).toHaveCount(12);
+
+          const region = page.getByRole('region', { name: 'Monthly average category table' });
+          await expect(region).toBeVisible();
+
+          if (viewport.width <= 768) {
+            await expect.poll(() => region.evaluate((element) => element.scrollWidth > element.clientWidth))
+              .toBe(true);
+          } else {
+            await expect.poll(() => region.evaluate((element) => element.scrollWidth <= element.clientWidth))
+              .toBe(true);
+          }
+          await expectNoPageOverflow(page);
+        }
+
         if (route.path === '/imports') {
           await expect(page.getByTestId('import-run')).toHaveCount(1);
           await expect(page.getByTestId('import-run-mode')).toHaveText('Non-writing');

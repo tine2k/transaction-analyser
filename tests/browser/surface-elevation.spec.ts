@@ -96,7 +96,7 @@ const routes = [
   { path: '/people', surface: 'people-scroll' },
   { path: '/monthly', surface: 'monthly-summary-card' },
   { path: '/yearly', surface: 'yearly-summary-card' },
-  { path: '/monthly-average', surface: 'monthly-average-list' },
+  { path: '/monthly-average', surface: 'monthly-average-table' },
   { path: '/imports', surface: 'imports-scroll' },
 ] as const;
 

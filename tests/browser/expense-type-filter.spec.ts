@@ -105,18 +105,19 @@ test('the yearly filter narrows the table', async ({ page }) => {
   await expect(page.getByTestId('yearly-row').first()).toContainText('New car');
 });
 
-test('the monthly average filter narrows the list', async ({ page }) => {
+test('the monthly average filter narrows the table', async ({ page }) => {
   await interceptTransactions(page);
   await page.goto('/monthly-average', { waitUntil: 'networkidle' });
 
-  await expect(page.getByTestId('expense-type-all')).toBeChecked();
+  const typeFilter = page.getByTestId('expense-type-filter');
+  await expect(typeFilter).toHaveValue('all');
   await expect(page.getByTestId('category-average')).toHaveCount(3);
 
-  await page.getByTestId('expense-type-recurring').check();
+  await typeFilter.selectOption('recurring');
   await expect(page.getByTestId('category-average')).toHaveCount(1);
   await expect(page.getByTestId('category-average').first()).toContainText('Groceries');
 
-  await page.getByTestId('expense-type-one-time').check();
+  await typeFilter.selectOption('one-time');
   await expect(page.getByTestId('category-average')).toHaveCount(1);
   await expect(page.getByTestId('category-average').first()).toContainText('New car');
 });

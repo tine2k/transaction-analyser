@@ -3,20 +3,22 @@ import {
   CATEGORY_COLOR_PALETTE,
   averageDecimalString,
   createCategoryColorMap,
+  createCategoryMonthlyAverageData,
   createMonthlyCategoryMatrixData,
   createYearlyCategoryMatrixData,
   filterTransactionsByExpenseType,
   filterTransactionsByMonth,
   filterTransactionsByPerson,
   formatEuroAmount,
+  formatMonthRange,
   getAvailableYears,
   getCalendarYearMonths,
   getCategoryBreakdown,
-  getCategoryMonthlyAverages,
   getCategorySharePercent,
   getElapsedMonthsInYear,
   getLastCalendarMonths,
   getPersonChoices,
+  getWindowAbsoluteTotal,
   getYearlyCellTintPercent,
   getYearlyYearOptions,
   groupTransactionsByAvailableMonth,
@@ -285,57 +287,140 @@ describe('monthly category averages', () => {
     expect(() => averageDecimalString('1.00', 0)).toThrow();
   });
 
-  it('averages absolute in-window amounts over the configured months, counting empty months as zero', () => {
-    const averages = getCategoryMonthlyAverages([
+  it('builds oldest-first cells, exact totals, rounded averages, and row maxima', () => {
+    const data = createCategoryMonthlyAverageData([
       { bookingDate: '2026-09-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
       { bookingDate: '2026-08-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-20', amount: '3.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
       { bookingDate: '2020-01-15', amount: '-100.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-02', amount: '-2.00', person: { id: '1', name: 'Default' }, category: null },
-    ], '2026-09-28', 12);
+    ], '2026-09-28', 3);
 
-    expect(averages).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '2.25' },
-      { key: 'uncategorised', name: 'Uncategorised', amount: '0.17' },
+    expect(data.months.map(({ key }) => key)).toEqual(['2026-07', '2026-08', '2026-09']);
+    expect(data.months[0]).toMatchObject({
+      label: 'July 2026',
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+    });
+    expect(data.rows).toEqual([
+      {
+        key: 'category:1',
+        name: 'Groceries',
+        cells: ['0', '12.00', '15.00'],
+        total: '27.00',
+        average: '9.00',
+        maximum: '15.00',
+      },
+      {
+        key: 'uncategorised',
+        name: 'Uncategorised',
+        cells: ['0', '0', '2.00'],
+        total: '2.00',
+        average: '0.67',
+        maximum: '2.00',
+      },
+    ]);
+    expect(data.total).toBe('29.00');
+  });
+
+  it('keeps a single-month window to one cell', () => {
+    const data = createCategoryMonthlyAverageData([
+      { bookingDate: '2026-09-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-09-20', amount: '3.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+      { bookingDate: '2026-08-20', amount: '-100.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+    ], '2026-09-28', 1);
+
+    expect(data.months.map(({ key }) => key)).toEqual(['2026-09']);
+    expect(data.rows).toEqual([
+      {
+        key: 'category:1',
+        name: 'Groceries',
+        cells: ['15.00'],
+        total: '15.00',
+        average: '15.00',
+        maximum: '15.00',
+      },
     ]);
   });
 
-  it('excludes hidden categories from the averages while leaving visible categories unchanged', () => {
-    const averages = getCategoryMonthlyAverages([
+  it('excludes hidden categories while leaving visible categories unchanged', () => {
+    const data = createCategoryMonthlyAverageData([
       { bookingDate: '2026-09-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-02', amount: '-120.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
       { bookingDate: '2026-09-03', amount: '-2.00', person: { id: '1', name: 'Default' }, category: null },
     ], '2026-09-28', 12);
 
-    expect(averages).toEqual([
-      { key: 'category:1', name: 'Groceries', amount: '1.00' },
-      { key: 'uncategorised', name: 'Uncategorised', amount: '0.17' },
+    expect(data.rows.map(({ key, average }) => [key, average])).toEqual([
+      ['category:1', '1.00'],
+      ['uncategorised', '0.17'],
     ]);
+    expect(data.rows.some(({ name }) => name === 'Internal')).toBe(false);
+    expect(data.total).toBe('14.00');
   });
 
   it('excludes transactions outside the window and future dates in the current month', () => {
-    const averages = getCategoryMonthlyAverages([
+    const data = createCategoryMonthlyAverageData([
       { bookingDate: '2025-09-30', amount: '-100.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Too old', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-29', amount: '-100.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Future', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-28', amount: '-6.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Today', hidden: false, expenseType: null } },
     ], '2026-09-28', 12);
 
-    expect(averages).toEqual([
-      { key: 'category:3', name: 'Today', amount: '0.50' },
+    expect(data.rows.map(({ key, average }) => [key, average])).toEqual([
+      ['category:3', '0.50'],
     ]);
+    expect(data.total).toBe('6.00');
   });
 
   it('orders categories by name case-insensitively with identity tie-breaks and uncategorised last', () => {
-    const averages = getCategoryMonthlyAverages([
+    const data = createCategoryMonthlyAverageData([
       { bookingDate: '2026-09-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '10', name: 'alpha', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-02', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Alpha', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-03', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '3', name: 'Zulu', hidden: false, expenseType: null } },
       { bookingDate: '2026-09-04', amount: '-12.00', person: { id: '1', name: 'Default' }, category: null },
     ], '2026-09-28', 12);
 
-    expect(averages.map(({ key }) => key)).toEqual([
+    expect(data.rows.map(({ key }) => key)).toEqual([
       'category:2', 'category:10', 'category:3', 'uncategorised',
     ]);
+  });
+
+  it('rejects a non-positive window', () => {
+    expect(() => createCategoryMonthlyAverageData([], '2026-09-28', 0)).toThrow();
+    expect(() => createCategoryMonthlyAverageData([], '2026-09-28', -1)).toThrow();
+    expect(() => createCategoryMonthlyAverageData([], '2026-09-28', 1.5)).toThrow();
+  });
+});
+
+describe('window totals and month ranges', () => {
+  const transactions: CategorySpendingTransaction[] = [
+    { bookingDate: '2026-07-01', amount: '-5.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+    { bookingDate: '2026-08-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+    { bookingDate: '2026-09-01', amount: '-12.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+    { bookingDate: '2026-09-20', amount: '3.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+    { bookingDate: '2026-09-02', amount: '-2.00', person: { id: '1', name: 'Default' }, category: null },
+    { bookingDate: '2026-09-03', amount: '-120.00', person: { id: '1', name: 'Default' }, category: { id: '2', name: 'Internal', hidden: true, expenseType: null } },
+    { bookingDate: '2020-01-15', amount: '-100.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+    { bookingDate: '2026-09-29', amount: '-100.00', person: { id: '1', name: 'Default' }, category: { id: '1', name: 'Groceries', hidden: false, expenseType: null } },
+  ];
+
+  it('sums only included in-window absolute amounts', () => {
+    expect(getWindowAbsoluteTotal(transactions, '2026-09-28', 1)).toBe('17.00');
+    expect(getWindowAbsoluteTotal(transactions, '2026-09-28', 3)).toBe('34.00');
+    expect(getWindowAbsoluteTotal(transactions, '2026-09-28', 12)).toBe('34.00');
+    expect(() => getWindowAbsoluteTotal(transactions, '2026-09-28', 0)).toThrow();
+  });
+
+  it('formats a single month, a range, and a range across a year boundary', () => {
+    const twelveMonths = [...getLastCalendarMonths('2026-09-28', 12)].reverse();
+    expect(formatMonthRange(twelveMonths)).toBe('Oct 2025 – Sep 2026');
+
+    const oneMonth = getLastCalendarMonths('2026-09-28', 1);
+    expect(formatMonthRange(oneMonth)).toBe('Sep 2026');
+
+    const crossYear = [...getLastCalendarMonths('2026-02-10', 3)].reverse();
+    expect(formatMonthRange(crossYear)).toBe('Dec 2025 – Feb 2026');
+
+    expect(formatMonthRange([])).toBe('');
   });
 });
 

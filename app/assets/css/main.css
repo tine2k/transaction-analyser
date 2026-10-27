@@ -77,7 +77,9 @@
 }
 
 /* The shared menu bar's brand ground, kept here so the gradient resolves from
-   the palette tokens rather than a per-screen value. */
+   the palette tokens rather than a per-screen value. The top padding lets an
+   installed app paint the gradient through the status-bar area; the custom
+   properties are unset in production and are set by tests to simulate a device. */
 .brand-bar {
   background-image: linear-gradient(
     100deg,
@@ -85,6 +87,46 @@
     var(--color-brand-bar-via) 52%,
     var(--color-brand-bar-to)
   );
+  padding-top: var(--safe-area-top, env(safe-area-inset-top, 0px));
+}
+
+/* The shared frame keeps its existing 16px/40px horizontal and 32px/64px
+   bottom padding when no device inset is present, and grows only when a notch
+   or the home indicator needs the room. */
+.frame-safe-inline {
+  padding-left: max(1rem, var(--safe-area-left, env(safe-area-inset-left, 0px)));
+  padding-right: max(1rem, var(--safe-area-right, env(safe-area-inset-right, 0px)));
+}
+
+.frame-safe-bottom {
+  padding-bottom: max(2rem, var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+/* The fixed transaction bars keep their white surface through the bottom inset
+   while their controls stay above it. */
+.fixed-bar-safe {
+  padding-bottom: calc(0.75rem + var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+/* The Transactions page reserve for one or two fixed bars follows the same
+   inset, so the added bar height does not reduce its existing scroll clearance. */
+.with-one-bottom-bar {
+  padding-bottom: calc(7rem + var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+.with-two-bottom-bars {
+  padding-bottom: calc(14rem + var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+@media (min-width: 40rem) {
+  .frame-safe-inline {
+    padding-left: max(2.5rem, var(--safe-area-left, env(safe-area-inset-left, 0px)));
+    padding-right: max(2.5rem, var(--safe-area-right, env(safe-area-inset-right, 0px)));
+  }
+
+  .frame-safe-bottom {
+    padding-bottom: max(4rem, var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+  }
 }
 
 /* The Yearly matrix is the one place where a cell background encodes magnitude.

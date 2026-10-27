@@ -14,8 +14,14 @@
 // padding, not a centered maximum-width column, keeps content off the edge. Screens
 // that need a readable measure bound their own forms rather than the shared frame.
 //
+// The frame also owns the phone's safe areas: the brand bar paints the top inset,
+// the header and main inset their content from a landscape notch, and main clears
+// the home indicator. A browser tab supplies zero insets, leaving the existing
+// phone and desktop padding unchanged.
+//
 // See openspec/changes/reorganise-navigation/specs/frontend-shell/spec.md
 // and openspec/changes/reorganise-navigation/specs/manage-hub/spec.md
+// and openspec/changes/remove-mobile-top-white-band/design.md D4-D6.
 import { IconMenu2, IconX } from '@tabler/icons-vue';
 
 type Screen = {
@@ -84,7 +90,7 @@ watch(() => route.path, () => {
 <template>
   <div class="min-h-screen text-ink">
     <header class="brand-bar">
-      <div class="px-4 pb-3 pt-3.5 sm:px-10 sm:py-3.5">
+      <div class="frame-safe-inline px-4 pb-3 pt-3.5 sm:px-10 sm:py-3.5">
         <div class="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-start md:gap-6">
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-2.5">
@@ -131,7 +137,7 @@ watch(() => route.path, () => {
       </div>
     </header>
 
-    <main class="w-full min-w-0 px-4 py-5 pb-8 sm:px-10 sm:py-8 sm:pb-16">
+    <main class="frame-safe-inline frame-safe-bottom w-full min-w-0 px-4 py-5 pb-8 sm:px-10 sm:py-8 sm:pb-16">
       <slot />
     </main>
   </div>

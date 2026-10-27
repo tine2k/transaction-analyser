@@ -878,7 +878,7 @@ describe('API integration', () => {
     expect(image[25]).toBe(2);
   });
 
-  it('delivers the icon, manifest, and label in the application shell', async () => {
+  it('delivers the icon, manifest, label, and install metadata in the application shell', async () => {
     const response = await request('/');
 
     expect(response.status).toBe(200);
@@ -895,14 +895,27 @@ describe('API integration', () => {
       'href="/apple-touch-icon.png"',
       'rel="manifest"',
       'href="/site.webmanifest"',
-      'name="apple-mobile-web-app-title"',
-      'content="Expenses"',
     ]) {
       expect(head).toContain(marker);
     }
+
+    const metaContent = (name: string): string | undefined => {
+      const tags = head.match(/<meta\b[^>]*>/g) ?? [];
+      const tag = tags.find((entry) => entry.includes(`name="${name}"`));
+      return tag === undefined ? undefined : /content="([^"]*)"/.exec(tag)?.[1];
+    };
+
+    const viewportTags = head.match(/<meta\b[^>]*name="viewport"[^>]*>/g) ?? [];
+    expect(viewportTags).toHaveLength(1);
+    expect(viewportTags[0]).toContain('viewport-fit=cover');
+    expect(metaContent('theme-color')).toBe('#101B5D');
+    expect(metaContent('mobile-web-app-capable')).toBe('yes');
+    expect(metaContent('apple-mobile-web-app-capable')).toBe('yes');
+    expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('black-translucent');
+    expect(metaContent('apple-mobile-web-app-title')).toBe('Expenses');
   });
 
-  it('serves a manifest naming the application whose icons resolve', async () => {
+  it('serves a manifest naming the application, its icons, and its launch surface', async () => {
     const response = await request('/site.webmanifest');
 
     expect(response.status).toBe(200);
@@ -912,13 +925,18 @@ describe('API integration', () => {
       name?: string;
       short_name?: string;
       display?: string;
+      theme_color?: string;
+      background_color?: string;
       icons?: Array<{ src: string; sizes: string; type: string }>;
     };
 
     expect(manifest.name).toBe('Expenses');
     expect(manifest.short_name).toBe('Expenses');
-    // Omitted display means `browser`: an added shortcut keeps the normal launch.
-    expect(manifest.display).toBeUndefined();
+    // A standalone display launches an installed shortcut without browser chrome.
+    expect(manifest.display).toBe('standalone');
+    // The top surface follows the brand bar; the launch splash stays on the page ground.
+    expect(manifest.theme_color).toBe('#101B5D');
+    expect(manifest.background_color).toBe('#E9E7F5');
 
     const sizes = (manifest.icons ?? []).map(({ sizes: entry }) => entry);
     expect(sizes).toEqual(expect.arrayContaining(['192x192', '512x512']));

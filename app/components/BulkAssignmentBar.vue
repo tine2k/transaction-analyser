@@ -39,7 +39,7 @@ function apply(): void {
 <template>
   <div
     data-testid="bulk-assignment-bar"
-    class="border-t border-rule-strong bg-surface px-4 py-3 shadow-[0_-2px_8px_rgba(32,30,62,0.10)]"
+    class="fixed-bar-safe border-t border-rule-strong bg-surface px-4 py-3 shadow-[0_-2px_8px_rgba(32,30,62,0.10)]"
   >
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
       <p class="min-w-0 flex-1 text-sm text-muted" data-testid="bulk-assignment-count">

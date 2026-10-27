@@ -1290,7 +1290,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="text-sm"
-    :class="{ 'pb-28': bottomBarsVisible === 1, 'pb-56': bottomBarsVisible === 2 }"
+    :class="{ 'with-one-bottom-bar': bottomBarsVisible === 1, 'with-two-bottom-bars': bottomBarsVisible === 2 }"
   >
     <h1 class="font-display text-[28px] font-extrabold tracking-[-0.02em] text-ink sm:text-[34px]">Transactions</h1>
 

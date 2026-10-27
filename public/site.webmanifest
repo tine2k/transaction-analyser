@@ -3,7 +3,8 @@
   "short_name": "Expenses",
   "start_url": "/",
   "scope": "/",
-  "theme_color": "#E9E7F5",
+  "display": "standalone",
+  "theme_color": "#101B5D",
   "background_color": "#E9E7F5",
   "icons": [
     {

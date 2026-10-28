@@ -356,6 +356,32 @@ for (const viewport of viewports) {
         const toggle = page.getByTestId('mobile-navigation-toggle');
 
         await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+        const masthead = await page.evaluate(() => {
+          const headerInner = document.querySelector('header > div') as HTMLElement;
+          const toggleElement = document.querySelector('[data-testid="mobile-navigation-toggle"]') as HTMLElement;
+          const mark = document.querySelector('[data-testid="application-logo"]') as SVGSVGElement;
+          const wordmark = document.querySelector('header p') as HTMLElement;
+          const toggleBox = toggleElement.getBoundingClientRect();
+          const markBox = mark.getBoundingClientRect();
+          const wordmarkBox = wordmark.getBoundingClientRect();
+          return {
+            contentLeft: headerInner.getBoundingClientRect().left
+              + Number.parseFloat(window.getComputedStyle(headerInner).paddingLeft),
+            toggleLeft: toggleBox.left,
+            toggleRight: toggleBox.right,
+            markLeft: markBox.left,
+            markRight: markBox.right,
+            wordmarkLeft: wordmarkBox.left,
+            togglePosition: Array.from(toggleElement.parentElement?.children ?? []).indexOf(toggleElement),
+          };
+        });
+
+        expect(masthead.toggleLeft).toBeCloseTo(masthead.contentLeft, 0);
+        expect(masthead.toggleRight).toBeLessThanOrEqual(masthead.markLeft);
+        expect(masthead.wordmarkLeft - masthead.markRight).toBeCloseTo(10, 0);
+        expect(masthead.togglePosition).toBe(0);
+
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-expanded', 'true');
         await expect(page.locator('#screen-navigation a')).toHaveCount(5);
@@ -374,6 +400,21 @@ for (const viewport of viewports) {
       test('wide navigation keeps all destinations directly visible', async ({ page }) => {
         await interceptApi(page);
         await page.goto('/');
+        await expect(page.getByTestId('mobile-navigation-toggle')).toBeHidden();
+        await expect(page.getByTestId('application-logo')).toBeVisible();
+
+        const headerInner = page.locator('header > div').first();
+        const mark = page.getByTestId('application-logo');
+        const headerBox = await headerInner.boundingBox();
+        const markBox = await mark.boundingBox();
+        const paddingLeft = await headerInner.evaluate(
+          (element) => Number.parseFloat(window.getComputedStyle(element).paddingLeft),
+        );
+
+        expect(headerBox).not.toBeNull();
+        expect(markBox).not.toBeNull();
+        expect(markBox!.x).toBeCloseTo(headerBox!.x + paddingLeft, 0);
+
         const links = page.locator('#screen-navigation a');
         await expect(links).toHaveCount(5);
         await expect(links.first()).toBeVisible();

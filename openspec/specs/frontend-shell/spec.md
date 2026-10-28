@@ -712,7 +712,7 @@ derive a value from transaction data for display.
 
 ### Requirement: The menu bar carries the application's identity and the current screen
 
-The shared menu bar SHALL present the application's logo mark immediately to the left of the application name `Expenses`, and one visibly labelled link for each of the five bar destinations: Transactions, Monthly, Yearly, Monthly average, and Manage. The mark SHALL be decorative: it SHALL NOT be a link or a control, SHALL NOT carry an accessible name of its own, and SHALL NOT change the name a screen reader reads for the application. The current destination SHALL be distinguishable without relying on colour alone, with Manage standing in for the manage hub and the category, people, and import screens. The bar SHALL NOT introduce a destination beyond the five. On narrow viewports the bar SHALL keep a labelled disclosure control for the same five links and SHALL keep the mark beside the name.
+The shared menu bar SHALL present the application's logo mark immediately to the left of the application name `Expenses`, and one visibly labelled link for each of the five bar destinations: Transactions, Monthly, Yearly, Monthly average, and Manage. The mark SHALL be decorative: it SHALL NOT be a link or a control, SHALL NOT carry an accessible name of its own, and SHALL NOT change the name a screen reader reads for the application. The current destination SHALL be distinguishable without relying on colour alone, with Manage standing in for the manage hub and the category, people, and import screens. The bar SHALL NOT introduce a destination beyond the five. On narrow viewports the bar SHALL keep a labelled disclosure control for the same five links and SHALL keep the mark beside the name. On narrow viewports that disclosure control SHALL be the leading item of the masthead, placed before the mark and the name, while the mark remains immediately left of the name.
 
 #### Scenario: The bar names the application
 
@@ -748,6 +748,16 @@ The shared menu bar SHALL present the application's logo mark immediately to the
 
 - **WHEN** the menu bar is rendered at a narrow viewport width
 - **THEN** the labelled disclosure control remains available, exposes the same five links, and keeps its expanded state available to assistive technology
+
+#### Scenario: The disclosure control leads the narrow-viewport masthead
+
+- **WHEN** the menu bar is rendered at a narrow viewport width
+- **THEN** the disclosure control is the first item in the masthead and sits at its leading edge, before the logo mark and the `Expenses` wordmark, and the mark remains immediately left of the name
+
+#### Scenario: The wide-screen masthead keeps its order
+
+- **WHEN** the menu bar is rendered at a wide viewport width
+- **THEN** no disclosure control is shown, the mark and name stay at the leading edge, and the five bar links remain directly visible
 
 ### Requirement: The shared masthead uses the design's type and size scale
 

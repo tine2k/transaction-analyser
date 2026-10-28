@@ -15,6 +15,8 @@ describe('default layout navigation', () => {
     const header = wrapper.get('header');
     const wordmark = header.get('p');
     const logo = header.get('svg[data-testid="application-logo"]');
+    const toggle = header.get('[data-testid="mobile-navigation-toggle"]');
+    const brand = logo.element.parentElement;
 
     expect(wordmark.text()).toBe('Expenses');
     expect(header.classes()).toContain('brand-bar');
@@ -25,6 +27,8 @@ describe('default layout navigation', () => {
     expect(logo.find('title').exists()).toBe(false);
     expect(logo.text()).toBe('');
     expect(wordmark.element.previousElementSibling).toBe(logo.element);
+    expect(toggle.element.parentElement?.firstElementChild).toBe(toggle.element);
+    expect(toggle.element.nextElementSibling).toBe(brand);
     expect(logo.element.closest('a')).toBeNull();
     expect(header.findAll('a')).toHaveLength(5);
     expect(header.findAll('button')).toHaveLength(1);

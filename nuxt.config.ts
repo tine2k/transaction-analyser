@@ -23,9 +23,12 @@ export default defineNuxtConfig({
   // with ssr disabled the layout runs only after the client application boots, and the
   // icon and manifest must already be in the document a browser is asked to install.
   // The manifest declares a standalone display, so an installed shortcut launches
-  // without browser chrome; the iOS metadata repeats that launch mode and makes the
-  // status bar translucent so the brand bar can paint through the top safe area.
-  // See openspec/changes/remove-mobile-top-white-band/design.md D1-D3.
+  // without browser chrome; the iOS metadata repeats that launch mode and asks for
+  // the platform's default status bar, which iOS draws as its own band above the
+  // brand bar. The brand bar's top safe-area padding stays for launch modes that
+  // report a top inset.
+  // See openspec/changes/remove-mobile-top-white-band/design.md D1-D3 and
+  // openspec/changes/set-default-status-bar-style/design.md D1-D3.
   app: {
     head: {
       viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
@@ -40,7 +43,7 @@ export default defineNuxtConfig({
         { name: 'theme-color', content: '#101B5D' },
         { name: 'mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
-        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
       ],
     },
   },

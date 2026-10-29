@@ -911,7 +911,7 @@ describe('API integration', () => {
     expect(metaContent('theme-color')).toBe('#101B5D');
     expect(metaContent('mobile-web-app-capable')).toBe('yes');
     expect(metaContent('apple-mobile-web-app-capable')).toBe('yes');
-    expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('black-translucent');
+    expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('default');
     expect(metaContent('apple-mobile-web-app-title')).toBe('Expenses');
   });
 

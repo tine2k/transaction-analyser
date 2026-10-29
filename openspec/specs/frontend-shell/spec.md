@@ -68,8 +68,8 @@ The system SHALL serve an installable identity from its own origin: an opaque 18
 `/apple-touch-icon.png`, and a web app manifest at `/site.webmanifest` that names the application,
 references 192×192 and 512×512 PNG icons, sets the brand bar's start colour as the theme colour,
 sets the paper ground as the background colour, and declares a standalone display. The document
-SHALL link both, and SHALL declare the application capable of a standalone launch with a
-translucent status bar. The icon artwork SHALL be the application's four-wedge logo mark on a
+SHALL link both, and SHALL declare the application capable of a standalone launch with the
+default status bar style. The icon artwork SHALL be the application's four-wedge logo mark on a
 full-bleed brand-gradient ground.
 
 #### Scenario: A home screen shows the application's own icon and label
@@ -90,7 +90,7 @@ full-bleed brand-gradient ground.
 #### Scenario: An installed shortcut launches without browser chrome
 
 - **WHEN** the manifest and the delivered document are read
-- **THEN** the manifest declares a standalone display, and the document declares the mobile-web-app capability, the Apple mobile-web-app capability, and a translucent Apple status bar
+- **THEN** the manifest declares a standalone display, and the document declares the mobile-web-app capability, the Apple mobile-web-app capability, and an `apple-mobile-web-app-status-bar-style` metadata value of `default`
 
 #### Scenario: An installed shortcut keeps the browser launch
 

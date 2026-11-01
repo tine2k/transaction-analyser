@@ -362,17 +362,24 @@ for (const viewport of viewports) {
           const toggleElement = document.querySelector('[data-testid="mobile-navigation-toggle"]') as HTMLElement;
           const mark = document.querySelector('[data-testid="application-logo"]') as SVGSVGElement;
           const wordmark = document.querySelector('header p') as HTMLElement;
+          const brandGroup = mark.parentElement as HTMLElement;
+          const innerBox = headerInner.getBoundingClientRect();
+          const style = window.getComputedStyle(headerInner);
+          const contentLeft = innerBox.left + Number.parseFloat(style.paddingLeft);
+          const contentRight = innerBox.right - Number.parseFloat(style.paddingRight);
           const toggleBox = toggleElement.getBoundingClientRect();
           const markBox = mark.getBoundingClientRect();
           const wordmarkBox = wordmark.getBoundingClientRect();
+          const brandBox = brandGroup.getBoundingClientRect();
           return {
-            contentLeft: headerInner.getBoundingClientRect().left
-              + Number.parseFloat(window.getComputedStyle(headerInner).paddingLeft),
+            contentLeft,
+            contentMid: (contentLeft + contentRight) / 2,
             toggleLeft: toggleBox.left,
             toggleRight: toggleBox.right,
             markLeft: markBox.left,
             markRight: markBox.right,
             wordmarkLeft: wordmarkBox.left,
+            brandMid: (brandBox.left + brandBox.right) / 2,
             togglePosition: Array.from(toggleElement.parentElement?.children ?? []).indexOf(toggleElement),
           };
         });
@@ -381,10 +388,30 @@ for (const viewport of viewports) {
         expect(masthead.toggleRight).toBeLessThanOrEqual(masthead.markLeft);
         expect(masthead.wordmarkLeft - masthead.markRight).toBeCloseTo(10, 0);
         expect(masthead.togglePosition).toBe(0);
+        expect(masthead.brandMid, 'the collapsed brand group is centred on the content line')
+          .toBeCloseTo(masthead.contentMid, 0);
 
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-expanded', 'true');
         await expect(page.locator('#screen-navigation a')).toHaveCount(5);
+
+        const expanded = await page.evaluate(() => {
+          const headerInner = document.querySelector('header > div') as HTMLElement;
+          const brandGroup = (document.querySelector('[data-testid="application-logo"]') as SVGSVGElement)
+            .parentElement as HTMLElement;
+          const innerBox = headerInner.getBoundingClientRect();
+          const style = window.getComputedStyle(headerInner);
+          const contentLeft = innerBox.left + Number.parseFloat(style.paddingLeft);
+          const contentRight = innerBox.right - Number.parseFloat(style.paddingRight);
+          const brandBox = brandGroup.getBoundingClientRect();
+          return {
+            contentMid: (contentLeft + contentRight) / 2,
+            brandMid: (brandBox.left + brandBox.right) / 2,
+          };
+        });
+
+        expect(expanded.brandMid, 'expanding the navigation keeps the brand group centred')
+          .toBeCloseTo(expanded.contentMid, 0);
         await expectPhoneControlsToBeTouchSized(page);
         await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Manage', exact: true }).click();
         await expect(page).toHaveURL(/\/manage$/);

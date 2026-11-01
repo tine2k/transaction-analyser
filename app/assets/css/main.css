@@ -201,10 +201,15 @@
   box-shadow: -1px 0 0 var(--color-rule);
 }
 
-/* Intentional wide-table overflow is handled by each table's own scroll region. */
+/* Intentional wide-table overflow is handled by each table's own scroll region.
+   `clip` rather than `hidden`: hidden would make the root a scroll container and
+   the sticky masthead would scroll away with the page. */
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
+  /* A sticky bar can sit over content scrolled into view, so a focused control
+     clears the collapsed bar instead of landing behind it. */
+  scroll-padding-top: calc(5rem + var(--safe-area-top, env(safe-area-inset-top, 0px)));
 }
 
 body {

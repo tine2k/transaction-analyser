@@ -89,10 +89,10 @@ watch(() => route.path, () => {
 
 <template>
   <div class="min-h-screen text-ink">
-    <header class="brand-bar">
+    <header class="brand-bar sticky top-0 z-40">
       <div class="frame-safe-inline px-4 pb-3 pt-3.5 sm:px-10 sm:py-3.5">
         <div class="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-start md:gap-6">
-          <div class="flex items-center gap-4">
+          <div class="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-4 md:flex md:gap-4">
             <button
               type="button"
               class="inline-flex size-11 items-center justify-center rounded-sheet border border-white/40 bg-white/10 text-white hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:hidden"
@@ -104,17 +104,18 @@ watch(() => route.path, () => {
             >
               <AppIcon :icon="mobileNavOpen ? IconX : IconMenu2" />
             </button>
-            <div class="flex items-center gap-2.5">
+            <div class="flex items-center gap-2.5 justify-self-center">
               <AppLogo :size="30" />
               <p class="font-display text-xl font-extrabold tracking-normal text-white md:tracking-[-0.02em]">
                 Expenses
               </p>
             </div>
+            <span aria-hidden="true" data-testid="brand-row-spacer" class="md:hidden"></span>
           </div>
           <nav
             id="screen-navigation"
             aria-label="Screens"
-            class="flex-col gap-1 md:flex md:flex-row md:flex-wrap md:items-center md:justify-start md:gap-1"
+            class="max-h-[calc(100dvh-7rem)] flex-col gap-1 overflow-y-auto md:flex md:max-h-none md:flex-row md:flex-wrap md:items-center md:justify-start md:gap-1 md:overflow-visible"
             :class="mobileNavOpen ? 'flex' : 'hidden md:flex'"
           >
             <NuxtLink

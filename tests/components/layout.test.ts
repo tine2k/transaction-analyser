@@ -30,6 +30,25 @@ describe('default layout navigation', () => {
     expect(toggle.element.parentElement?.firstElementChild).toBe(toggle.element);
     expect(toggle.element.nextElementSibling).toBe(brand);
     expect(logo.element.closest('a')).toBeNull();
+
+    // The narrow row is a symmetric three-column grid so the brand group's midpoint
+    // is the row's midpoint, with the disclosure control first and a matching
+    // trailing spacer that disappears at md.
+    const brandRow = toggle.element.parentElement as HTMLElement;
+    expect(brandRow.classList).toContain('grid');
+    expect(brandRow.classList).toContain('grid-cols-[44px_minmax(0,1fr)_44px]');
+    expect(brandRow.classList).toContain('gap-4');
+    expect(brandRow.classList).toContain('md:flex');
+    expect(brandRow.children).toHaveLength(3);
+    expect(brandRow.children[0]).toBe(toggle.element);
+    expect(brandRow.children[1]).toBe(brand);
+    expect(brand.className).toContain('justify-self-center');
+
+    const spacer = wrapper.get('[data-testid="brand-row-spacer"]');
+    expect(brandRow.lastElementChild).toBe(spacer.element);
+    expect(spacer.attributes('aria-hidden')).toBe('true');
+    expect(spacer.classes()).toContain('md:hidden');
+
     expect(header.findAll('a')).toHaveLength(5);
     expect(header.findAll('button')).toHaveLength(1);
     expect(header.text().match(/Expenses/g)).toHaveLength(1);

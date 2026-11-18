@@ -43,9 +43,10 @@
 
 /* The theme's design tokens. Every template value resolves to one of these
    roles: the paper ground, the surface sheets, ink and muted text, rules, the
-   brand and failure colours, the interface and machine faces, the sheet,
-   panel, control, and pill radii, and the resting sheet elevation. The brand
-   role covers the shared menu bar, primary actions, and selection controls. */
+   brand and failure colours, the transaction amount direction colours, the
+   interface and machine faces, the sheet, panel, control, and pill radii, and
+   the resting sheet elevation. The brand role covers the shared menu bar,
+   primary actions, and selection controls. */
 @theme {
   --color-paper: #e9e7f5;
   --color-surface: #ffffff;
@@ -56,6 +57,8 @@
   --color-rule-strong: #d5d2e3;
   --color-neutral-strong: #8a87a0;
   --color-failure: #a63a2e;
+  --color-amount-positive: #0b5132;
+  --color-amount-negative: #8a1428;
   --color-brand: #2e3fc1;
   --color-brand-strong: #1b2a8a;
   --color-brand-soft: #e9e8ff;

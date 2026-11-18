@@ -174,7 +174,7 @@ test.describe('phone transactions cards', () => {
     expect(metrics.purposeWeight).toBe('700');
     expect(metrics.amountSize).toBe('15px');
     expect(metrics.amountWeight).toBe('800');
-    expect(metrics.amountColor).toBe('rgb(32, 30, 62)');
+    expect(metrics.amountColor).toBe('rgb(138, 20, 40)');
     expect(metrics.metaSize).toBe('12px');
     expect(metrics.pillSize).toBe('12px');
     expect(metrics.pillWeight).toBe('700');

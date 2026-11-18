@@ -4,6 +4,7 @@ import {
   createCategoryColorMap,
   formatEuroAmount,
   getCategoryColorFamily,
+  isZeroAmountString,
   sumSignedAmountStrings,
   CATEGORY_COLOR_PALETTE,
 } from '../utils/category-spending';
@@ -568,6 +569,27 @@ function categoryPillStyle(category: Category | null): Record<string, string> {
     borderColor: `color-mix(in srgb, ${family.ink} 15%, ${family.tint})`,
     color: family.ink,
   };
+}
+
+// The amount's direction is read from the returned string, never from a number:
+// the sign states the money movement and the digits are the stored value. Zero
+// is neither income nor spending, so it keeps the ink colour.
+function amountTone(amount: string): 'negative' | 'positive' | 'zero' {
+  if (isZeroAmountString(amount)) {
+    return 'zero';
+  }
+  return amount.trim().startsWith('-') ? 'negative' : 'positive';
+}
+
+function amountColorClass(amount: string): string {
+  const tone = amountTone(amount);
+  if (tone === 'negative') {
+    return 'text-amount-negative';
+  }
+  if (tone === 'positive') {
+    return 'text-amount-positive';
+  }
+  return 'text-ink';
 }
 
 // The descriptive text is normalised once per loaded response, so applying a
@@ -1533,7 +1555,8 @@ onBeforeUnmount(() => {
                 >{{ transaction.purpose }}</span>
                 <span
                   data-transaction-field="amount"
-                  class="shrink-0 whitespace-nowrap text-[15px] font-extrabold tabular-nums text-ink"
+                  class="shrink-0 whitespace-nowrap text-[15px] font-extrabold tabular-nums"
+                  :class="amountColorClass(transaction.amount)"
                 >{{ transaction.amount }}</span>
               </div>
             </div>
@@ -1757,7 +1780,10 @@ onBeforeUnmount(() => {
                     </span>
                     <span v-if="markers.has(transaction.id)" class="sr-only">Updating category</span>
                   </td>
-                  <td class="whitespace-nowrap px-2 py-[13px] text-right font-bold tabular-nums text-ink">{{ transaction.amount }}</td>
+                  <td
+                    class="whitespace-nowrap px-2 py-[13px] text-right font-bold tabular-nums"
+                    :class="amountColorClass(transaction.amount)"
+                  >{{ transaction.amount }}</td>
                 </tr>
               </tbody>
             </table>

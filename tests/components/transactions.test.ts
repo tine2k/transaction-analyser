@@ -878,6 +878,89 @@ describe('transaction sorting', () => {
   });
 });
 
+describe('transaction amount colour', () => {
+  const amountTransactions: TestTransaction[] = [
+    {
+      id: 'neg', bookingDate: '2026-02-10', valueDate: '2026-02-10', amount: '-12.50',
+      purpose: 'Weekly shop', counterpartyName: 'Market', counterpartyAccount: null,
+      categoryAssignment: 'automatic',
+      category: { id: '1', name: 'Groceries', hidden: false },
+    },
+    {
+      id: 'pos', bookingDate: '2026-02-11', valueDate: '2026-02-11', amount: '250.00',
+      purpose: 'Salary', counterpartyName: 'Employer', counterpartyAccount: null,
+      categoryAssignment: 'automatic',
+      category: { id: '1', name: 'Groceries', hidden: false },
+    },
+    {
+      id: 'zero', bookingDate: '2026-02-12', valueDate: '2026-02-12', amount: '0.00',
+      purpose: 'Refund offset', counterpartyName: 'Shop', counterpartyAccount: null,
+      categoryAssignment: 'automatic',
+      category: { id: '1', name: 'Groceries', hidden: false },
+    },
+  ];
+
+  beforeEach(() => {
+    mocks.useFetch.mockReset();
+    mocks.fetch.mockReset();
+    mocks.useFetch.mockImplementation((url: unknown) =>
+      url === '/api/transactions' ? transactionsResponse(amountTransactions) : categoriesResponse());
+  });
+
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) {
+      wrapper.unmount();
+    }
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('colours the table amount by direction and leaves its text exact', async () => {
+    const wrapper = await mountTransactions();
+
+    const negative = wrapper.get('[data-transaction-id="neg"] td:last-child');
+    expect(negative.text()).toBe('-12.50');
+    expect(negative.classes()).toContain('text-amount-negative');
+    expect(negative.classes()).not.toContain('text-amount-positive');
+    expect(negative.classes()).not.toContain('text-ink');
+
+    const positive = wrapper.get('[data-transaction-id="pos"] td:last-child');
+    expect(positive.text()).toBe('250.00');
+    expect(positive.classes()).toContain('text-amount-positive');
+    expect(positive.classes()).not.toContain('text-amount-negative');
+
+    const zero = wrapper.get('[data-transaction-id="zero"] td:last-child');
+    expect(zero.text()).toBe('0.00');
+    expect(zero.classes()).toContain('text-ink');
+    expect(zero.classes()).not.toContain('text-amount-negative');
+    expect(zero.classes()).not.toContain('text-amount-positive');
+  });
+
+  it('colours the phone card amount by direction and leaves its text exact', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })));
+    const wrapper = await mountTransactions();
+
+    const amountOf = (id: string) =>
+      wrapper.get(`[data-transaction-id="${id}"] [data-transaction-field="amount"]`);
+
+    expect(amountOf('neg').text()).toBe('-12.50');
+    expect(amountOf('neg').classes()).toContain('text-amount-negative');
+
+    expect(amountOf('pos').text()).toBe('250.00');
+    expect(amountOf('pos').classes()).toContain('text-amount-positive');
+
+    expect(amountOf('zero').text()).toBe('0.00');
+    expect(amountOf('zero').classes()).toContain('text-ink');
+    expect(amountOf('zero').classes()).not.toContain('text-amount-negative');
+    expect(amountOf('zero').classes()).not.toContain('text-amount-positive');
+  });
+});
+
 describe('transaction pattern shortcut', () => {
   beforeEach(() => {
     mocks.useFetch.mockReset();
